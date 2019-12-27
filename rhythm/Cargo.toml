@@ -1,0 +1,21 @@
+[package]
+name = "rhythm"
+version = "0.1.0"
+authors = ["Joshua Netterfield <joshua@nettek.ca>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+[dependencies.num-rational]
+version = "0.2.2"
+default-features = false
+
+[dependencies.num-traits]
+version = "0.2.10"
+default-features = false
+
+[dependencies.num-integer]
+version = "0.1.41"
+default-features = false
