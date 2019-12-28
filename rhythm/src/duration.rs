@@ -130,15 +130,21 @@ impl Duration {
     /// duration.
     ///
     /// This will return None if the duration cannot be printed.
-    pub fn exact(display: Rational, tuplet: Option<Rational>) -> Option<Duration> {
+    pub fn exact(display: Rational, tuplet: Option<Rational>) -> Duration {
         let maybe_valid = Duration {
             display,
             tuplet: tuplet.unwrap_or_else(Rational::one),
         };
-        maybe_valid._duration_display_base()?;
-        maybe_valid._display_dots()?;
 
-        Some(maybe_valid)
+        (maybe_valid)
+    }
+
+    /// Return whether this is a valid duration for a single note.
+    ///
+    /// A valid duration has a base type between a 1/256th note and a maxima note and at most 3
+    /// dots.
+    pub fn printable(&self) -> bool {
+        self.duration_display_base().is_some() && self.display_dots().is_some()
     }
 
     /// A multiplier which converts the true duration into how it is displayed.
@@ -161,7 +167,8 @@ impl Duration {
         self.display
     }
 
-    fn _duration_display_base(&self) -> Option<NoteValue> {
+    /// The kind of note this will be rendered as.
+    fn duration_display_base(&self) -> Option<NoteValue> {
         match self.display_duration().to_f64().log2().floor() as isize {
             3 => Some(NoteValue::DoubleWhole),
             2 => Some(NoteValue::DoubleWhole),
@@ -179,14 +186,10 @@ impl Duration {
         }
     }
 
-    /// The kind of note this will be rendered as.
-    pub fn duration_display_base(&self) -> NoteValue {
-        self._duration_display_base().expect("Invalid Duration")
-    }
-
-    fn _display_dots(&self) -> Option<usize> {
+    /// The number of dots that will be rendered.
+    fn display_dots(&self) -> Option<usize> {
         let len = self.display_duration();
-        let base = self.duration_display_base().count();
+        let base = self.duration_display_base()?.count();
         let mut dots: usize = 0;
         let mut len_with_dots = base;
         while len_with_dots < len && dots <= MAX_DOTS.into() {
@@ -200,11 +203,6 @@ impl Duration {
 
         Some(dots)
     }
-
-    /// The number of dots that will be rendered.
-    pub fn display_dots(&self) -> usize {
-        self._display_dots().unwrap()
-    }
 }
 
 #[cfg(test)]
@@ -215,8 +213,8 @@ mod event_rhythm_tests {
     #[test]
     fn half_note() {
         let er = Duration::new(NoteValue::Half, 0, None);
-        assert_eq!(er.duration_display_base(), NoteValue::Half);
-        assert_eq!(er.display_dots(), 0);
+        assert_eq!(er.duration_display_base(), Some(NoteValue::Half));
+        assert_eq!(er.display_dots(), Some(0));
         assert_eq!(er.tuplet(), 1.into());
         assert_eq!(er.duration(), Rational::new(1, 2));
         assert_eq!(er.display_duration(), Rational::new(1, 2));
@@ -225,8 +223,8 @@ mod event_rhythm_tests {
     #[test]
     fn dotted_double_whole_note() {
         let er = Duration::new(NoteValue::DoubleWhole, 1, None);
-        assert_eq!(er.duration_display_base(), NoteValue::DoubleWhole);
-        assert_eq!(er.display_dots(), 1);
+        assert_eq!(er.duration_display_base(), Some(NoteValue::DoubleWhole));
+        assert_eq!(er.display_dots(), Some(1));
         assert_eq!(er.tuplet(), 1.into());
         assert_eq!(er.duration(), Rational::from_integer(3));
         assert_eq!(er.display_duration(), Rational::from_integer(3));
@@ -235,8 +233,8 @@ mod event_rhythm_tests {
     #[test]
     fn double_dotted_sixteenth_note() {
         let er = Duration::new(NoteValue::Sixteenth, 2, None);
-        assert_eq!(er.duration_display_base(), NoteValue::Sixteenth);
-        assert_eq!(er.display_dots(), 2);
+        assert_eq!(er.duration_display_base(), Some(NoteValue::Sixteenth));
+        assert_eq!(er.display_dots(), Some(2));
         assert_eq!(er.tuplet(), 1.into());
         assert_eq!(er.duration(), Rational::new(7, 64));
         assert_eq!(er.display_duration(), Rational::new(7, 64));
@@ -245,8 +243,8 @@ mod event_rhythm_tests {
     #[test]
     fn triplet_quarter_note() {
         let er = Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2)));
-        assert_eq!(er.duration_display_base(), NoteValue::Quarter);
-        assert_eq!(er.display_dots(), 0);
+        assert_eq!(er.duration_display_base(), Some(NoteValue::Quarter));
+        assert_eq!(er.display_dots(), Some(0));
         assert_eq!(er.tuplet(), Rational::new(3, 2));
         assert_eq!(er.duration(), Rational::new(1, 6));
         assert_eq!(er.display_duration(), Rational::new(1, 4));

@@ -123,11 +123,31 @@ impl Metre {
             (num, den)
                 if den == 1 || den == 2 || den == 4 || den == 8 || den == 16 || den == 32 =>
             {
-                vec![MetreSegment {
-                    duration: Rational::new(num.into(), den.into()),
-                    subdivisions: num,
-                    superdivision: Superdivision::Duple,
-                }]
+                // Segments must have a printable duration.  There is no accepted convention for
+                // how to organize these segments, so take a guess.
+                let mut segments = Vec::new();
+                let mut t = num;
+                while t > 0 {
+                    let subdivisions = if t == 4 {
+                        4
+                    } else if t >= 3 {
+                        3
+                    } else if t >= 2 {
+                        2
+                    } else {
+                        1
+                    };
+                    assert!(t >= subdivisions);
+                    segments.push(MetreSegment {
+                        duration: Rational::new(subdivisions.into(), den.into()),
+                        subdivisions,
+                        // TODO: guess this too?
+                        superdivision: Superdivision::Duple,
+                    });
+                    t -= subdivisions;
+                }
+
+                segments
             }
             _ => panic!("Invalid denominator."),
         })
@@ -163,7 +183,7 @@ impl Metre {
     ///
     /// assert_eq!(Metre::new(4, 4).division_starts(), vec![Rational::zero(), Rational::new(1, 2), Rational::new(2, 2)] );
     /// assert_eq!(Metre::new(3, 4).division_starts(), vec![Rational::zero(), Rational::new(1, 4), Rational::new(2, 4), Rational::new(3, 4)] );
-    /// assert_eq!(Metre::new(5, 8).division_starts(), vec![Rational::zero(), Rational::new(5, 8)] );
+    /// assert_eq!(Metre::new(5, 8).division_starts(), vec![Rational::zero(), Rational::new(3, 8), Rational::new(5, 8)] );
     /// ```
     pub fn division_starts(&self) -> Vec<Rational> {
         let mut divisions = vec![];
