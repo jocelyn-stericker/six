@@ -35,6 +35,8 @@ pub enum Superdivision {
     Duple,
     /// An odd (usually three) number of such parts form a group.
     Triple,
+    /// The emphasis on the 6th eighth note of 12/8.
+    Quadruple,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -106,7 +108,16 @@ impl Metre {
                 subdivisions,
                 superdivision: Superdivision::Duple,
             };
-            vec![seg, seg, seg, seg]
+            vec![
+                seg,
+                seg,
+                MetreSegment {
+                    duration,
+                    subdivisions,
+                    superdivision: Superdivision::Quadruple,
+                },
+                seg,
+            ]
         }
 
         Metre(match (num, den) {

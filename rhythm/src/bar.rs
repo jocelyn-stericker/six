@@ -50,39 +50,49 @@ impl Bar {
 
     fn try_amend(
         &self,
-        prev_start: Rational,
-        prev: Option<&mut (Duration, bool)>,
-        start: Rational,
+        division_start: Rational,
+        amend_to: Option<&mut (Duration, bool)>,
+        t: Rational,
         duration: Rational,
     ) -> bool {
-        if let Some(prev) = prev {
-            if prev.1 {
-                false
-            } else if start - prev.0.duration() >= prev_start
-                || (self
-                    .metre
-                    .on_division(prev_start)
-                    .filter(|d| d.superdivision() != Superdivision::Triple)
-                    .is_some()
-                    && self
-                        .metre
-                        .on_division(start + duration)
-                        .filter(|d| d.superdivision() != Superdivision::Triple)
-                        .is_some())
-            {
-                let dur = Duration::exact(prev.0.duration() + duration, None);
-                if dur.printable() {
-                    prev.0 = dur;
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
+        if let Some(amend_to) = amend_to {
+            let prior_note_t = t - amend_to.0.duration();
+            if amend_to.1 {
+                return false;
             }
-        } else {
-            false
+
+            let amended_duration = Duration::exact(amend_to.0.duration() + duration, None);
+            let amended_starts_on_division = self
+                .metre
+                .on_division(prior_note_t)
+                .filter(|d| d.superdivision() != Superdivision::Triple)
+                .is_some();
+
+            let amended_ends_on_division = self
+                .metre
+                .on_division(t + duration)
+                .filter(|d| d.superdivision() != Superdivision::Triple)
+                .is_some()
+                || (t + duration == self.metre().duration());
+
+            let amended_does_not_cross_quad = self
+                .metre
+                .on_division(t)
+                .filter(|d| d.superdivision() == Superdivision::Quadruple)
+                .is_none();
+
+            let valid_multi_segment = amended_starts_on_division
+                && amended_ends_on_division
+                && amended_does_not_cross_quad
+                && amended_duration.printable();
+
+            if prior_note_t >= division_start || valid_multi_segment {
+                amend_to.0 = amended_duration;
+                return true;
+            }
         }
+
+        return false;
     }
 
     /// Merge implicit notes in the same division or spanning multiple divisions (except in triple
@@ -90,7 +100,7 @@ impl Bar {
     ///
     /// This will merge some rests that should not be merged. optimize() will split those up.
     fn simplify(&mut self) {
-        let mut prev_start = Rational::zero();
+        let mut division_start = Rational::zero();
         let mut division_starts = self.metre.division_starts().into_iter().peekable();
 
         // The time, in whole notes, at which `existing_note` started, before this change.
@@ -103,7 +113,7 @@ impl Bar {
             let existing_note_end = t_read + existing_note.0.duration();
 
             while t_read >= next_division_start {
-                prev_start = division_starts.next().unwrap();
+                division_start = division_starts.next().unwrap();
                 next_division_start = *division_starts.peek().unwrap();
             }
 
@@ -113,18 +123,18 @@ impl Bar {
             {
                 let new_duration = next_division_start - t_read;
                 assert!(new_duration.is_positive());
-                if !self.try_amend(prev_start, new.last_mut(), t_read, new_duration) {
+                if !self.try_amend(division_start, new.last_mut(), t_read, new_duration) {
                     new.push((Duration::exact(new_duration, None), false));
                 }
                 // The time up to which we have written to `new`.
                 let mut t_write = t_read + new_duration;
                 t_read = existing_note_end;
                 while t_write < t_read {
-                    prev_start = division_starts.next().unwrap();
+                    division_start = division_starts.next().unwrap();
                     next_division_start = *division_starts.peek().unwrap();
 
                     let p = t_read.min(next_division_start);
-                    if !self.try_amend(prev_start, new.last_mut(), t_write, new_duration) {
+                    if !self.try_amend(division_start, new.last_mut(), t_write, new_duration) {
                         new.push((Duration::exact(new_duration, None), false));
                     }
 
@@ -135,7 +145,7 @@ impl Bar {
             } else {
                 if existing_note.1
                     || !self.try_amend(
-                        prev_start,
+                        division_start,
                         new.last_mut(),
                         t_read,
                         existing_note.0.duration(),
@@ -246,10 +256,6 @@ impl Bar {
                                 }
                             }
 
-                            // Perfer to clarify early.
-                            score -= Rational::from_integer(start_q as isize)
-                                / Rational::from_integer(div_parts as isize);
-
                             // shorter is better.
                             score -= max_q as isize;
                         }
@@ -280,7 +286,6 @@ impl Bar {
     /// removed, and non-overlapping parts are replaced with rests.
     /// Existing notes entirely after the splice are kept.
     ///
-    /// TODO: Rests will be organized according to the metre.
     /// TODO: Handle tuplets
     pub fn splice(&mut self, splice_start: Rational, replacement: Vec<(Duration, bool)>) {
         let bar_duration = self.metre.duration();
@@ -518,6 +523,47 @@ mod bar_tests {
                     (Duration::new(NoteValue::Quarter, 1, None), true),
                     (Duration::new(NoteValue::Eighth, 0, None), false),
                     (Duration::new(NoteValue::Quarter, 0, None), false),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(4, 4));
+            bar.splice(
+                Rational::new(0, 1),
+                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(1, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(2, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(3, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(1, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+            );
+            bar.splice(
+                Rational::new(2, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+            );
+            bar.splice(
+                Rational::new(3, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), false),
                 ],
             );
         }
@@ -1119,22 +1165,21 @@ mod bar_tests {
             );
         }
 
-        // TODO
-        // {
-        //     let mut bar = Bar::new(Metre::new(12, 8));
-        //     bar.splice(
-        //         Rational::zero(),
-        //         vec![(Duration::new(NoteValue::Quarter, 1, None), true)],
-        //     );
-        //     assert_eq!(
-        //         bar.rhythm(),
-        //         &vec![
-        //             (Duration::new(NoteValue::Quarter, 1, None), true),
-        //             (Duration::new(NoteValue::Quarter, 1, None), false),
-        //             (Duration::new(NoteValue::Half, 1, None), false),
-        //         ],
-        //     );
-        // }
+        {
+            let mut bar = Bar::new(Metre::new(12, 8));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Quarter, 1, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 1, None), true),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Half, 1, None), false),
+                ],
+            );
+        }
     }
 
     #[test]
