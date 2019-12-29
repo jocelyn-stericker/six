@@ -1,7 +1,9 @@
 use crate::duration::Duration;
-use crate::metre::Metre;
+use crate::metre::{Metre, Subdivision, Superdivision};
+use num_integer::Integer;
 use num_rational::Rational;
 use num_traits::{sign::Signed, Zero};
+use std::collections::BinaryHeap;
 
 #[derive(Clone)]
 /// The rhythm and metre of a voice in a single bar.
@@ -44,6 +46,224 @@ impl Bar {
                 self.rhythm.push((Duration::exact(to - from, None), false));
             }
         }
+    }
+
+    fn try_amend(
+        &self,
+        prev_start: Rational,
+        prev: Option<&mut (Duration, bool)>,
+        start: Rational,
+        duration: Rational,
+    ) -> bool {
+        if let Some(prev) = prev {
+            if prev.1 {
+                false
+            } else if start - prev.0.duration() >= prev_start
+                || (self
+                    .metre
+                    .on_division(prev_start)
+                    .filter(|d| d.superdivision() != Superdivision::Triple)
+                    .is_some()
+                    && self
+                        .metre
+                        .on_division(start + duration)
+                        .filter(|d| d.superdivision() != Superdivision::Triple)
+                        .is_some())
+            {
+                let dur = Duration::exact(prev.0.duration() + duration, None);
+                if dur.printable() {
+                    prev.0 = dur;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Merge implicit notes in the same division or spanning multiple divisions (except in triple
+    /// metre)
+    ///
+    /// This will merge some rests that should not be merged. optimize() will split those up.
+    fn simplify(&mut self) {
+        let mut prev_start = Rational::zero();
+        let mut division_starts = self.metre.division_starts().into_iter().peekable();
+
+        // The time, in whole notes, at which `existing_note` started, before this change.
+        let mut t_read = Rational::zero();
+        // The notes and rests, after the change.
+        let mut new: Vec<(Duration, bool)> = Vec::new();
+
+        for existing_note in &self.rhythm {
+            let mut next_division_start = *division_starts.peek().unwrap();
+            let existing_note_end = t_read + existing_note.0.duration();
+
+            while t_read >= next_division_start {
+                prev_start = division_starts.next().unwrap();
+                next_division_start = *division_starts.peek().unwrap();
+            }
+
+            if !existing_note.1
+                && t_read < next_division_start
+                && next_division_start < existing_note_end
+            {
+                let new_duration = next_division_start - t_read;
+                assert!(new_duration.is_positive());
+                if !self.try_amend(prev_start, new.last_mut(), t_read, new_duration) {
+                    new.push((Duration::exact(new_duration, None), false));
+                }
+                // The time up to which we have written to `new`.
+                let mut t_write = t_read + new_duration;
+                t_read = existing_note_end;
+                while t_write < t_read {
+                    prev_start = division_starts.next().unwrap();
+                    next_division_start = *division_starts.peek().unwrap();
+
+                    let p = t_read.min(next_division_start);
+                    if !self.try_amend(prev_start, new.last_mut(), t_write, new_duration) {
+                        new.push((Duration::exact(new_duration, None), false));
+                    }
+
+                    t_write = p;
+                }
+
+                assert_eq!(t_read, t_write);
+            } else {
+                if existing_note.1
+                    || !self.try_amend(
+                        prev_start,
+                        new.last_mut(),
+                        t_read,
+                        existing_note.0.duration(),
+                    )
+                {
+                    new.push(*existing_note);
+                }
+
+                t_read = existing_note_end;
+            }
+        }
+
+        if self.rhythm.iter().any(|rhythm| rhythm.1) {
+            self.rhythm = new;
+        } else {
+            self.rhythm.clear();
+        }
+    }
+
+    fn optimize(&mut self) {
+        let quant = Rational::new(
+            1,
+            self.rhythm
+                .iter()
+                .fold(1isize, |acc, note| acc.lcm(note.0.duration().denom()))
+                .lcm(&self.metre.lcm()),
+        );
+
+        let mut q: BinaryHeap<(
+            Rational,
+            Rational,
+            Vec<(Duration, bool)>,
+            Vec<(Duration, bool)>,
+        )> = BinaryHeap::new();
+
+        q.push((
+            Rational::zero(),
+            Rational::zero(),
+            self.rhythm.clone(),
+            vec![],
+        ));
+
+        while let Some((score, time, input, mut output)) = q.pop() {
+            if let Some((first, remainder)) = input.split_first() {
+                if first.1 {
+                    output.push(*first);
+                    q.push((
+                        score,
+                        time + first.0.duration(),
+                        remainder.iter().cloned().collect(),
+                        output,
+                    ));
+                } else {
+                    let quants = (first.0.duration() / quant).to_integer();
+                    for i in 1..=quants {
+                        let mut output = output.clone();
+                        let (div_start, div) = self.metre().division(time);
+                        let dur = quant * i;
+                        let displayed = Duration::exact(dur, None);
+
+                        if let Some(dots) = displayed.display_dots() {
+                            // The longest permitted dotted rest in simple time is one value
+                            // smaller than the beat.
+                            if dots > 0
+                                && div.subdivision() == Subdivision::Simple
+                                && dur > div.subdivision_duration()
+                            {
+                                continue;
+                            }
+                        }
+
+                        let remainder_t = first.0.duration() - dur;
+                        let new_input: Vec<(Duration, bool)> = if remainder_t > Rational::zero() {
+                            let mut x: Vec<(Duration, bool)> = input.iter().cloned().collect();
+                            x[0].0 = Duration::exact(remainder_t, None);
+                            x
+                        } else {
+                            input.iter().skip(1).cloned().collect()
+                        };
+                        output.push((displayed, false));
+                        let mut score = score;
+                        if !displayed.printable() {
+                            score -= 10000;
+                        }
+                        let div_parts = (div.duration() / quant).to_integer() as usize;
+                        let start_q = ((time - div_start) / quant).to_integer() as usize;
+                        let end_q = ((time + dur - div_start) / quant).to_integer() as usize;
+                        let mut powers: Vec<usize> = (0..div_parts).map(|_| 0).collect();
+                        if end_q <= div_parts {
+                            let mut max_q = 0;
+                            for p in 2..=div_parts {
+                                if div_parts % p != 0 {
+                                    continue;
+                                }
+                                for i in 0..div_parts {
+                                    if i % p == 0 {
+                                        powers[i] += 1;
+                                        max_q = max_q.max(powers[i]);
+                                    }
+                                }
+                            }
+                            for q in (start_q + 1)..end_q {
+                                if powers[q as usize] >= powers[start_q] {
+                                    score -= 3;
+                                    score -= Rational::from_integer(
+                                        ((powers[q as usize] - powers[start_q]) * 2) as isize,
+                                    );
+                                }
+                            }
+
+                            // Perfer to clarify early.
+                            score -= Rational::from_integer(start_q as isize)
+                                / Rational::from_integer(div_parts as isize);
+
+                            // shorter is better.
+                            score -= max_q as isize;
+                        }
+
+                        q.push((score, time + dur, new_input, output));
+                    }
+                }
+            } else {
+                self.rhythm = output;
+                return;
+            }
+        }
+
+        panic!("No solution");
     }
 
     /// Starting at the `splice_start`, in whole notes, replace existing notes with `replacement`.
@@ -139,6 +359,9 @@ impl Bar {
         }
 
         self.rhythm = new;
+
+        self.simplify();
+        self.optimize();
     }
 }
 
@@ -239,5 +462,722 @@ mod bar_tests {
                 ],
             );
         }
+    }
+
+    #[test]
+    fn simplify() {
+        {
+            let mut bar = Bar::new(Metre::new(4, 4));
+            bar.splice(
+                Rational::new(1, 4),
+                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(1, 4),
+                vec![(Duration::new(NoteValue::Half, 0, None), false)],
+            );
+            assert_eq!(bar.rhythm(), &vec![],);
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(4, 4));
+            bar.splice(
+                Rational::new(1, 4),
+                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(3, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), false),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(4, 4));
+            bar.splice(
+                Rational::new(1, 4),
+                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(5, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+            );
+            // This is not a good rhythm, but we do not adjust explicit rhythms.
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn simple_time_exposes_middle() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 161
+
+        for bar in &mut [Bar::new(Metre::new(4, 8)), Bar::new(Metre::new(2, 4))] {
+            bar.splice(
+                Rational::new(3, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+
+        for bar in &mut [Bar::new(Metre::new(4, 8)), Bar::new(Metre::new(2, 4))] {
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(3, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+        for bar in &mut [Bar::new(Metre::new(4, 8)), Bar::new(Metre::new(2, 4))] {
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                ],
+            );
+        }
+
+        for bar in &mut [Bar::new(Metre::new(4, 4)), Bar::new(Metre::new(2, 2))] {
+            bar.splice(
+                Rational::new(3, 4),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                ],
+            );
+        }
+
+        for bar in &mut [Bar::new(Metre::new(4, 4)), Bar::new(Metre::new(2, 2))] {
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(3, 4),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                ],
+            );
+        }
+        for bar in &mut [Bar::new(Metre::new(4, 4)), Bar::new(Metre::new(2, 2))] {
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), false),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn compound_time_exposes_middle() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 161
+
+        {
+            let mut bar = Bar::new(Metre::new(6, 16));
+            bar.splice(
+                Rational::new(5, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                ],
+            );
+        }
+        {
+            let mut bar = Bar::new(Metre::new(6, 16));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(4, 16),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+        {
+            let mut bar = Bar::new(Metre::new(6, 16));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(6, 8));
+            bar.splice(
+                Rational::new(5, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+        {
+            let mut bar = Bar::new(Metre::new(6, 8));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(4, 8),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                ],
+            );
+        }
+        {
+            let mut bar = Bar::new(Metre::new(6, 8));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(6, 4));
+            bar.splice(
+                Rational::new(5, 4),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Half, 1, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                ],
+            );
+        }
+        {
+            let mut bar = Bar::new(Metre::new(6, 4));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(4, 4),
+                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Half, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), true),
+                ],
+            );
+        }
+        {
+            let mut bar = Bar::new(Metre::new(6, 4));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Half, 1, None), false),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(12, 8));
+            bar.splice(
+                Rational::new(11, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Half, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn three_shows_all_beats() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 161
+
+        {
+            let mut bar = Bar::new(Metre::new(3, 4));
+            bar.splice(
+                Rational::new(2, 4),
+                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(3, 8));
+            bar.splice(
+                Rational::new(2, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(9, 8));
+            bar.splice(
+                Rational::new(6, 8),
+                vec![(Duration::new(NoteValue::Quarter, 1, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), true),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn dotted_rests() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 161
+
+        {
+            let mut bar = Bar::new(Metre::new(2, 4));
+            bar.splice(
+                Rational::new(3, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(7, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(9, 8));
+            bar.splice(
+                Rational::new(8, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn no_dotted_rests_at_end_of_simple_time_beat() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 162
+
+        {
+            let mut bar = Bar::new(Metre::new(2, 4));
+            bar.splice(
+                Rational::new(3, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(4, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                ],
+            );
+        }
+        {
+            let mut bar = Bar::new(Metre::new(2, 2));
+            bar.splice(
+                Rational::new(3, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(4, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn maximum_dotted_rest() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 162
+
+        {
+            let mut bar = Bar::new(Metre::new(4, 4));
+            bar.splice(
+                Rational::new(7, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(4, 4));
+            bar.splice(
+                Rational::new(3, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), false),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(2, 2));
+            bar.splice(
+                Rational::new(3, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(7, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(2, 2));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), false),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn double_dotted_rest() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 162
+
+        {
+            let mut bar = Bar::new(Metre::new(2, 4));
+            bar.splice(
+                Rational::new(7, 32),
+                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 2, None), false),
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(2, 4));
+            bar.splice(
+                Rational::new(7, 32),
+                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(8, 32),
+                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 2, None), false),
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn expose_middle_of_beat() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 163
+
+        {
+            let mut bar = Bar::new(Metre::new(2, 4));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(7, 32),
+                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 1, None), false),
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                ],
+            );
+        }
+
+        // TODO: "may be combined when rhythms are straightforward".
+    }
+
+    #[test]
+    fn compound_combine_segments() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 163
+
+        {
+            let mut bar = Bar::new(Metre::new(12, 8));
+            bar.splice(
+                Rational::new(9, 8),
+                vec![(Duration::new(NoteValue::Quarter, 1, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Half, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), true),
+                ],
+            );
+        }
+
+        // TODO
+        // {
+        //     let mut bar = Bar::new(Metre::new(12, 8));
+        //     bar.splice(
+        //         Rational::zero(),
+        //         vec![(Duration::new(NoteValue::Quarter, 1, None), true)],
+        //     );
+        //     assert_eq!(
+        //         bar.rhythm(),
+        //         &vec![
+        //             (Duration::new(NoteValue::Quarter, 1, None), true),
+        //             (Duration::new(NoteValue::Quarter, 1, None), false),
+        //             (Duration::new(NoteValue::Half, 1, None), false),
+        //         ],
+        //     );
+        // }
+    }
+
+    #[test]
+    fn compound_combine_start() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 163
+
+        {
+            let mut bar = Bar::new(Metre::new(6, 8));
+            bar.splice(
+                Rational::new(1, 4),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(5, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+
+        // TODO
+        // {
+        //     let mut bar = Bar::new(Metre::new(6, 8));
+        //     bar.splice(
+        //         Rational::new(5, 16),
+        //         vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+        //     );
+        //     assert_eq!(
+        //         bar.rhythm(),
+        //         &vec![
+        //             (Duration::new(NoteValue::Eighth, 0, None), false),
+        //             (Duration::new(NoteValue::Eighth, 1, None), false),
+        //             (Duration::new(NoteValue::Sixteenth, 0, None), true),
+        //             (Duration::new(NoteValue::Eighth, 1, None), false),
+        //         ],
+        //     );
+        // }
     }
 }

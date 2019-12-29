@@ -1,7 +1,8 @@
+use num_integer::Integer;
 use num_rational::Rational;
 use num_traits::Zero;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 /// Whether there are an even or odd number of time signature denominator notes in a bar segment.
 ///
@@ -21,7 +22,7 @@ pub enum Subdivision {
     Compound,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 /// There can be an even or odd number of segments in a bar, which determines a segment's role.
 ///
@@ -123,7 +124,7 @@ impl Metre {
             (num, den)
                 if den == 1 || den == 2 || den == 4 || den == 8 || den == 16 || den == 32 =>
             {
-                // Segments must have a printable duration.  There is no accepted convention for
+                // Segments should have a printable duration.  There is no accepted convention for
                 // how to organize these segments, so take a guess.
                 let mut segments = Vec::new();
                 let mut t = num;
@@ -198,18 +199,31 @@ impl Metre {
         divisions
     }
 
-    /// Given a time, the start of the division that it is in.
-    pub fn division(&self, t: Rational) -> Rational {
-        let starts = self.division_starts();
-        let mut previous = Rational::zero();
-        for division in &starts {
-            if t < *division {
-                return previous;
+    /// Given a time, the division that it is in.
+    pub fn on_division(&self, t: Rational) -> Option<&MetreSegment> {
+        let mut t2 = Rational::zero();
+        for division in &self.0 {
+            if t == t2 {
+                return Some(division);
             }
-            previous = *division;
+            t2 += division.duration();
         }
 
-        *starts.last().unwrap()
+        None
+    }
+
+    /// Given a time, the division that it is in.
+    pub fn division(&self, t: Rational) -> (Rational, MetreSegment) {
+        let mut t2 = Rational::zero();
+        for division in &self.0 {
+            let next = t2 + division.duration();
+            if t < next {
+                return (t2, *division);
+            }
+            t2 = next;
+        }
+
+        (t2, *self.0.last().unwrap())
     }
 
     /// Given a time, the start of the division that follows, or the end of the bar.
@@ -254,5 +268,11 @@ impl Metre {
         }
 
         Rational::zero()
+    }
+
+    pub fn lcm(&self) -> isize {
+        self.0.iter().fold(1isize, |acc, sub| {
+            acc.lcm((sub.duration / Rational::from_integer(sub.subdivisions.into())).denom())
+        })
     }
 }

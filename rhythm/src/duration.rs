@@ -85,7 +85,7 @@ impl NoteValue {
 /// https://web.archive.org/web/20141031082831/http://www.informatics.indiana.edu/donbyrd/CMNExtremesBody.htm
 const MAX_DOTS: u8 = 4;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd)]
 /// The duration of a note, rest, or chord.
 ///
 /// This contains whether the duration is a tuplet, because some the duration alone is insuffient
@@ -104,10 +104,6 @@ pub struct Duration {
 impl Duration {
     /// Create the duration of a note, chord, or rest in a bar, given a duration base, the number
     /// of dots, and what kind of tuplet it is in, if applicable.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `dots` is larger than `MAX_DOTS` (4).
     pub fn new(base: NoteValue, dots: u8, tuplet: Option<Rational>) -> Duration {
         if dots >= MAX_DOTS {
             panic!("Too many dots");
@@ -126,10 +122,7 @@ impl Duration {
         }
     }
 
-    /// Given a displayed duration, in whole notes, and a tuplet, try to create a printable
-    /// duration.
-    ///
-    /// This will return None if the duration cannot be printed.
+    /// Create a duration with a displayed duration, in whole notes, and a tuplet.
     pub fn exact(display: Rational, tuplet: Option<Rational>) -> Duration {
         let maybe_valid = Duration {
             display,
@@ -168,7 +161,7 @@ impl Duration {
     }
 
     /// The kind of note this will be rendered as.
-    fn duration_display_base(&self) -> Option<NoteValue> {
+    pub fn duration_display_base(&self) -> Option<NoteValue> {
         match self.display_duration().to_f64().log2().floor() as isize {
             3 => Some(NoteValue::DoubleWhole),
             2 => Some(NoteValue::DoubleWhole),
@@ -187,7 +180,7 @@ impl Duration {
     }
 
     /// The number of dots that will be rendered.
-    fn display_dots(&self) -> Option<usize> {
+    pub fn display_dots(&self) -> Option<usize> {
         let len = self.display_duration();
         let base = self.duration_display_base()?.count();
         let mut dots: usize = 0;
