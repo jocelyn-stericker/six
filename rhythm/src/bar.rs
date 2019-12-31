@@ -2,8 +2,8 @@ use crate::duration::Duration;
 use crate::metre::{Metre, Subdivision, Superdivision};
 use num_integer::Integer;
 use num_rational::Rational;
-use num_traits::{sign::Signed, Zero};
-use std::collections::BinaryHeap;
+use num_traits::{sign::Signed, One, Zero};
+use std::collections::{BTreeSet, BinaryHeap};
 
 #[derive(Clone)]
 /// The rhythm and metre of a voice in a single bar.
@@ -200,7 +200,7 @@ impl Bar {
                     ));
                 } else {
                     let quants = (first.0.duration() / quant).to_integer();
-                    for i in 1..=quants {
+                    for i in (1..=quants).rev() {
                         let mut output = output.clone();
                         let (div_start, div) = self.metre().division(time);
                         let dur = quant * i;
@@ -230,35 +230,87 @@ impl Bar {
                         if !displayed.printable() {
                             score -= 10000;
                         }
-                        let div_parts = (div.duration() / quant).to_integer() as usize;
-                        let start_q = ((time - div_start) / quant).to_integer() as usize;
-                        let end_q = ((time + dur - div_start) / quant).to_integer() as usize;
-                        let mut powers: Vec<usize> = (0..div_parts).map(|_| 0).collect();
-                        if end_q <= div_parts {
-                            let mut max_q = 0;
-                            for p in 2..=div_parts {
-                                if div_parts % p != 0 {
-                                    continue;
-                                }
-                                for i in 0..div_parts {
-                                    if i % p == 0 {
-                                        powers[i] += 1;
-                                        max_q = max_q.max(powers[i]);
+
+                        let second_div = div_start + div.subdivision_duration() * 2;
+                        let mut beats_covered = BTreeSet::new();
+                        let mut beats_exposed = BTreeSet::new();
+                        if div.subdivision() == Subdivision::Compound
+                            && time <= second_div
+                            && second_div <= time + dur
+                        {
+                            let mut t = Rational::zero();
+                            for note in &output {
+                                let t_next = t + note.0.duration();
+
+                                if t >= div_start && t <= div_start + div.duration() {
+                                    let q = div.duration()
+                                        / Rational::from_integer(div.subdivisions().into());
+                                    for i in 1..=div.subdivisions() {
+                                        let t_beat: Rational =
+                                            q * Rational::from_integer(i.into()) + div_start;
+                                        if t < t_beat && t_beat < t_next {
+                                            beats_covered.insert(i);
+                                        } else if t_beat == t_next && !note.1 && t.is_zero() {
+                                            beats_exposed.insert(i);
+                                        }
                                     }
                                 }
-                            }
-                            for q in (start_q + 1)..end_q {
-                                if powers[q as usize] >= powers[start_q] {
-                                    score -= 3;
-                                    score -= Rational::from_integer(
-                                        ((powers[q as usize] - powers[start_q]) * 2) as isize,
-                                    );
-                                }
+                                t = t_next;
                             }
 
-                            // shorter is better.
-                            score -= max_q as isize;
+                            if beats_exposed.contains(&2) && beats_covered.contains(&1) {
+                                // If we can do it for one fewer rest, it's worth it.
+                                score -= Rational::new(99, 100);
+                            }
                         }
+
+                        {
+                            let div_parts = (div.duration() / quant).to_integer() as usize;
+                            let start_q = ((time - div_start) / quant).to_integer() as usize;
+                            let end_q = ((time + dur - div_start) / quant).to_integer() as usize;
+                            let mut powers: Vec<Rational> =
+                                (0..div_parts).map(|_| Rational::zero()).collect();
+                            if end_q <= div_parts {
+                                for p in 1..=div_parts {
+                                    if div_parts % p != 0 {
+                                        continue;
+                                    }
+                                    for i in 0..div_parts {
+                                        if i % p == 0 {
+                                            if div_parts / p == 3
+                                                && div.subdivision() == Subdivision::Compound
+                                            {
+                                                powers[i] += match (i / p) % 3 {
+                                                    0 => Rational::new(23, 20),
+                                                    1 => Rational::new(21, 20),
+                                                    2 => {
+                                                        if beats_exposed.contains(&1) {
+                                                            Rational::one()
+                                                        } else {
+                                                            Rational::new(21, 20)
+                                                        }
+                                                    }
+                                                    _ => unreachable!(),
+                                                };
+                                            } else {
+                                                powers[i] += 1;
+                                            }
+                                        }
+                                    }
+                                }
+                                for q in (start_q + 1)..end_q {
+                                    if powers[q as usize] >= powers[start_q] {
+                                        score -= (Rational::one() + powers[q as usize]
+                                            - powers[start_q])
+                                            * 2;
+                                    }
+                                }
+                                // eprintln!("{:?} {} {} {}", powers, start_q, end_q, score);
+                            }
+                        }
+
+                        // shorter is better.
+                        score -= 1;
 
                         q.push((score, time + dur, new_input, output));
                     }
@@ -1207,22 +1259,50 @@ mod bar_tests {
             );
         }
 
-        // TODO
-        // {
-        //     let mut bar = Bar::new(Metre::new(6, 8));
-        //     bar.splice(
-        //         Rational::new(5, 16),
-        //         vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
-        //     );
-        //     assert_eq!(
-        //         bar.rhythm(),
-        //         &vec![
-        //             (Duration::new(NoteValue::Eighth, 0, None), false),
-        //             (Duration::new(NoteValue::Eighth, 1, None), false),
-        //             (Duration::new(NoteValue::Sixteenth, 0, None), true),
-        //             (Duration::new(NoteValue::Eighth, 1, None), false),
-        //         ],
-        //     );
-        // }
+        {
+            let mut bar = Bar::new(Metre::new(6, 8));
+            bar.splice(
+                Rational::new(5, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn compound_spell_out_later_beats() {
+        // From Beyond Bars, by Elaine Gould (2011), p. 163
+
+        {
+            let mut bar = Bar::new(Metre::new(6, 8));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(3, 8),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                ],
+            );
+        }
     }
 }

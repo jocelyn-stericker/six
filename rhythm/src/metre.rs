@@ -210,7 +210,7 @@ impl Metre {
         divisions
     }
 
-    /// Given a time, the division that it is in.
+    /// Given a time, the division that it starts.
     pub fn on_division(&self, t: Rational) -> Option<&MetreSegment> {
         let mut t2 = Rational::zero();
         for division in &self.0 {
