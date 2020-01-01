@@ -114,6 +114,9 @@ impl Bar {
 
             while t_read >= next_division_start {
                 division_start = division_starts.next().unwrap();
+                if division_starts.peek().is_none() {
+                    panic!("Overfilled bar.");
+                }
                 next_division_start = *division_starts.peek().unwrap();
             }
 
@@ -250,7 +253,7 @@ impl Bar {
                                             q * Rational::from_integer(i.into()) + div_start;
                                         if t < t_beat && t_beat < t_next {
                                             beats_covered.insert(i);
-                                        } else if t_beat == t_next && !note.1 && t.is_zero() {
+                                        } else if t_beat == t_next && !note.1 && t == div_start {
                                             beats_exposed.insert(i);
                                         }
                                     }
@@ -382,6 +385,7 @@ impl Bar {
                         let new_duration = bar_duration - t_write;
                         if new_duration.is_positive() {
                             new.push((Duration::exact(new_duration, None), new_note.1));
+                            t_write = bar_duration;
                         }
                     }
                 }
@@ -1280,7 +1284,6 @@ mod bar_tests {
     #[test]
     fn compound_spell_out_later_beats() {
         // From Beyond Bars, by Elaine Gould (2011), p. 163
-
         {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
@@ -1301,6 +1304,102 @@ mod bar_tests {
                     (Duration::new(NoteValue::Sixteenth, 0, None), false),
                     (Duration::new(NoteValue::Eighth, 0, None), false),
                     (Duration::new(NoteValue::Eighth, 0, None), false),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn overfill() {
+        let mut bar = Bar::new(Metre::new(4, 4));
+        bar.splice(
+            Rational::new(3, 4),
+            vec![(Duration::new(NoteValue::Half, 0, None), true)],
+        );
+        assert_eq!(
+            bar.rhythm(),
+            &vec![
+                (Duration::new(NoteValue::Half, 0, None), false),
+                (Duration::new(NoteValue::Quarter, 0, None), false),
+                (Duration::new(NoteValue::Quarter, 0, None), true),
+            ],
+        );
+    }
+
+    #[test]
+    fn compound_combine_initial_rests_unless_confusing() {
+        // p163
+        {
+            let mut bar = Bar::new(Metre::new(6, 8));
+            bar.splice(
+                Rational::new(2, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(11, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                ],
+            );
+        }
+
+        // p164
+        {
+            let mut bar = Bar::new(Metre::new(9, 8));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(5, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(8, 8),
+                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                ],
+            );
+        }
+
+        {
+            let mut bar = Bar::new(Metre::new(6, 8));
+            bar.splice(
+                Rational::zero(),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            bar.splice(
+                Rational::new(5, 16),
+                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    // TODO: join?
+                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 1, None), false),
                 ],
             );
         }
