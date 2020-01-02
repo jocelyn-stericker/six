@@ -177,6 +177,9 @@ impl Bar {
                 .lcm(&self.metre.lcm()),
         );
 
+        let tuplet_kinds: BTreeSet<Rational> =
+            self.rhythm.iter().map(|rhy| rhy.0.tuplet()).collect();
+
         let mut q: BinaryHeap<(
             Rational,
             Rational,
@@ -204,118 +207,144 @@ impl Bar {
                 } else {
                     let quants = (first.0.duration() / quant).to_integer();
                     for i in (1..=quants).rev() {
-                        let mut output = output.clone();
-                        let (div_start, div) = self.metre().division(time);
-                        let dur = quant * i;
-                        let displayed = Duration::exact(dur, None);
+                        for tuplet_kind in &tuplet_kinds {
+                            let mut output = output.clone();
+                            let (div_start, div) = self.metre().division(time);
+                            let dur = quant * i;
+                            let displayed = Duration::exact(dur * tuplet_kind, Some(*tuplet_kind));
 
-                        if let Some(dots) = displayed.display_dots() {
-                            // The longest permitted dotted rest in simple time is one value
-                            // smaller than the beat.
-                            if dots > 0
-                                && div.subdivision() == Subdivision::Simple
-                                && dur > div.subdivision_duration()
-                            {
-                                continue;
-                            }
-                        }
-
-                        let remainder_t = first.0.duration() - dur;
-                        let new_input: Vec<(Duration, bool)> = if remainder_t > Rational::zero() {
-                            let mut x: Vec<(Duration, bool)> = input.iter().cloned().collect();
-                            x[0].0 = Duration::exact(remainder_t, None);
-                            x
-                        } else {
-                            input.iter().skip(1).cloned().collect()
-                        };
-                        output.push((displayed, false));
-                        let mut score = score;
-                        if !displayed.printable() {
-                            score -= 10000;
-                        }
-
-                        let second_div = div_start + div.subdivision_duration() * 2;
-                        let mut beats_covered = BTreeSet::new();
-                        let mut beats_exposed = BTreeSet::new();
-                        if div.subdivision() == Subdivision::Compound
-                            && time <= second_div
-                            && second_div <= time + dur
-                        {
-                            let mut t = Rational::zero();
-                            for note in &output {
-                                let t_next = t + note.0.duration();
-
-                                if t >= div_start && t <= div_start + div.duration() {
-                                    let q = div.duration()
-                                        / Rational::from_integer(div.subdivisions().into());
-                                    for i in 1..=div.subdivisions() {
-                                        let t_beat: Rational =
-                                            q * Rational::from_integer(i.into()) + div_start;
-                                        if t < t_beat && t_beat < t_next {
-                                            beats_covered.insert(i);
-                                        } else if t_beat == t_next && !note.1 && t == div_start {
-                                            beats_exposed.insert(i);
-                                        }
-                                    }
+                            if let Some(dots) = displayed.display_dots() {
+                                // The longest permitted dotted rest in simple time is one value
+                                // smaller than the beat.
+                                if dots > 0
+                                    && div.subdivision() == Subdivision::Simple
+                                    && dur > div.subdivision_duration()
+                                {
+                                    continue;
                                 }
-                                t = t_next;
                             }
 
-                            if beats_exposed.contains(&2) && beats_covered.contains(&1) {
-                                // If we can do it for one fewer rest, it's worth it.
-                                score -= Rational::new(99, 100);
+                            let remainder_t = first.0.duration() - dur;
+                            let new_input: Vec<(Duration, bool)> = if remainder_t > Rational::zero()
+                            {
+                                let mut x: Vec<(Duration, bool)> = input.iter().cloned().collect();
+                                x[0].0 =
+                                    Duration::exact(remainder_t * tuplet_kind, Some(*tuplet_kind));
+                                x
+                            } else {
+                                input.iter().skip(1).cloned().collect()
+                            };
+                            output.push((displayed, false));
+                            let mut score = score;
+                            if !displayed.printable() {
+                                score -= 10000;
                             }
-                        }
 
-                        {
-                            let div_parts = (div.duration() / quant).to_integer() as usize;
-                            let start_q = ((time - div_start) / quant).to_integer() as usize;
-                            let end_q = ((time + dur - div_start) / quant).to_integer() as usize;
-                            let mut powers: Vec<Rational> =
-                                (0..div_parts).map(|_| Rational::zero()).collect();
-                            if end_q <= div_parts {
-                                for p in 1..=div_parts {
-                                    if div_parts % p != 0 {
-                                        continue;
-                                    }
-                                    for i in 0..div_parts {
-                                        if i % p == 0 {
-                                            if div_parts / p == 3
-                                                && div.subdivision() == Subdivision::Compound
+                            // shorter is better.
+                            score -= 1;
+
+                            let second_div = div_start + div.subdivision_duration() * 2;
+                            let mut beats_covered = BTreeSet::new();
+                            let mut beats_exposed = BTreeSet::new();
+                            {
+                                let mut t = Rational::zero();
+                                for note in &output {
+                                    let t_next = t + note.0.duration();
+
+                                    if t >= div_start && t <= div_start + div.duration() {
+                                        let q = div.duration()
+                                            / Rational::from_integer(div.subdivisions().into());
+                                        for i in 1..=div.subdivisions() {
+                                            let t_beat: Rational =
+                                                q * Rational::from_integer(i.into()) + div_start;
+                                            if t < t_beat && t_beat < t_next {
+                                                beats_covered.insert(i);
+                                            } else if t_beat == t_next && !note.1 && t == div_start
                                             {
-                                                powers[i] += match (i / p) % 3 {
-                                                    0 => Rational::new(23, 20),
-                                                    1 => Rational::new(21, 20),
-                                                    2 => {
-                                                        if beats_exposed.contains(&1) {
-                                                            Rational::one()
-                                                        } else {
-                                                            Rational::new(21, 20)
-                                                        }
-                                                    }
-                                                    _ => unreachable!(),
-                                                };
-                                            } else {
-                                                powers[i] += 1;
+                                                beats_exposed.insert(i);
                                             }
                                         }
                                     }
+                                    t = t_next;
                                 }
-                                for q in (start_q + 1)..end_q {
-                                    if powers[q as usize] >= powers[start_q] {
-                                        score -= (Rational::one() + powers[q as usize]
-                                            - powers[start_q])
-                                            * 2;
-                                    }
-                                }
-                                // eprintln!("{:?} {} {} {}", powers, start_q, end_q, score);
                             }
+
+                            if div.subdivision() == Subdivision::Compound
+                                && time <= second_div
+                                && second_div <= time + dur
+                                && beats_exposed.contains(&2)
+                                && beats_covered.contains(&1)
+                            {
+                                // If we can do it for one fewer rest, it's worth it.
+                                score -= Rational::new(99, 100);
+                            }
+
+                            {
+                                let div_parts = (div.duration() / quant).to_integer() as usize;
+                                let start_q = ((time - div_start) / quant).to_integer() as usize;
+                                let end_q =
+                                    ((time + dur - div_start) / quant).to_integer() as usize;
+                                let mut powers: Vec<Rational> =
+                                    (0..div_parts).map(|_| Rational::zero()).collect();
+                                // eprintln!(">> {} {} {:?}", end_q, div_parts, tuplet_kind);
+                                if end_q <= div_parts {
+                                    for p in 1..=div_parts {
+                                        if div_parts % p != 0 {
+                                            continue;
+                                        }
+                                        if Duration::exact(
+                                            quant * (p as isize) * tuplet_kind,
+                                            Some(*tuplet_kind),
+                                        )
+                                        .display_dots()
+                                            != Some(0)
+                                        {
+                                            continue;
+                                        }
+                                        for i in 0..div_parts {
+                                            if i % p == 0 {
+                                                if div_parts / p == 3 {
+                                                    powers[i] += match (i / p) % 3 {
+                                                        0 => {
+                                                            if div.subdivision()
+                                                                == Subdivision::Compound
+                                                            {
+                                                                Rational::new(22, 20)
+                                                            } else {
+                                                                Rational::new(21, 20)
+                                                            }
+                                                        }
+                                                        1 => Rational::new(21, 20),
+                                                        2 => {
+                                                            if beats_exposed.contains(&1)
+                                                                && tuplet_kind.is_one()
+                                                            {
+                                                                Rational::one()
+                                                            } else {
+                                                                Rational::new(21, 20)
+                                                            }
+                                                        }
+                                                        _ => unreachable!(),
+                                                    };
+                                                } else {
+                                                    powers[i] += 1;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    for q in (start_q + 1)..end_q {
+                                        if powers[q as usize] >= powers[start_q] {
+                                            score -= (Rational::one() + powers[q as usize]
+                                                - powers[start_q])
+                                                * 2;
+                                        }
+                                    }
+                                    // eprintln!("{:?} {} {} {}", powers, start_q, end_q, score);
+                                }
+                            }
+
+                            q.push((score, time + dur, new_input, output));
                         }
-
-                        // shorter is better.
-                        score -= 1;
-
-                        q.push((score, time + dur, new_input, output));
                     }
                 }
             } else {
@@ -1400,6 +1429,67 @@ mod bar_tests {
                     (Duration::new(NoteValue::Sixteenth, 0, None), false),
                     (Duration::new(NoteValue::Sixteenth, 0, None), true),
                     (Duration::new(NoteValue::Quarter, 1, None), false),
+                ],
+            );
+        }
+    }
+
+    #[test]
+    fn triplets() {
+        // Triplet rests are described on p211, but these are different.
+        {
+            let mut bar = Bar::new(Metre::new(4, 4));
+            bar.splice(
+                Rational::zero(),
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
+                    true,
+                )],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (
+                        Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
+                        true
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
+                        false
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
+                        false
+                    ),
+                    (Duration::new(NoteValue::Half, 0, None), false),
+                ],
+            );
+        }
+        {
+            let mut bar = Bar::new(Metre::new(4, 4));
+            bar.splice(
+                Rational::new(2, 6),
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
+                    true,
+                )],
+            );
+            assert_eq!(
+                bar.rhythm(),
+                &vec![
+                    (
+                        Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
+                        false
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
+                        false
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
+                        true
+                    ),
+                    (Duration::new(NoteValue::Half, 0, None), false),
                 ],
             );
         }
