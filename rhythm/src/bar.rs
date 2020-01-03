@@ -92,7 +92,7 @@ impl Bar {
             }
         }
 
-        return false;
+        false
     }
 
     /// Merge implicit notes in the same division or spanning multiple divisions (except in triple
@@ -198,12 +198,7 @@ impl Bar {
             if let Some((first, remainder)) = input.split_first() {
                 if first.1 {
                     output.push(*first);
-                    q.push((
-                        score,
-                        time + first.0.duration(),
-                        remainder.iter().cloned().collect(),
-                        output,
-                    ));
+                    q.push((score, time + first.0.duration(), remainder.to_vec(), output));
                 } else {
                     let quants = (first.0.duration() / quant).to_integer();
                     for i in (1..=quants).rev() {
@@ -227,7 +222,7 @@ impl Bar {
                             let remainder_t = first.0.duration() - dur;
                             let new_input: Vec<(Duration, bool)> = if remainder_t > Rational::zero()
                             {
-                                let mut x: Vec<(Duration, bool)> = input.iter().cloned().collect();
+                                let mut x: Vec<(Duration, bool)> = input.to_vec();
                                 x[0].0 =
                                     Duration::exact(remainder_t * tuplet_kind, Some(*tuplet_kind));
                                 x
@@ -452,6 +447,28 @@ impl Bar {
 
         self.simplify();
         self.optimize();
+    }
+
+    pub fn split_note(&self, t: Rational, duration: Duration) -> Vec<Duration> {
+        // TODO(joshuan): Split results up into printable bits.
+        // TODO(joshuan): p166-168
+        let (div_start, segment) = self.metre.division(t);
+        if t == div_start && segment.subdivision() == Subdivision::Simple {
+            return vec![duration];
+        }
+
+        let div_end = div_start + segment.duration();
+        if t + duration.duration() <= div_end {
+            vec![duration]
+        } else {
+            let mut split = vec![Duration::exact(div_end - t, Some(duration.tuplet()))];
+            split.append(&mut self.split_note(
+                div_end,
+                Duration::exact(duration.duration() - (div_end - t), Some(duration.tuplet())),
+            ));
+
+            split
+        }
     }
 }
 
@@ -1493,5 +1510,26 @@ mod bar_tests {
                 ],
             );
         }
+    }
+
+    #[test]
+    fn split_note_simple() {
+        let bar = Bar::new(Metre::new(4, 4));
+
+        assert_eq!(
+            bar.split_note(
+                Rational::new(3, 8),
+                Duration::new(NoteValue::Quarter, 0, None)
+            ),
+            vec![
+                Duration::new(NoteValue::Eighth, 0, None),
+                Duration::new(NoteValue::Eighth, 0, None),
+            ]
+        );
+
+        assert_eq!(
+            bar.split_note(Rational::zero(), Duration::new(NoteValue::Half, 1, None)),
+            vec![Duration::new(NoteValue::Half, 1, None),]
+        );
     }
 }
