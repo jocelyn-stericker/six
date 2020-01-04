@@ -480,11 +480,63 @@ impl Bar {
     }
 
     pub fn split_note(&self, t: Rational, duration: Duration) -> Vec<Duration> {
+        if !duration.duration().is_positive() {
+            return vec![];
+        }
+
         // TODO(joshuan): Split results up into printable bits.
         // TODO(joshuan): p166-168
-        let (div_start, segment) = self.metre.division(t);
-        if t == div_start && segment.subdivision() == Subdivision::Simple {
-            return vec![duration];
+        let (div_start, mut segment) = self.metre.division(t);
+
+        fn to_tuple(d: Rational) -> (isize, isize) {
+            (*d.numer(), *d.denom())
+        }
+
+        // Check for common syncopation (Behind Bars, p. 171)
+        match (
+            to_tuple(div_start),
+            to_tuple(segment.duration()),
+            segment.subdivisions(),
+            segment.superdivision(),
+            to_tuple(t - div_start),
+            to_tuple(duration.duration()),
+        ) {
+            (_, (1, 4), 1, Superdivision::Duple, (1, 8), (1, 4))
+            | (_, (1, 4), 1, Superdivision::Duple, (1, 8), (3, 8))
+            | ((0, 1), (1, 4), 1, Superdivision::Triple, (1, 8), (1, 4))
+            | (_, (1, 2), 2, Superdivision::Duple, (1, 4), (1, 2))
+            | (_, (1, 2), 2, Superdivision::Duple, (1, 4), (3, 4)) => {
+                return vec![duration];
+            }
+            (_, _, _, _, _, _) => {
+                // No match.
+            }
+        }
+
+        if t == div_start {
+            if segment.subdivision() == Subdivision::Simple {
+                return vec![duration];
+            } else {
+                // Fill as many full segments as possible.
+                let mut t_end = t;
+                loop {
+                    let t2 = t_end + segment.duration();
+                    if t2 > t + duration.duration() || !Duration::exact(t2 - t, None).printable() {
+                        break;
+                    }
+                    let next = self.metre.division(t2);
+                    segment = next.1;
+                    t_end = t2;
+                }
+                if t_end > t {
+                    let mut split = vec![Duration::exact(t_end - t, None)];
+                    split.append(&mut self.split_note(
+                        t_end,
+                        Duration::exact(duration.duration() - t_end, Some(duration.tuplet())),
+                    ));
+                    return split;
+                }
+            }
         }
 
         let div_end = div_start + segment.duration();
@@ -1543,11 +1595,12 @@ mod bar_tests {
     }
 
     #[test]
-    fn split_note_simple() {
-        let bar = Bar::new(Metre::new(4, 4));
+    fn split_note_duple() {
+        let two_four = Bar::new(Metre::new(2, 4));
+        let four_four = Bar::new(Metre::new(4, 4));
 
         assert_eq!(
-            bar.split_note(
+            four_four.split_note(
                 Rational::new(3, 8),
                 Duration::new(NoteValue::Quarter, 0, None)
             ),
@@ -1558,8 +1611,221 @@ mod bar_tests {
         );
 
         assert_eq!(
-            bar.split_note(Rational::zero(), Duration::new(NoteValue::Half, 1, None)),
+            four_four.split_note(Rational::zero(), Duration::new(NoteValue::Half, 1, None)),
             vec![Duration::new(NoteValue::Half, 1, None),]
+        );
+
+        assert_eq!(
+            two_four.split_note(
+                Rational::new(1, 16),
+                Duration::new(NoteValue::Quarter, 1, None)
+            ),
+            vec![
+                Duration::new(NoteValue::Eighth, 1, None),
+                Duration::new(NoteValue::Eighth, 1, None),
+            ]
+        );
+
+        assert_eq!(
+            four_four.split_note(Rational::new(1, 8), Duration::new(NoteValue::Half, 0, None)),
+            vec![
+                Duration::new(NoteValue::Quarter, 1, None),
+                Duration::new(NoteValue::Eighth, 0, None),
+            ]
+        );
+
+        assert_eq!(
+            four_four.split_note(Rational::new(3, 8), Duration::new(NoteValue::Half, 0, None)),
+            vec![
+                Duration::new(NoteValue::Eighth, 0, None),
+                Duration::new(NoteValue::Quarter, 1, None),
+            ]
+        );
+    }
+
+    #[test]
+    fn split_note_triple() {
+        let three_four = Bar::new(Metre::new(2, 4));
+        let nine_eight = Bar::new(Metre::new(9, 8));
+
+        assert_eq!(
+            three_four.split_note(Rational::new(1, 8), Duration::new(NoteValue::Half, 0, None)),
+            vec![
+                Duration::new(NoteValue::Eighth, 0, None),
+                Duration::new(NoteValue::Quarter, 1, None),
+            ]
+        );
+
+        assert_eq!(
+            nine_eight.split_note(Rational::zero(), Duration::new(NoteValue::Half, 1, None)),
+            vec![Duration::new(NoteValue::Half, 1, None),]
+        );
+
+        assert_eq!(
+            nine_eight.split_note(Rational::zero(), Duration::new(NoteValue::Whole, 0, None)),
+            vec![
+                Duration::new(NoteValue::Half, 1, None),
+                Duration::new(NoteValue::Quarter, 0, None),
+            ]
+        );
+    }
+
+    #[test]
+    fn split_syncopation_exceptions() {
+        // Behind Bars p.166 and p.171
+        let two_four = Bar::new(Metre::new(2, 4));
+        let three_four = Bar::new(Metre::new(3, 4));
+        let four_four = Bar::new(Metre::new(4, 4));
+
+        assert_eq!(
+            four_four.split_note(
+                Rational::new(1, 8),
+                Duration::new(NoteValue::Quarter, 0, None)
+            ),
+            vec![Duration::new(NoteValue::Quarter, 0, None),]
+        );
+
+        assert_eq!(
+            two_four.split_note(
+                Rational::new(1, 8),
+                Duration::new(NoteValue::Quarter, 0, None)
+            ),
+            vec![Duration::new(NoteValue::Quarter, 0, None),]
+        );
+
+        assert_eq!(
+            four_four.split_note(Rational::new(1, 4), Duration::new(NoteValue::Half, 1, None)),
+            vec![Duration::new(NoteValue::Half, 1, None),]
+        );
+
+        assert_eq!(
+            two_four.split_note(
+                Rational::new(1, 8),
+                Duration::new(NoteValue::Quarter, 1, None)
+            ),
+            vec![Duration::new(NoteValue::Quarter, 1, None),]
+        );
+
+        assert_eq!(
+            three_four.split_note(
+                Rational::new(1, 8),
+                Duration::new(NoteValue::Quarter, 0, None)
+            ),
+            vec![Duration::new(NoteValue::Quarter, 0, None),]
+        );
+
+        assert_eq!(
+            three_four.split_note(
+                Rational::new(3, 8),
+                Duration::new(NoteValue::Quarter, 0, None)
+            ),
+            vec![
+                Duration::new(NoteValue::Eighth, 0, None),
+                Duration::new(NoteValue::Eighth, 0, None)
+            ]
+        );
+
+        assert_eq!(
+            three_four.split_note(
+                Rational::new(1, 16),
+                Duration::new(NoteValue::Eighth, 0, None)
+            ),
+            vec![Duration::new(NoteValue::Eighth, 0, None),]
+        );
+
+        assert_eq!(
+            four_four.split_note(Rational::new(1, 4), Duration::new(NoteValue::Half, 0, None)),
+            vec![Duration::new(NoteValue::Half, 0, None),]
+        );
+
+        assert_eq!(
+            four_four.split_note(Rational::new(1, 4), Duration::new(NoteValue::Half, 1, None)),
+            vec![Duration::new(NoteValue::Half, 1, None),]
+        );
+    }
+
+    #[test]
+    fn split_syncopation() {
+        // Behind Bars p.166 and p.171
+        let three_four = Bar::new(Metre::new(3, 4));
+
+        assert_eq!(
+            three_four.split_note(
+                Rational::new(1, 16),
+                Duration::new(NoteValue::Quarter, 0, None)
+            ),
+            vec![
+                Duration::new(NoteValue::Eighth, 1, None),
+                Duration::new(NoteValue::Sixteenth, 0, None)
+            ]
+        );
+
+        // TODO
+        // let two_four = Bar::new(Metre::new(2, 4));
+        // assert_eq!(
+        //     two_four.split_note(
+        //         Rational::new(1, 32),
+        //         Duration::new(NoteValue::Eighth, 1, None)
+        //     ),
+        //     vec![
+        //         Duration::new(NoteValue::Sixteenth, 1, None),
+        //         Duration::new(NoteValue::Sixteenth, 1, None)
+        //     ]
+        // );
+    }
+
+    #[test]
+    fn split_long_simple() {
+        let two_four = Bar::new(Metre::new(2, 4));
+        let four_eight = Bar::new(Metre::new(4, 8));
+        let four_four = Bar::new(Metre::new(4, 4));
+
+        assert_eq!(
+            two_four.split_note(Rational::zero(), Duration::new(NoteValue::Quarter, 3, None)),
+            vec![Duration::new(NoteValue::Quarter, 3, None),]
+        );
+
+        assert_eq!(
+            four_eight.split_note(Rational::zero(), Duration::new(NoteValue::Quarter, 3, None)),
+            vec![Duration::new(NoteValue::Quarter, 3, None),]
+        );
+
+        assert_eq!(
+            four_four.split_note(Rational::zero(), Duration::new(NoteValue::Half, 4, None)),
+            vec![Duration::new(NoteValue::Half, 4, None),]
+        );
+
+        assert_eq!(
+            two_four.split_note(
+                Rational::new(1, 16),
+                Duration::new(NoteValue::Quarter, 2, None)
+            ),
+            vec![
+                Duration::new(NoteValue::Eighth, 1, None),
+                Duration::new(NoteValue::Quarter, 0, None)
+            ]
+        );
+
+        assert_eq!(
+            four_eight.split_note(
+                Rational::new(1, 16),
+                Duration::new(NoteValue::Quarter, 2, None)
+            ),
+            vec![
+                Duration::new(NoteValue::Eighth, 1, None),
+                Duration::new(NoteValue::Quarter, 0, None)
+            ]
+        );
+
+        assert_eq!(
+            four_four.split_note(
+                Rational::new(1, 16),
+                Duration::new(NoteValue::Half, 3, None)
+            ),
+            vec![
+                Duration::new(NoteValue::Quarter, 2, None),
+                Duration::new(NoteValue::Half, 0, None)
+            ]
         );
     }
 }

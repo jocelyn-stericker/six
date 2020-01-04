@@ -105,7 +105,7 @@ impl Duration {
     /// Create the duration of a note, chord, or rest in a bar, given a duration base, the number
     /// of dots, and what kind of tuplet it is in, if applicable.
     pub fn new(base: NoteValue, dots: u8, tuplet: Option<Rational>) -> Duration {
-        if dots >= MAX_DOTS {
+        if dots > MAX_DOTS {
             panic!("Too many dots");
         }
 
