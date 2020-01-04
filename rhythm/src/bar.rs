@@ -1,5 +1,5 @@
 use crate::duration::Duration;
-use crate::metre::{Metre, Subdivision, Superdivision};
+use crate::metre::{Metre, MetreSegment, Subdivision, Superdivision};
 use num_integer::Integer;
 use num_rational::Rational;
 use num_traits::{sign::Signed, One, Zero};
@@ -168,6 +168,55 @@ impl Bar {
         }
     }
 
+    fn get_powers(
+        &self,
+        div_parts: usize,
+        quant: Rational,
+        tuplet_kind: Rational,
+        div: MetreSegment,
+        beats_exposed: BTreeSet<u8>,
+    ) -> Vec<Rational> {
+        let mut powers: Vec<Rational> = (0..div_parts).map(|_| Rational::zero()).collect();
+        for p in 1..=div_parts {
+            if div_parts % p != 0 {
+                continue;
+            }
+            if Duration::exact(quant * (p as isize) * tuplet_kind, Some(tuplet_kind)).display_dots()
+                != Some(0)
+            {
+                continue;
+            }
+            for (i, power) in powers.iter_mut().enumerate() {
+                if i % p == 0 {
+                    if div_parts / p == 3 {
+                        *power += match (i / p) % 3 {
+                            0 => {
+                                if div.subdivision() == Subdivision::Compound {
+                                    Rational::new(22, 20)
+                                } else {
+                                    Rational::new(21, 20)
+                                }
+                            }
+                            1 => Rational::new(21, 20),
+                            2 => {
+                                if beats_exposed.contains(&1) && tuplet_kind.is_one() {
+                                    Rational::one()
+                                } else {
+                                    Rational::new(21, 20)
+                                }
+                            }
+                            _ => unreachable!(),
+                        };
+                    } else {
+                        *power += 1;
+                    }
+                }
+            }
+        }
+
+        powers
+    }
+
     fn optimize(&mut self) {
         let quant = Rational::new(
             1,
@@ -180,31 +229,45 @@ impl Bar {
         let tuplet_kinds: BTreeSet<Rational> =
             self.rhythm.iter().map(|rhy| rhy.0.tuplet()).collect();
 
-        let mut q: BinaryHeap<(
-            Rational,
-            Rational,
-            Vec<(Duration, bool)>,
-            Vec<(Duration, bool)>,
-        )> = BinaryHeap::new();
+        #[derive(Ord, PartialOrd, Eq, PartialEq)]
+        struct PartialSolution {
+            score: Rational,
+            done_time: Rational,
+            todo: Vec<(Duration, bool)>,
+            done: Vec<(Duration, bool)>,
+        }
 
-        q.push((
-            Rational::zero(),
-            Rational::zero(),
-            self.rhythm.clone(),
-            vec![],
-        ));
+        let mut q: BinaryHeap<PartialSolution> = BinaryHeap::new();
 
-        while let Some((score, time, input, mut output)) = q.pop() {
+        q.push(PartialSolution {
+            score: Rational::zero(),
+            done_time: Rational::zero(),
+            todo: self.rhythm.clone(),
+            done: vec![],
+        });
+
+        while let Some(PartialSolution {
+            score,
+            done_time,
+            todo: input,
+            done: mut output,
+        }) = q.pop()
+        {
             if let Some((first, remainder)) = input.split_first() {
                 if first.1 {
                     output.push(*first);
-                    q.push((score, time + first.0.duration(), remainder.to_vec(), output));
+                    q.push(PartialSolution {
+                        score,
+                        done_time: done_time + first.0.duration(),
+                        todo: remainder.to_vec(),
+                        done: output,
+                    });
                 } else {
                     let quants = (first.0.duration() / quant).to_integer();
                     for i in (1..=quants).rev() {
                         for tuplet_kind in &tuplet_kinds {
                             let mut output = output.clone();
-                            let (div_start, div) = self.metre().division(time);
+                            let (div_start, div) = self.metre().division(done_time);
                             let dur = quant * i;
                             let displayed = Duration::exact(dur * tuplet_kind, Some(*tuplet_kind));
 
@@ -265,8 +328,8 @@ impl Bar {
                             }
 
                             if div.subdivision() == Subdivision::Compound
-                                && time <= second_div
-                                && second_div <= time + dur
+                                && done_time <= second_div
+                                && second_div <= done_time + dur
                                 && beats_exposed.contains(&2)
                                 && beats_covered.contains(&1)
                             {
@@ -276,57 +339,19 @@ impl Bar {
 
                             {
                                 let div_parts = (div.duration() / quant).to_integer() as usize;
-                                let start_q = ((time - div_start) / quant).to_integer() as usize;
+                                let start_q =
+                                    ((done_time - div_start) / quant).to_integer() as usize;
                                 let end_q =
-                                    ((time + dur - div_start) / quant).to_integer() as usize;
-                                let mut powers: Vec<Rational> =
-                                    (0..div_parts).map(|_| Rational::zero()).collect();
+                                    ((done_time + dur - div_start) / quant).to_integer() as usize;
                                 // eprintln!(">> {} {} {:?}", end_q, div_parts, tuplet_kind);
                                 if end_q <= div_parts {
-                                    for p in 1..=div_parts {
-                                        if div_parts % p != 0 {
-                                            continue;
-                                        }
-                                        if Duration::exact(
-                                            quant * (p as isize) * tuplet_kind,
-                                            Some(*tuplet_kind),
-                                        )
-                                        .display_dots()
-                                            != Some(0)
-                                        {
-                                            continue;
-                                        }
-                                        for i in 0..div_parts {
-                                            if i % p == 0 {
-                                                if div_parts / p == 3 {
-                                                    powers[i] += match (i / p) % 3 {
-                                                        0 => {
-                                                            if div.subdivision()
-                                                                == Subdivision::Compound
-                                                            {
-                                                                Rational::new(22, 20)
-                                                            } else {
-                                                                Rational::new(21, 20)
-                                                            }
-                                                        }
-                                                        1 => Rational::new(21, 20),
-                                                        2 => {
-                                                            if beats_exposed.contains(&1)
-                                                                && tuplet_kind.is_one()
-                                                            {
-                                                                Rational::one()
-                                                            } else {
-                                                                Rational::new(21, 20)
-                                                            }
-                                                        }
-                                                        _ => unreachable!(),
-                                                    };
-                                                } else {
-                                                    powers[i] += 1;
-                                                }
-                                            }
-                                        }
-                                    }
+                                    let powers = self.get_powers(
+                                        div_parts,
+                                        quant,
+                                        *tuplet_kind,
+                                        div,
+                                        beats_exposed,
+                                    );
                                     for q in (start_q + 1)..end_q {
                                         if powers[q as usize] >= powers[start_q] {
                                             score -= (Rational::one() + powers[q as usize]
@@ -338,7 +363,12 @@ impl Bar {
                                 }
                             }
 
-                            q.push((score, time + dur, new_input, output));
+                            q.push(PartialSolution {
+                                score,
+                                done_time: done_time + dur,
+                                todo: new_input,
+                                done: output,
+                            });
                         }
                     }
                 }
