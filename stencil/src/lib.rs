@@ -1,6 +1,6 @@
 mod corefont;
 
-use kurbo::{BezPath, Rect, TranslateScale, Vec2};
+use kurbo::{BezPath, Line, Point, Rect, TranslateScale, Vec2};
 
 /// A path with precomputed bounds.
 pub struct Path {
@@ -17,7 +17,120 @@ pub enum Stencil {
     TranslateScale(TranslateScale, Box<Stencil>),
 }
 
+/// Normalized normal vector of line.
+fn normal(line: Line) -> Vec2 {
+    let n = tangent(line);
+    Vec2::new(n.y, -n.x)
+}
+
+/// Normalized tangent vector of line.
+fn tangent(line: Line) -> Vec2 {
+    (line.p1 - line.p0).normalize()
+}
+
+const BEZIER_CIRCLE_FACTOR: f64 = 0.552_284_8;
+
 impl Stencil {
+    pub fn padding(advance: f64) -> Stencil {
+        Stencil::Path(Path {
+            outline: BezPath::default(),
+            bounds: Rect::new(0.0, 0.0, 0.0, 0.0),
+            advance,
+        })
+    }
+
+    /// Draw a reasonable approximation of a circle.
+    ///
+    /// The radial error is about 0.0273%.
+    ///
+    /// For consistency, this function accepts blot. This is added to the radius.
+    pub fn circle(radius: f64, center: Point, blot_diameter: f64) -> Stencil {
+        let rx = Vec2::new(radius + blot_diameter / 2.0, 0.0);
+        let ry = Vec2::new(0.0, radius + blot_diameter / 2.0);
+        let cx = rx * BEZIER_CIRCLE_FACTOR;
+        let cy = ry * BEZIER_CIRCLE_FACTOR;
+
+        let mut path = BezPath::new();
+        path.move_to(center + rx);
+        path.curve_to(center + rx + cy, center + ry + cx, center + ry);
+        path.curve_to(center + ry - cx, center - rx + cy, center - rx);
+        path.curve_to(center - rx - cy, center - ry - cx, center - ry);
+        path.curve_to(center - ry + cx, center + rx - cy, center + rx);
+        path.close_path();
+        Stencil::Path(Path {
+            bounds: Rect::new(
+                center.x - radius,
+                center.y - radius,
+                center.x + radius,
+                center.y + radius,
+            ),
+            outline: path,
+            advance: center.x + radius,
+        })
+    }
+
+    /// Draw a line with rounded edges.
+    ///
+    /// This stencil has a blot diameter equal to the thickness, which is included in the
+    /// bounding box.
+    ///
+    /// (In Lilypond, it's not included.)
+    pub fn line(line: Line, thickness: f64) -> Stencil {
+        if line.p0 == line.p1 {
+            return Self::circle(thickness / 2.0, line.p0, 0.0);
+        }
+
+        let normal = normal(line);
+        if normal.x.is_nan() || normal.y.is_nan() {
+            return Stencil::default();
+        }
+
+        let tangent = tangent(line);
+
+        let rx = tangent * (thickness / 2.0);
+        let ry = normal * (thickness / 2.0);
+        let cx = rx * BEZIER_CIRCLE_FACTOR;
+        let cy = ry * BEZIER_CIRCLE_FACTOR;
+
+        eprintln!("{:?} {:?}", rx, ry);
+
+        let mut path = BezPath::new();
+        // Top
+        path.move_to(line.p0 + ry);
+        path.line_to(line.p1 + ry);
+
+        // Right blot
+        path.curve_to(line.p1 + ry + cx, line.p1 + rx + cy, line.p1 + rx);
+        path.curve_to(line.p1 + rx - cy, line.p1 - ry + cx, line.p1 - ry);
+
+        // Bottom
+        path.line_to(line.p0 - ry);
+
+        // Left blot
+        path.curve_to(line.p0 - ry - cx, line.p0 - rx - cy, line.p0 - rx);
+        path.curve_to(line.p0 - rx + cy, line.p0 + ry - cx, line.p0 + ry);
+
+        // Done!
+        path.close_path();
+        Stencil::Path(Path {
+            bounds: Rect::new(
+                line.p0.x - thickness / 2.0,
+                line.p0.y - thickness / 2.0,
+                line.p1.x + thickness / 2.0,
+                line.p1.y + thickness / 2.0,
+            ),
+            outline: path,
+            advance: line.p1.x,
+        })
+    }
+
+    pub fn staff_line(width: f64) -> Stencil {
+        Self::line(
+            Line::new(Point::new(0.0, 0.0), Point::new(width, 0.0)),
+            corefont::STAFF_LINE_THICKNESS / 4.0,
+        )
+    }
+
     /// Initialize a stencil, in staff cordinates.
     fn from_corefont(corefont: &(i32, [i32; 4], &str)) -> Stencil {
         Stencil::Path(Path {
@@ -93,6 +206,22 @@ impl Stencil {
 
     pub fn time_sig_cancel() -> Stencil {
         Self::from_corefont(&corefont::TIME_SIG_X)
+    }
+
+    pub fn clef_g() -> Stencil {
+        Self::from_corefont(&corefont::G_CLEF)
+    }
+
+    pub fn clef_c() -> Stencil {
+        Self::from_corefont(&corefont::C_CLEF)
+    }
+
+    pub fn clef_f() -> Stencil {
+        Self::from_corefont(&corefont::F_CLEF)
+    }
+
+    pub fn clef_unpitched() -> Stencil {
+        Self::from_corefont(&corefont::UNPITCHED_PERCUSSION_CLEF1)
     }
 
     pub fn combine(stencils: Vec<Stencil>) -> Stencil {
@@ -264,22 +393,57 @@ mod tests {
 
     #[test]
     fn time_signatures() {
+        let times = Stencil::padding(0.2)
+            .and_right(Stencil::time_sig_fraction(4, 4))
+            .and_right(Stencil::time_sig_fraction(3, 4))
+            .and_right(Stencil::time_sig_fraction(5, 4))
+            .and_right(Stencil::time_sig_fraction(7, 4))
+            .and_right(Stencil::time_sig_fraction(12, 8))
+            .and_right(Stencil::time_sig_fraction(6, 16))
+            .and_right(Stencil::time_sig_fraction(9, 8))
+            .and_right(Stencil::time_sig_fraction(6, 8))
+            .and_right(Stencil::time_sig_common())
+            .and_right(Stencil::time_sig_cut())
+            .and_right(Stencil::time_sig_cancel());
+
+        let right = times.advance();
+
         assert_eq!(
-            Stencil::time_sig_fraction(4, 4)
-                .and_right(Stencil::time_sig_fraction(3, 4))
-                .and_right(Stencil::time_sig_fraction(5, 4))
-                .and_right(Stencil::time_sig_fraction(7, 4))
-                .and_right(Stencil::time_sig_fraction(12, 8))
-                .and_right(Stencil::time_sig_fraction(6, 16))
-                .and_right(Stencil::time_sig_fraction(9, 8))
-                .and_right(Stencil::time_sig_fraction(6, 8))
-                .and_right(Stencil::time_sig_common())
-                .and_right(Stencil::time_sig_cut())
-                .and_right(Stencil::time_sig_cancel())
+            Stencil::staff_line(right + 0.2)
+                .and(times)
                 .with_translation(Vec2::new(0.0, -0.5))
                 .with_paper_size(3)
                 .to_svg_doc_for_testing(),
             include_str!("./test_time_signature_stencils.svg")
+        );
+    }
+
+    #[test]
+    fn clefs() {
+        let clefs = Stencil::padding(0.2)
+            .and_right(Stencil::clef_c())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::clef_f().with_translation(Vec2::new(0.0, 0.25)))
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::clef_g().with_translation(Vec2::new(0.0, -0.25)))
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::clef_unpitched())
+            .and_right(Stencil::padding(0.2));
+        let right = clefs.rect().x1;
+
+        let staff_lines: Vec<Stencil> = (-2..=2)
+            .map(|i| {
+                Stencil::staff_line(right + 0.2).with_translation(Vec2::new(0.0, (i as f64) * 0.25))
+            })
+            .collect();
+
+        assert_eq!(
+            Stencil::combine(staff_lines)
+                .and(clefs)
+                .with_translation(Vec2::new(0.0, -1.0))
+                .with_paper_size(3)
+                .to_svg_doc_for_testing(),
+            include_str!("./test_clef_stencils.svg")
         );
     }
 }

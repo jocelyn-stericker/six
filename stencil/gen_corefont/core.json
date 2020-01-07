@@ -1,4 +1,8 @@
 [
+    "gClef",
+    "cClef",
+    "fClef",
+    "unpitchedPercussionClef1",
     "timeSig0",
     "timeSig1",
     "timeSig2",
