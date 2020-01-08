@@ -15,5 +15,17 @@
     "timeSig9",
     "timeSigX",
     "timeSigCommon",
-    "timeSigCutCommon"
+    "timeSigCutCommon",
+    "restMaxima",
+    "restLonga",
+    "restDoubleWhole",
+    "restWhole",
+    "restHalf",
+    "restQuarter",
+    "rest8th",
+    "rest16th",
+    "rest32nd",
+    "rest64th",
+    "rest128th",
+    "rest256th"
 ]

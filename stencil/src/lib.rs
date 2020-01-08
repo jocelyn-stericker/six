@@ -92,8 +92,6 @@ impl Stencil {
         let cx = rx * BEZIER_CIRCLE_FACTOR;
         let cy = ry * BEZIER_CIRCLE_FACTOR;
 
-        eprintln!("{:?} {:?}", rx, ry);
-
         let mut path = BezPath::new();
         // Top
         path.move_to(line.p0 + ry);
@@ -222,6 +220,54 @@ impl Stencil {
 
     pub fn clef_unpitched() -> Stencil {
         Self::from_corefont(&corefont::UNPITCHED_PERCUSSION_CLEF1)
+    }
+
+    pub fn rest_maxima() -> Stencil {
+        Self::from_corefont(&corefont::REST_MAXIMA)
+    }
+
+    pub fn rest_longa() -> Stencil {
+        Self::from_corefont(&corefont::REST_LONGA)
+    }
+
+    pub fn rest_double_whole() -> Stencil {
+        Self::from_corefont(&corefont::REST_DOUBLE_WHOLE)
+    }
+
+    pub fn rest_whole() -> Stencil {
+        Self::from_corefont(&corefont::REST_WHOLE)
+    }
+
+    pub fn rest_half() -> Stencil {
+        Self::from_corefont(&corefont::REST_HALF)
+    }
+
+    pub fn rest_quarter() -> Stencil {
+        Self::from_corefont(&corefont::REST_QUARTER)
+    }
+
+    pub fn rest_8() -> Stencil {
+        Self::from_corefont(&corefont::REST8TH)
+    }
+
+    pub fn rest_16() -> Stencil {
+        Self::from_corefont(&corefont::REST16TH)
+    }
+
+    pub fn rest_32() -> Stencil {
+        Self::from_corefont(&corefont::REST32ND)
+    }
+
+    pub fn rest_64() -> Stencil {
+        Self::from_corefont(&corefont::REST64TH)
+    }
+
+    pub fn rest_128() -> Stencil {
+        Self::from_corefont(&corefont::REST128TH)
+    }
+
+    pub fn rest_256() -> Stencil {
+        Self::from_corefont(&corefont::REST256TH)
     }
 
     pub fn combine(stencils: Vec<Stencil>) -> Stencil {
@@ -391,6 +437,14 @@ impl Default for Stencil {
 mod tests {
     use crate::*;
 
+    fn snapshot(path: &str, contents: &str) {
+        if std::env::vars().any(|(key, _val)| key == "SIX_SNAPSHOT") {
+            std::fs::write(path, contents).unwrap();
+        } else {
+            assert_eq!(std::fs::read_to_string(path).unwrap(), contents);
+        }
+    }
+
     #[test]
     fn time_signatures() {
         let times = Stencil::padding(0.2)
@@ -408,13 +462,13 @@ mod tests {
 
         let right = times.advance();
 
-        assert_eq!(
-            Stencil::staff_line(right + 0.2)
+        snapshot(
+            "./snapshots/time_signature_stencils.svg",
+            &Stencil::staff_line(right + 0.2)
                 .and(times)
                 .with_translation(Vec2::new(0.0, -0.5))
                 .with_paper_size(3)
                 .to_svg_doc_for_testing(),
-            include_str!("./test_time_signature_stencils.svg")
         );
     }
 
@@ -437,13 +491,59 @@ mod tests {
             })
             .collect();
 
-        assert_eq!(
-            Stencil::combine(staff_lines)
+        snapshot(
+            "./snapshots/clef_stencils.svg",
+            &Stencil::combine(staff_lines)
                 .and(clefs)
                 .with_translation(Vec2::new(0.0, -1.0))
                 .with_paper_size(3)
                 .to_svg_doc_for_testing(),
-            include_str!("./test_clef_stencils.svg")
+        );
+    }
+
+    #[test]
+    fn rests() {
+        let rests = Stencil::padding(0.2)
+            .and_right(Stencil::rest_256())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_128())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_64())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_32())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_16())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_8())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_quarter())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_half())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_whole())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_double_whole())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_longa())
+            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::rest_maxima())
+            .and_right(Stencil::padding(0.2));
+
+        let right = rests.rect().x1;
+
+        let staff_lines: Vec<Stencil> = (-2..=2)
+            .map(|i| {
+                Stencil::staff_line(right + 0.2).with_translation(Vec2::new(0.0, (i as f64) * 0.25))
+            })
+            .collect();
+
+        snapshot(
+            "./snapshots/rest_stencils.svg",
+            &Stencil::combine(staff_lines)
+                .and(rests)
+                .with_translation(Vec2::new(0.0, -1.0))
+                .with_paper_size(3)
+                .to_svg_doc_for_testing(),
         );
     }
 }
