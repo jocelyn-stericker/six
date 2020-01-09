@@ -81,7 +81,7 @@ impl MetreSegment {
 }
 
 #[derive(Debug, Clone)]
-pub struct Metre(Vec<MetreSegment>);
+pub struct Metre(Vec<MetreSegment>, u8, u8);
 
 /// The way beats are organized in a bar of music.
 impl Metre {
@@ -120,49 +120,64 @@ impl Metre {
             ]
         }
 
-        Metre(match (num, den) {
-            (4, 4) => duple(Rational::new(1, 2), 2),
-            (2, 2) => duple(Rational::new(1, 2), 1),
-            (4, 8) => duple(Rational::new(1, 4), 2),
-            (2, 4) => duple(Rational::new(1, 4), 1),
-            (6, 16) => duple(Rational::new(3, 16), 3),
-            (6, 8) => duple(Rational::new(3, 8), 3),
-            (6, 4) => duple(Rational::new(3, 4), 3),
-            (12, 8) => quad(Rational::new(3, 8), 3),
-            (3, 4) => triple(Rational::new(1, 4), 1),
-            (3, 8) => triple(Rational::new(1, 8), 1),
-            (9, 8) => triple(Rational::new(3, 8), 3),
-            (num, den)
-                if den == 1 || den == 2 || den == 4 || den == 8 || den == 16 || den == 32 =>
-            {
-                // Segments should have a printable duration.  There is no accepted convention for
-                // how to organize these segments, so take a guess.
-                let mut segments = Vec::new();
-                let mut t = num;
-                while t > 0 {
-                    let subdivisions = if t == 4 {
-                        4
-                    } else if t >= 3 {
-                        3
-                    } else if t >= 2 {
-                        2
-                    } else {
-                        1
-                    };
-                    assert!(t >= subdivisions);
-                    segments.push(MetreSegment {
-                        duration: Rational::new(subdivisions.into(), den.into()),
-                        subdivisions,
-                        // TODO: guess this too?
-                        superdivision: Superdivision::Duple,
-                    });
-                    t -= subdivisions;
-                }
+        Metre(
+            match (num, den) {
+                (4, 4) => duple(Rational::new(1, 2), 2),
+                (2, 2) => duple(Rational::new(1, 2), 1),
+                (4, 8) => duple(Rational::new(1, 4), 2),
+                (2, 4) => duple(Rational::new(1, 4), 1),
+                (6, 16) => duple(Rational::new(3, 16), 3),
+                (6, 8) => duple(Rational::new(3, 8), 3),
+                (6, 4) => duple(Rational::new(3, 4), 3),
+                (12, 8) => quad(Rational::new(3, 8), 3),
+                (3, 4) => triple(Rational::new(1, 4), 1),
+                (3, 8) => triple(Rational::new(1, 8), 1),
+                (9, 8) => triple(Rational::new(3, 8), 3),
+                (num, den)
+                    if den == 1 || den == 2 || den == 4 || den == 8 || den == 16 || den == 32 =>
+                {
+                    // Segments should have a printable duration.  There is no accepted convention for
+                    // how to organize these segments, so take a guess.
+                    let mut segments = Vec::new();
+                    let mut t = num;
+                    while t > 0 {
+                        let subdivisions = if t == 4 {
+                            4
+                        } else if t >= 3 {
+                            3
+                        } else if t >= 2 {
+                            2
+                        } else {
+                            1
+                        };
+                        assert!(t >= subdivisions);
+                        segments.push(MetreSegment {
+                            duration: Rational::new(subdivisions.into(), den.into()),
+                            subdivisions,
+                            // TODO: guess this too?
+                            superdivision: Superdivision::Duple,
+                        });
+                        t -= subdivisions;
+                    }
 
-                segments
-            }
-            _ => panic!("Invalid denominator."),
-        })
+                    segments
+                }
+                _ => panic!("Invalid denominator."),
+            },
+            num,
+            den,
+        )
+    }
+
+    pub fn num(&self) -> Option<u8> {
+        // Temporary implementation -- not all time signatures will have a single numerator.
+        Some(self.1)
+    }
+
+    /// Temporary.
+    pub fn den(&self) -> Option<u8> {
+        // Temporary implementation -- not all time signatures will have a single denominator.
+        Some(self.2)
     }
 
     /// The duration of the bar, in whole notes.

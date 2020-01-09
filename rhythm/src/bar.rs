@@ -1,9 +1,10 @@
-use crate::duration::Duration;
+use crate::duration::{Duration, NoteValue};
 use crate::metre::{Metre, MetreSegment, Subdivision, Superdivision};
 use num_integer::Integer;
 use num_rational::Rational;
 use num_traits::{sign::Signed, One, Zero};
 use std::collections::{BTreeSet, BinaryHeap};
+use stencil::Stencil;
 
 #[derive(Clone)]
 /// The rhythm and metre of a voice in a single bar.
@@ -168,6 +169,7 @@ impl Bar {
         }
     }
 
+    /// For optimize(), get's how "important" each subdivision is.
     fn get_powers(
         &self,
         div_parts: usize,
@@ -217,6 +219,7 @@ impl Bar {
         powers
     }
 
+    /// Split implicit rests in a reasonable way.
     fn optimize(&mut self) {
         let quant = Rational::new(
             1,
@@ -479,6 +482,7 @@ impl Bar {
         self.optimize();
     }
 
+    /// Determine how a note at a given position time be spelled, rhythmically.
     pub fn split_note(&self, t: Rational, duration: Duration) -> Vec<Duration> {
         if !duration.duration().is_positive() {
             return vec![];
@@ -551,6 +555,44 @@ impl Bar {
 
             split
         }
+    }
+
+    pub fn print(&self) -> Stencil {
+        let num = self.metre().num();
+        let den = self.metre().num();
+
+        let mut stencil = Stencil::padding(0.2);
+        if let (Some(num), Some(den)) = (num, den) {
+            stencil = stencil
+                .and_right(Stencil::time_sig_fraction(num, den))
+                .and_right(Stencil::padding(0.2));
+        }
+        for note_or_rest in self.rhythm() {
+            let rest = match note_or_rest.0.duration_display_base() {
+                Some(NoteValue::Maxima) => Stencil::rest_maxima(),
+                Some(NoteValue::Longa) => Stencil::rest_longa(),
+                Some(NoteValue::DoubleWhole) => Stencil::rest_double_whole(),
+                Some(NoteValue::Whole) => Stencil::rest_whole(),
+                Some(NoteValue::Half) => Stencil::rest_half(),
+                Some(NoteValue::Quarter) => Stencil::rest_quarter(),
+                Some(NoteValue::Eighth) => Stencil::rest_8(),
+                Some(NoteValue::Sixteenth) => Stencil::rest_16(),
+                Some(NoteValue::ThirtySecond) => Stencil::rest_32(),
+                Some(NoteValue::SixtyFourth) => Stencil::rest_64(),
+                Some(NoteValue::HundredTwentyEighth) => Stencil::rest_128(),
+                Some(NoteValue::TwoHundredFiftySixth) => Stencil::rest_256(),
+                None => Stencil::padding(0.2),
+            };
+
+            if note_or_rest.1 {
+                // Rendered elsewhere.
+                stencil = stencil.and_right(Stencil::padding(rest.advance()));
+            } else {
+                stencil = stencil.and_right(rest);
+            }
+        }
+
+        stencil
     }
 }
 
@@ -1826,6 +1868,30 @@ mod bar_tests {
                 Duration::new(NoteValue::Quarter, 2, None),
                 Duration::new(NoteValue::Half, 0, None)
             ]
+        );
+    }
+
+    #[test]
+    fn print() {
+        use kurbo::Vec2;
+        use stencil::snapshot;
+
+        let mut bar = Bar::new(Metre::new(2, 2));
+        bar.splice(
+            Rational::zero(),
+            vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+        );
+
+        let bar_stencil = bar.print();
+        let right = bar_stencil.rect().x1;
+
+        snapshot(
+            "./snapshots/bar.svg",
+            &bar_stencil
+                .and(Stencil::staff_line(right + 0.2))
+                .with_translation(Vec2::new(0.0, -1.0))
+                .with_paper_size(3)
+                .to_svg_doc_for_testing(),
         );
     }
 }

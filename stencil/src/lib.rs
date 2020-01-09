@@ -34,7 +34,7 @@ impl Stencil {
     pub fn padding(advance: f64) -> Stencil {
         Stencil::Path(Path {
             outline: BezPath::default(),
-            bounds: Rect::new(0.0, 0.0, 0.0, 0.0),
+            bounds: Rect::new(0.0, 0.0, advance, 0.0),
             advance,
         })
     }
@@ -320,13 +320,13 @@ impl Stencil {
                         rect.x0 = child_rect.x0;
                     }
                     if child_rect.y0 < rect.y0 {
-                        rect.x0 = child_rect.y0;
+                        rect.y0 = child_rect.y0;
                     }
                     if child_rect.x1 > rect.x1 {
                         rect.x1 = child_rect.x1;
                     }
                     if child_rect.y1 > rect.y1 {
-                        rect.x1 = child_rect.y1;
+                        rect.y1 = child_rect.y1;
                     }
                 }
 
@@ -433,17 +433,17 @@ impl Default for Stencil {
     }
 }
 
+pub fn snapshot(path: &str, contents: &str) {
+    if std::env::vars().any(|(key, _val)| key == "SIX_SNAPSHOT") {
+        std::fs::write(path, contents).unwrap();
+    } else {
+        assert_eq!(std::fs::read_to_string(path).unwrap(), contents);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
-
-    fn snapshot(path: &str, contents: &str) {
-        if std::env::vars().any(|(key, _val)| key == "SIX_SNAPSHOT") {
-            std::fs::write(path, contents).unwrap();
-        } else {
-            assert_eq!(std::fs::read_to_string(path).unwrap(), contents);
-        }
-    }
 
     #[test]
     fn time_signatures() {
@@ -458,13 +458,14 @@ mod tests {
             .and_right(Stencil::time_sig_fraction(6, 8))
             .and_right(Stencil::time_sig_common())
             .and_right(Stencil::time_sig_cut())
-            .and_right(Stencil::time_sig_cancel());
+            .and_right(Stencil::time_sig_cancel())
+            .and_right(Stencil::padding(0.2));
 
         let right = times.advance();
 
         snapshot(
             "./snapshots/time_signature_stencils.svg",
-            &Stencil::staff_line(right + 0.2)
+            &Stencil::staff_line(right)
                 .and(times)
                 .with_translation(Vec2::new(0.0, -0.5))
                 .with_paper_size(3)
@@ -486,9 +487,7 @@ mod tests {
         let right = clefs.rect().x1;
 
         let staff_lines: Vec<Stencil> = (-2..=2)
-            .map(|i| {
-                Stencil::staff_line(right + 0.2).with_translation(Vec2::new(0.0, (i as f64) * 0.25))
-            })
+            .map(|i| Stencil::staff_line(right).with_translation(Vec2::new(0.0, (i as f64) * 0.25)))
             .collect();
 
         snapshot(
@@ -532,9 +531,7 @@ mod tests {
         let right = rests.rect().x1;
 
         let staff_lines: Vec<Stencil> = (-2..=2)
-            .map(|i| {
-                Stencil::staff_line(right + 0.2).with_translation(Vec2::new(0.0, (i as f64) * 0.25))
-            })
+            .map(|i| Stencil::staff_line(right).with_translation(Vec2::new(0.0, (i as f64) * 0.25)))
             .collect();
 
         snapshot(

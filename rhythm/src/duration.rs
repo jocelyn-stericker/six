@@ -163,8 +163,8 @@ impl Duration {
     /// The kind of note this will be rendered as.
     pub fn duration_display_base(&self) -> Option<NoteValue> {
         match self.display_duration().to_f64().log2().floor() as isize {
-            3 => Some(NoteValue::DoubleWhole),
-            2 => Some(NoteValue::DoubleWhole),
+            3 => Some(NoteValue::Maxima),
+            2 => Some(NoteValue::Longa),
             1 => Some(NoteValue::DoubleWhole),
             0 => Some(NoteValue::Whole),
             -1 => Some(NoteValue::Half),
