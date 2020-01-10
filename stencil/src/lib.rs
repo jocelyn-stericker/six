@@ -129,6 +129,11 @@ impl Stencil {
         )
     }
 
+    pub fn stem_line(x: f64, y1: f64, y2: f64) -> Stencil {
+        let thickness = corefont::STEM_THICKNESS / 4.0;
+        Self::line(Line::new(Point::new(x, y1), Point::new(x, y2)), thickness)
+    }
+
     /// Initialize a stencil, in staff cordinates.
     fn from_corefont(corefont: &(i32, [i32; 4], &str)) -> Stencil {
         Stencil::Path(Path {
@@ -142,6 +147,13 @@ impl Stencil {
             ),
             advance: corefont.0 as f64 / (corefont::UNITS_PER_EM as f64),
         })
+    }
+
+    fn attachment(corefont: &[i32; 2]) -> Point {
+        Point::new(
+            corefont[0] as f64 / (corefont::UNITS_PER_EM as f64),
+            corefont[1] as f64 / (corefont::UNITS_PER_EM as f64),
+        )
     }
 
     pub fn time_sig_number(mut number: u8) -> Stencil {
@@ -268,6 +280,87 @@ impl Stencil {
 
     pub fn rest_256() -> Stencil {
         Self::from_corefont(&corefont::REST256TH)
+    }
+
+    pub fn notehead_x_double_whole() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_X_DOUBLE_WHOLE),
+            None,
+        )
+    }
+
+    pub fn notehead_x_whole() -> (Stencil, Option<Point>) {
+        (Self::from_corefont(&corefont::NOTEHEAD_X_WHOLE), None)
+    }
+
+    pub fn notehead_x_half_up() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_X_HALF),
+            Some(Self::attachment(&corefont::NOTEHEAD_X_HALF_STEM_UP)),
+        )
+    }
+
+    pub fn notehead_x_half_down() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_X_HALF),
+            Some(Self::attachment(&corefont::NOTEHEAD_X_HALF_STEM_DOWN)),
+        )
+    }
+
+    pub fn notehead_x_black_up() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_X_BLACK),
+            Some(Self::attachment(&corefont::NOTEHEAD_X_BLACK_STEM_UP)),
+        )
+    }
+
+    pub fn notehead_x_black_stem_down_attachment() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_X_BLACK),
+            Some(Self::attachment(&corefont::NOTEHEAD_X_BLACK_STEM_DOWN)),
+        )
+    }
+
+    pub fn flag_up_8() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG8TH_UP),
+            Self::attachment(&corefont::FLAG8TH_UP_STEM_UP),
+        )
+    }
+
+    pub fn flag_up_16() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG16TH_UP),
+            Self::attachment(&corefont::FLAG16TH_UP_STEM_UP),
+        )
+    }
+
+    pub fn flag_up_32() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG32ND_UP),
+            Self::attachment(&corefont::FLAG32ND_UP_STEM_UP),
+        )
+    }
+
+    pub fn flag_up_64() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG64TH_UP),
+            Self::attachment(&corefont::FLAG64TH_UP_STEM_UP),
+        )
+    }
+
+    pub fn flag_up_128() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG128TH_UP),
+            Self::attachment(&corefont::FLAG128TH_UP_STEM_UP),
+        )
+    }
+
+    pub fn flag_up_256() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG256TH_UP),
+            Self::attachment(&corefont::FLAG256TH_UP_STEM_UP),
+        )
     }
 
     pub fn combine(stencils: Vec<Stencil>) -> Stencil {

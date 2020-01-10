@@ -15,6 +15,9 @@ tmp/corefont.json: tmp/Bravura.json core.json glyphnames.json bravura_metadata.j
 	jq -r '.engravingDefaults | to_entries[] | "pub(crate) static " + (.key | gsub("(?<a>[A-Z])"; "_" + .a) | ascii_upcase) + ": f64 = " + (.value|tostring) + ";"' ./tmp/corefont.json >> ../src/corefont.rs
 	cat ./tmp/corefont.json | jq -r '"pub(crate) static UNITS_PER_EM: usize = " + (.unitsPerEm|tostring) + ";"' >> ../src/corefont.rs
 	cat ./tmp/corefont.json | jq -r '.glyphs[] | "pub(crate) static " + (.name | gsub("(?<a>[A-Z])"; "_" + .a) | ascii_upcase) + ": (i32, [i32; 4], &str) = (" + (.adv|tostring) + ", [" + (.bBoxSW[0]|tostring) + "," + (.bBoxSW[1]|tostring) + "," + (.bBoxNE[0]|tostring) + "," + (.bBoxNE[1]|tostring) + "], \"" + .d + "\");"' >> ../src/corefont.rs
+	cat ./tmp/corefont.json | jq -r '.glyphs[] | select(.stemDownNW) | "pub(crate) static " + (.name | gsub("(?<a>[A-Z])"; "_" + .a) | ascii_upcase) + "_STEM_DOWN: [i32; 2] = [" + (.stemDownNW[0]|tostring) + "," + (.stemDownNW[1]|tostring) + "];"' >> ../src/corefont.rs
+	cat ./tmp/corefont.json | jq -r '.glyphs[] | select(.stemUpSE) | "pub(crate) static " + (.name | gsub("(?<a>[A-Z])"; "_" + .a) | ascii_upcase) + "_STEM_UP: [i32; 2] = [" + (.stemUpSE[0]|tostring) + "," + (.stemUpSE[1]|tostring) + "];"' >> ../src/corefont.rs
+	cat ./tmp/corefont.json | jq -r '.glyphs[] | select(.stemUpNW) | "pub(crate) static " + (.name | gsub("(?<a>[A-Z])"; "_" + .a) | ascii_upcase) + "_STEM_UP: [i32; 2] = [" + (.stemUpNW[0]|tostring) + "," + (.stemUpNW[1]|tostring) + "];"' >> ../src/corefont.rs
 
 clean:
 	rm -fr tmp

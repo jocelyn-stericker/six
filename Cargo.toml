@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "rhythm",
-    "stencil"
+    "stencil",
+    "rest_note_chord"
 ]
