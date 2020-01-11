@@ -5,8 +5,7 @@ authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
 
 [dependencies]
-stencil = {path = "../stencil"}
-kurbo = {git = "https://github.com/jnetterf/kurbo", branch = "last_ctrl"}
+entity = {path = "../entity"}
 
 [dependencies.num-rational]
 version = "0.2.2"

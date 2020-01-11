@@ -1,17 +1,25 @@
-use crate::duration::{Duration, NoteValue};
+use crate::duration::Duration;
 use crate::metre::{Metre, MetreSegment, Subdivision, Superdivision};
+use entity::{EntitiesRes, Entity};
 use num_integer::Integer;
 use num_rational::Rational;
 use num_traits::{sign::Signed, One, Zero};
 use std::collections::{BTreeSet, BinaryHeap};
-use stencil::Stencil;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 /// The rhythm and metre of a voice in a single bar.
 pub struct Bar {
+    /// Time-signature and beat grouping spec.
     metre: Metre,
-    // true means a note, chord, or implicit rest. This will be an Entity eventually.
-    rhythm: Vec<(Duration, bool)>,
+
+    /// The Rests, Notes, and Chords (RNCs) that fill up this bar.
+    ///
+    /// If the entity is None, that means it's an implicit rest that is managed
+    /// by sys_implicit_rests.
+    rhythm: Vec<(Duration, Option<Entity>)>,
+
+    /// Automatically-generated ("managed") rests, managed by sys_implicit_rests.
+    managed: Vec<Entity>,
 }
 
 impl Bar {
@@ -20,6 +28,7 @@ impl Bar {
         Bar {
             metre,
             rhythm: vec![],
+            managed: vec![],
         }
     }
 
@@ -31,7 +40,7 @@ impl Bar {
         &self.metre
     }
 
-    pub fn rhythm(&self) -> &Vec<(Duration, bool)> {
+    pub fn rhythm(&self) -> &Vec<(Duration, Option<Entity>)> {
         &self.rhythm
     }
 
@@ -44,7 +53,7 @@ impl Bar {
                 .into_iter()
                 .zip(self.metre.division_starts().into_iter().skip(1))
             {
-                self.rhythm.push((Duration::exact(to - from, None), false));
+                self.rhythm.push((Duration::exact(to - from, None), None));
             }
         }
     }
@@ -52,13 +61,13 @@ impl Bar {
     fn try_amend(
         &self,
         division_start: Rational,
-        amend_to: Option<&mut (Duration, bool)>,
+        amend_to: Option<&mut (Duration, Option<Entity>)>,
         t: Rational,
         duration: Rational,
     ) -> bool {
         if let Some(amend_to) = amend_to {
             let prior_note_t = t - amend_to.0.duration();
-            if amend_to.1 {
+            if amend_to.1.is_some() {
                 return false;
             }
 
@@ -107,7 +116,7 @@ impl Bar {
         // The time, in whole notes, at which `existing_note` started, before this change.
         let mut t_read = Rational::zero();
         // The notes and rests, after the change.
-        let mut new: Vec<(Duration, bool)> = Vec::new();
+        let mut new: Vec<(Duration, Option<Entity>)> = Vec::new();
 
         for existing_note in &self.rhythm {
             let mut next_division_start = *division_starts.peek().unwrap();
@@ -121,14 +130,14 @@ impl Bar {
                 next_division_start = *division_starts.peek().unwrap();
             }
 
-            if !existing_note.1
+            if existing_note.1.is_none()
                 && t_read < next_division_start
                 && next_division_start < existing_note_end
             {
                 let new_duration = next_division_start - t_read;
                 assert!(new_duration.is_positive());
                 if !self.try_amend(division_start, new.last_mut(), t_read, new_duration) {
-                    new.push((Duration::exact(new_duration, None), false));
+                    new.push((Duration::exact(new_duration, None), None));
                 }
                 // The time up to which we have written to `new`.
                 let mut t_write = t_read + new_duration;
@@ -139,7 +148,7 @@ impl Bar {
 
                     let p = t_read.min(next_division_start);
                     if !self.try_amend(division_start, new.last_mut(), t_write, new_duration) {
-                        new.push((Duration::exact(new_duration, None), false));
+                        new.push((Duration::exact(new_duration, None), None));
                     }
 
                     t_write = p;
@@ -147,7 +156,7 @@ impl Bar {
 
                 assert_eq!(t_read, t_write);
             } else {
-                if existing_note.1
+                if existing_note.1.is_some()
                     || !self.try_amend(
                         division_start,
                         new.last_mut(),
@@ -162,7 +171,7 @@ impl Bar {
             }
         }
 
-        if self.rhythm.iter().any(|rhythm| rhythm.1) {
+        if self.rhythm.iter().any(|rhythm| rhythm.1.is_some()) {
             self.rhythm = new;
         } else {
             self.rhythm.clear();
@@ -236,8 +245,8 @@ impl Bar {
         struct PartialSolution {
             score: Rational,
             done_time: Rational,
-            todo: Vec<(Duration, bool)>,
-            done: Vec<(Duration, bool)>,
+            todo: Vec<(Duration, Option<Entity>)>,
+            done: Vec<(Duration, Option<Entity>)>,
         }
 
         let mut q: BinaryHeap<PartialSolution> = BinaryHeap::new();
@@ -257,7 +266,7 @@ impl Bar {
         }) = q.pop()
         {
             if let Some((first, remainder)) = input.split_first() {
-                if first.1 {
+                if first.1.is_some() {
                     output.push(*first);
                     q.push(PartialSolution {
                         score,
@@ -286,16 +295,17 @@ impl Bar {
                             }
 
                             let remainder_t = first.0.duration() - dur;
-                            let new_input: Vec<(Duration, bool)> = if remainder_t > Rational::zero()
+                            let new_input: Vec<(Duration, Option<Entity>)> = if remainder_t
+                                > Rational::zero()
                             {
-                                let mut x: Vec<(Duration, bool)> = input.to_vec();
+                                let mut x: Vec<(Duration, Option<Entity>)> = input.to_vec();
                                 x[0].0 =
                                     Duration::exact(remainder_t * tuplet_kind, Some(*tuplet_kind));
                                 x
                             } else {
                                 input.iter().skip(1).cloned().collect()
                             };
-                            output.push((displayed, false));
+                            output.push((displayed, None));
                             let mut score = score;
                             if !displayed.printable() {
                                 score -= 10000;
@@ -320,7 +330,9 @@ impl Bar {
                                                 q * Rational::from_integer(i.into()) + div_start;
                                             if t < t_beat && t_beat < t_next {
                                                 beats_covered.insert(i);
-                                            } else if t_beat == t_next && !note.1 && t == div_start
+                                            } else if t_beat == t_next
+                                                && note.1.is_none()
+                                                && t == div_start
                                             {
                                                 beats_exposed.insert(i);
                                             }
@@ -399,7 +411,7 @@ impl Bar {
     /// Existing notes entirely after the splice are kept.
     ///
     /// TODO: Handle tuplets
-    pub fn splice(&mut self, splice_start: Rational, replacement: Vec<(Duration, bool)>) {
+    pub fn splice(&mut self, splice_start: Rational, replacement: Vec<(Duration, Option<Entity>)>) {
         let bar_duration = self.metre.duration();
 
         if splice_start >= bar_duration {
@@ -449,7 +461,7 @@ impl Bar {
 
                 let pad_end = t_read - t_write;
                 if pad_end.is_positive() {
-                    new.push((Duration::exact(pad_end, None), false));
+                    new.push((Duration::exact(pad_end, None), None));
                     t_write += pad_end;
                 }
 
@@ -460,7 +472,7 @@ impl Bar {
                 if new_duration.is_positive() {
                     // We are splicing only the start of this note. We are creating a new rest with
                     // the remaining duration.
-                    new.push((Duration::exact(new_duration, None), false));
+                    new.push((Duration::exact(new_duration, None), None));
                     t_read = existing_note_end;
                     t_write += new_duration;
                     assert_eq!(t_read, t_write);
@@ -557,42 +569,60 @@ impl Bar {
         }
     }
 
-    pub fn print(&self) -> Stencil {
-        let num = self.metre().num();
-        let den = self.metre().num();
-
-        let mut stencil = Stencil::padding(0.2);
-        if let (Some(num), Some(den)) = (num, den) {
-            stencil = stencil
-                .and_right(Stencil::time_sig_fraction(num, den))
-                .and_right(Stencil::padding(0.2));
-        }
-        for note_or_rest in self.rhythm() {
-            let rest = match note_or_rest.0.duration_display_base() {
-                Some(NoteValue::Maxima) => Stencil::rest_maxima(),
-                Some(NoteValue::Longa) => Stencil::rest_longa(),
-                Some(NoteValue::DoubleWhole) => Stencil::rest_double_whole(),
-                Some(NoteValue::Whole) => Stencil::rest_whole(),
-                Some(NoteValue::Half) => Stencil::rest_half(),
-                Some(NoteValue::Quarter) => Stencil::rest_quarter(),
-                Some(NoteValue::Eighth) => Stencil::rest_8(),
-                Some(NoteValue::Sixteenth) => Stencil::rest_16(),
-                Some(NoteValue::ThirtySecond) => Stencil::rest_32(),
-                Some(NoteValue::SixtyFourth) => Stencil::rest_64(),
-                Some(NoteValue::HundredTwentyEighth) => Stencil::rest_128(),
-                Some(NoteValue::TwoHundredFiftySixth) => Stencil::rest_256(),
-                None => Stencil::padding(0.2),
-            };
-
-            if note_or_rest.1 {
-                // Rendered elsewhere.
-                stencil = stencil.and_right(Stencil::padding(rest.advance()));
-            } else {
-                stencil = stencil.and_right(rest);
+    fn target_managed_count(&self) -> usize {
+        let mut target_managed_count = 0;
+        for rnc in &self.rhythm {
+            if rnc.1.is_none() {
+                target_managed_count += 1;
             }
         }
 
-        stencil
+        target_managed_count
+    }
+
+    /// If targed_managed_count < managed_count, create a new managed entity.
+    ///
+    /// Returns the duration and ID for the created managed entity.
+    pub fn push_managed_entity(&mut self, entities: &EntitiesRes) -> Option<(Duration, Entity)> {
+        let mut managed_idx = self.managed.len();
+
+        for note in &self.rhythm {
+            if note.1.is_none() {
+                if managed_idx == 0 {
+                    let entity = entities.create();
+                    self.managed.push(entity);
+                    return Some((note.0, entity));
+                }
+                managed_idx -= 1;
+            }
+        }
+
+        None
+    }
+
+    /// If targed_managed_count > managed_count, remove a new managed entity.
+    ///
+    /// Returns the ID for the created managed entity.
+    pub fn pop_managed_entity(&mut self) -> Option<Entity> {
+        if self.target_managed_count() < self.managed.len() {
+            return self.managed.pop();
+        }
+
+        None
+    }
+
+    pub fn managed(&self) -> &Vec<Entity> {
+        &self.managed
+    }
+
+    /// Rest/note/chords (RNCs)
+    pub fn children(&self) -> Vec<Entity> {
+        let mut managed = self.managed().iter();
+
+        self.rhythm
+            .iter()
+            .map(|(_, entity)| entity.unwrap_or_else(|| *managed.next().unwrap()))
+            .collect()
     }
 }
 
@@ -608,14 +638,20 @@ mod bar_tests {
             assert!(bar.whole_rest());
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
             assert!(!bar.whole_rest());
@@ -624,14 +660,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(1, 4),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
         }
@@ -639,14 +681,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(1, 2),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
                 ],
             );
         }
@@ -655,16 +703,25 @@ mod bar_tests {
             bar.splice(
                 Rational::new(3, 4),
                 vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1)),
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1)),
+                    ),
                 ],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -673,7 +730,10 @@ mod bar_tests {
             assert!(bar.whole_rest());
             bar.splice(
                 Rational::new(4, 4),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(bar.rhythm(), &vec![]);
             assert!(bar.whole_rest());
@@ -682,14 +742,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(1, 4),
-                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Half, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
                 ],
             );
         }
@@ -701,11 +767,14 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(1, 4),
-                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Half, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(1, 4),
-                vec![(Duration::new(NoteValue::Half, 0, None), false)],
+                vec![(Duration::new(NoteValue::Half, 0, None), None)],
             );
             assert_eq!(bar.rhythm(), &vec![],);
         }
@@ -714,19 +783,25 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(1, 4),
-                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Half, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
         }
@@ -735,20 +810,26 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(1, 4),
-                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Half, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(5, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
             );
             // This is not a good rhythm, but we do not adjust explicit rhythms.
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 1, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
                 ],
             );
         }
@@ -757,39 +838,54 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(0, 1),
-                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Half, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(1, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(2, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(1, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
             );
             bar.splice(
                 Rational::new(2, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
             );
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), false)],
+                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
         }
@@ -802,14 +898,20 @@ mod bar_tests {
         for bar in &mut [Bar::new(Metre::new(4, 8)), Bar::new(Metre::new(2, 4))] {
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -817,33 +919,51 @@ mod bar_tests {
         for bar in &mut [Bar::new(Metre::new(4, 8)), Bar::new(Metre::new(2, 4))] {
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
         for bar in &mut [Bar::new(Metre::new(4, 8)), Bar::new(Metre::new(2, 4))] {
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
                 ],
             );
         }
@@ -851,14 +971,20 @@ mod bar_tests {
         for bar in &mut [Bar::new(Metre::new(4, 4)), Bar::new(Metre::new(2, 2))] {
             bar.splice(
                 Rational::new(3, 4),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -866,33 +992,51 @@ mod bar_tests {
         for bar in &mut [Bar::new(Metre::new(4, 4)), Bar::new(Metre::new(2, 2))] {
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(3, 4),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
         for bar in &mut [Bar::new(Metre::new(4, 4)), Bar::new(Metre::new(2, 2))] {
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
         }
@@ -906,14 +1050,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 16));
             bar.splice(
                 Rational::new(5, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 1, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -921,19 +1071,31 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 16));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(4, 16),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -941,15 +1103,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 16));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 1, None), false),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 1, None), None),
                 ],
             );
         }
@@ -958,14 +1126,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
                 Rational::new(5, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -973,19 +1147,31 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(4, 8),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -993,15 +1179,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
                 ],
             );
         }
@@ -1010,14 +1202,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 4));
             bar.splice(
                 Rational::new(5, 4),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 1, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (Duration::new(NoteValue::Half, 1, None), None),
+                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1025,19 +1223,31 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 4));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Half, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(4, 4),
-                vec![(Duration::new(NoteValue::Half, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Half, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), true),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1045,15 +1255,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 4));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Half, 1, None), false),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Half, 1, None), None),
                 ],
             );
         }
@@ -1062,15 +1278,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(12, 8));
             bar.splice(
                 Rational::new(11, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Half, 1, None), None),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1084,14 +1306,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(3, 4));
             bar.splice(
                 Rational::new(2, 4),
-                vec![(Duration::new(NoteValue::Quarter, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1100,14 +1328,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(3, 8));
             bar.splice(
                 Rational::new(2, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1116,14 +1350,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(9, 8));
             bar.splice(
                 Rational::new(6, 8),
-                vec![(Duration::new(NoteValue::Quarter, 1, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 1, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 1, None), true),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1137,19 +1377,31 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(2, 4));
             bar.splice(
                 Rational::new(3, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(7, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 1, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 1, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1158,15 +1410,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(9, 8));
             bar.splice(
                 Rational::new(8, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1180,20 +1438,32 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(2, 4));
             bar.splice(
                 Rational::new(3, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(4, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 1, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
                 ],
             );
         }
@@ -1201,20 +1471,32 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(2, 2));
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(4, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
                 ],
             );
         }
@@ -1228,15 +1510,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(7, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1245,15 +1533,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(4, 4));
             bar.splice(
                 Rational::new(3, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 1, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
         }
@@ -1262,19 +1556,31 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(2, 2));
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(7, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1283,15 +1589,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(2, 2));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
         }
@@ -1305,14 +1617,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(2, 4));
             bar.splice(
                 Rational::new(7, 32),
-                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::ThirtySecond, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 2, None), false),
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 2, None), None),
+                    (
+                        Duration::new(NoteValue::ThirtySecond, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
                 ],
             );
         }
@@ -1321,21 +1639,33 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(2, 4));
             bar.splice(
                 Rational::new(7, 32),
-                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::ThirtySecond, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(8, 32),
-                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::ThirtySecond, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 2, None), false),
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (Duration::new(NoteValue::Eighth, 2, None), None),
+                    (
+                        Duration::new(NoteValue::ThirtySecond, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::ThirtySecond, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), None),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
                 ],
             );
         }
@@ -1349,21 +1679,33 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(2, 4));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::ThirtySecond, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(7, 32),
-                vec![(Duration::new(NoteValue::ThirtySecond, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::ThirtySecond, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 1, None), false),
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
+                    (
+                        Duration::new(NoteValue::ThirtySecond, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::ThirtySecond, 0, None), None),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (Duration::new(NoteValue::Sixteenth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::ThirtySecond, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
                 ],
             );
         }
@@ -1379,14 +1721,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(12, 8));
             bar.splice(
                 Rational::new(9, 8),
-                vec![(Duration::new(NoteValue::Quarter, 1, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 1, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Quarter, 1, None), true),
+                    (Duration::new(NoteValue::Half, 1, None), None),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1395,14 +1743,20 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(12, 8));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Quarter, 1, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Quarter, 1, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), true),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
-                    (Duration::new(NoteValue::Half, 1, None), false),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (Duration::new(NoteValue::Half, 1, None), None),
                 ],
             );
         }
@@ -1416,19 +1770,31 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
                 Rational::new(1, 4),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(5, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1437,15 +1803,21 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
                 Rational::new(5, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 1, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
                 ],
             );
         }
@@ -1458,22 +1830,34 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
                 ],
             );
         }
@@ -1484,14 +1868,20 @@ mod bar_tests {
         let mut bar = Bar::new(Metre::new(4, 4));
         bar.splice(
             Rational::new(3, 4),
-            vec![(Duration::new(NoteValue::Half, 0, None), true)],
+            vec![(
+                Duration::new(NoteValue::Half, 0, None),
+                Some(Entity::new(1)),
+            )],
         );
         assert_eq!(
             bar.rhythm(),
             &vec![
-                (Duration::new(NoteValue::Half, 0, None), false),
-                (Duration::new(NoteValue::Quarter, 0, None), false),
-                (Duration::new(NoteValue::Quarter, 0, None), true),
+                (Duration::new(NoteValue::Half, 0, None), None),
+                (Duration::new(NoteValue::Quarter, 0, None), None),
+                (
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Some(Entity::new(1))
+                ),
             ],
         );
     }
@@ -1503,20 +1893,32 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
                 Rational::new(2, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(11, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 1, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1526,26 +1928,44 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(9, 8));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(5, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(8, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 0, None), false),
-                    (Duration::new(NoteValue::Eighth, 0, None), true),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Some(Entity::new(1))
+                    ),
                 ],
             );
         }
@@ -1554,22 +1974,34 @@ mod bar_tests {
             let mut bar = Bar::new(Metre::new(6, 8));
             bar.splice(
                 Rational::zero(),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             bar.splice(
                 Rational::new(5, 16),
-                vec![(Duration::new(NoteValue::Sixteenth, 0, None), true)],
+                vec![(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Some(Entity::new(1)),
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
                     // TODO: join?
-                    (Duration::new(NoteValue::Eighth, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), false),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), true),
-                    (Duration::new(NoteValue::Quarter, 1, None), false),
+                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Some(Entity::new(1))
+                    ),
+                    (Duration::new(NoteValue::Quarter, 1, None), None),
                 ],
             );
         }
@@ -1584,7 +2016,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                    true,
+                    Some(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1592,17 +2024,17 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        true
+                        Some(Entity::new(1))
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        false
+                        None
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        false
+                        None
                     ),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
         }
@@ -1612,7 +2044,7 @@ mod bar_tests {
                 Rational::new(2, 6),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                    true,
+                    Some(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1620,17 +2052,17 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        false
+                        None
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        false
+                        None
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        true
+                        Some(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Half, 0, None), false),
+                    (Duration::new(NoteValue::Half, 0, None), None),
                 ],
             );
         }
@@ -1868,30 +2300,6 @@ mod bar_tests {
                 Duration::new(NoteValue::Quarter, 2, None),
                 Duration::new(NoteValue::Half, 0, None)
             ]
-        );
-    }
-
-    #[test]
-    fn print() {
-        use kurbo::Vec2;
-        use stencil::snapshot;
-
-        let mut bar = Bar::new(Metre::new(2, 2));
-        bar.splice(
-            Rational::zero(),
-            vec![(Duration::new(NoteValue::Eighth, 0, None), true)],
-        );
-
-        let bar_stencil = bar.print();
-        let right = bar_stencil.rect().x1;
-
-        snapshot(
-            "./snapshots/bar.svg",
-            &bar_stencil
-                .and(Stencil::staff_line(right + 0.2))
-                .with_translation(Vec2::new(0.0, -1.0))
-                .with_paper_size(3)
-                .to_svg_doc_for_testing(),
         );
     }
 }

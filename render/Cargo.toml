@@ -1,15 +1,14 @@
 [package]
-name = "rest_note_chord"
+name = "render"
 version = "0.1.0"
 authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-rhythm = {path = "../rhythm"}
-stencil = {path = "../stencil"}
-entity = {path = "../entity"}
+entity = { path = "../entity" }
+rest_note_chord = { path = "../rest_note_chord" }
+rhythm = { path = "../rhythm" }
+stencil = { path = "../stencil" }
 kurbo = {git = "https://github.com/linebender/kurbo", rev = "680b4a94d11db6d59e2be323dee721d9bd25ae56"}
 
 [dependencies.num-rational]

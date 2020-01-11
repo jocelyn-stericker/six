@@ -1,7 +1,7 @@
 use num_rational::Rational;
 use num_traits::One;
 
-trait RationalToF64 {
+pub(crate) trait RationalToF64 {
     fn to_f64(&self) -> f64;
 }
 

@@ -3,14 +3,17 @@ mod corefont;
 use kurbo::{BezPath, Line, Point, Rect, TranslateScale, Vec2};
 
 /// A path with precomputed bounds.
+#[derive(Debug, Clone)]
 pub struct Path {
     pub(crate) outline: BezPath,
     pub(crate) bounds: Rect,
     pub(crate) advance: f64,
 }
 
+#[derive(Debug, Clone)]
 pub struct CombineStencil(pub Vec<Stencil>);
 
+#[derive(Debug, Clone)]
 pub enum Stencil {
     Path(Path),
     Combine(CombineStencil),
@@ -370,6 +373,10 @@ impl Stencil {
             Self::from_corefont(&corefont::FLAG256TH_UP),
             Self::attachment(corefont::FLAG256TH_UP_STEM_UP),
         )
+    }
+
+    pub fn augmentation_dot() -> Stencil {
+        Self::from_corefont(&corefont::AUGMENTATION_DOT)
     }
 
     pub fn combine(stencils: Vec<Stencil>) -> Stencil {
