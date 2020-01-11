@@ -9,4 +9,4 @@ edition = "2018"
 [dependencies]
 rhythm = {path = "../rhythm"}
 stencil = {path = "../stencil"}
-kurbo = "0.5.6"
+kurbo = {git = "https://github.com/jnetterf/kurbo", branch = "last_ctrl"}

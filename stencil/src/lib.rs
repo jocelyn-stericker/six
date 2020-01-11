@@ -73,8 +73,6 @@ impl Stencil {
     ///
     /// This stencil has a blot diameter equal to the thickness, which is included in the
     /// bounding box.
-    ///
-    /// (In Lilypond, it's not included.)
     pub fn line(line: Line, thickness: f64) -> Stencil {
         if line.p0 == line.p1 {
             return Self::circle(thickness / 2.0, line.p0, 0.0);
@@ -129,9 +127,20 @@ impl Stencil {
         )
     }
 
-    pub fn stem_line(x: f64, y1: f64, y2: f64) -> Stencil {
+    /// Includes blot in height.
+    pub fn stem_line(x: f64, mut y1: f64, mut y2: f64) -> Stencil {
+        if y1 > y2 {
+            std::mem::swap(&mut y1, &mut y2);
+        }
+
         let thickness = corefont::STEM_THICKNESS / 4.0;
-        Self::line(Line::new(Point::new(x, y1), Point::new(x, y2)), thickness)
+        Self::line(
+            Line::new(
+                Point::new(x, y1 + thickness / 2.0),
+                Point::new(x, y2 - thickness / 2.0),
+            ),
+            thickness,
+        )
     }
 
     /// Initialize a stencil, in staff cordinates.
@@ -149,7 +158,7 @@ impl Stencil {
         })
     }
 
-    fn attachment(corefont: &[i32; 2]) -> Point {
+    fn attachment(corefont: [i32; 2]) -> Point {
         Point::new(
             corefont[0] as f64 / (corefont::UNITS_PER_EM as f64),
             corefont[1] as f64 / (corefont::UNITS_PER_EM as f64),
@@ -296,70 +305,70 @@ impl Stencil {
     pub fn notehead_x_half_up() -> (Stencil, Option<Point>) {
         (
             Self::from_corefont(&corefont::NOTEHEAD_X_HALF),
-            Some(Self::attachment(&corefont::NOTEHEAD_X_HALF_STEM_UP)),
+            Some(Self::attachment(corefont::NOTEHEAD_X_HALF_STEM_UP)),
         )
     }
 
     pub fn notehead_x_half_down() -> (Stencil, Option<Point>) {
         (
             Self::from_corefont(&corefont::NOTEHEAD_X_HALF),
-            Some(Self::attachment(&corefont::NOTEHEAD_X_HALF_STEM_DOWN)),
+            Some(Self::attachment(corefont::NOTEHEAD_X_HALF_STEM_DOWN)),
         )
     }
 
     pub fn notehead_x_black_up() -> (Stencil, Option<Point>) {
         (
             Self::from_corefont(&corefont::NOTEHEAD_X_BLACK),
-            Some(Self::attachment(&corefont::NOTEHEAD_X_BLACK_STEM_UP)),
+            Some(Self::attachment(corefont::NOTEHEAD_X_BLACK_STEM_UP)),
         )
     }
 
     pub fn notehead_x_black_stem_down_attachment() -> (Stencil, Option<Point>) {
         (
             Self::from_corefont(&corefont::NOTEHEAD_X_BLACK),
-            Some(Self::attachment(&corefont::NOTEHEAD_X_BLACK_STEM_DOWN)),
+            Some(Self::attachment(corefont::NOTEHEAD_X_BLACK_STEM_DOWN)),
         )
     }
 
     pub fn flag_up_8() -> (Stencil, Point) {
         (
             Self::from_corefont(&corefont::FLAG8TH_UP),
-            Self::attachment(&corefont::FLAG8TH_UP_STEM_UP),
+            Self::attachment(corefont::FLAG8TH_UP_STEM_UP),
         )
     }
 
     pub fn flag_up_16() -> (Stencil, Point) {
         (
             Self::from_corefont(&corefont::FLAG16TH_UP),
-            Self::attachment(&corefont::FLAG16TH_UP_STEM_UP),
+            Self::attachment(corefont::FLAG16TH_UP_STEM_UP),
         )
     }
 
     pub fn flag_up_32() -> (Stencil, Point) {
         (
             Self::from_corefont(&corefont::FLAG32ND_UP),
-            Self::attachment(&corefont::FLAG32ND_UP_STEM_UP),
+            Self::attachment(corefont::FLAG32ND_UP_STEM_UP),
         )
     }
 
     pub fn flag_up_64() -> (Stencil, Point) {
         (
             Self::from_corefont(&corefont::FLAG64TH_UP),
-            Self::attachment(&corefont::FLAG64TH_UP_STEM_UP),
+            Self::attachment(corefont::FLAG64TH_UP_STEM_UP),
         )
     }
 
     pub fn flag_up_128() -> (Stencil, Point) {
         (
             Self::from_corefont(&corefont::FLAG128TH_UP),
-            Self::attachment(&corefont::FLAG128TH_UP_STEM_UP),
+            Self::attachment(corefont::FLAG128TH_UP_STEM_UP),
         )
     }
 
     pub fn flag_up_256() -> (Stencil, Point) {
         (
             Self::from_corefont(&corefont::FLAG256TH_UP),
-            Self::attachment(&corefont::FLAG256TH_UP_STEM_UP),
+            Self::attachment(corefont::FLAG256TH_UP_STEM_UP),
         )
     }
 

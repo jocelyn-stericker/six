@@ -46,21 +46,20 @@ impl RestNoteChord {
 
                 if let Some((flag, flag_attachment)) = flag {
                     let top = attachment.y + 3.5 / 4.0;
-                    stencil = stencil.and(Stencil::stem_line(
-                        attachment.x,
-                        attachment.y,
-                        top + flag_attachment.y,
-                    ));
+                    let stem =
+                        Stencil::stem_line(attachment.x, attachment.y, top + flag_attachment.y);
+                    let stem_width = stem.rect().width();
+                    stencil = stencil.and(stem);
 
                     stencil = stencil.and(
-                        flag.with_translation(Vec2::new(attachment.x + flag_attachment.x, top)),
+                        flag.with_translation(Vec2::new(attachment.x - stem_width / 2.0, top)),
                     );
                 }
             }
 
             stencil
         } else {
-            let rest = match self.duration.duration_display_base() {
+            match self.duration.duration_display_base() {
                 Some(NoteValue::Maxima) => Stencil::rest_maxima(),
                 Some(NoteValue::Longa) => Stencil::rest_longa(),
                 Some(NoteValue::DoubleWhole) => Stencil::rest_double_whole(),
@@ -74,9 +73,7 @@ impl RestNoteChord {
                 Some(NoteValue::HundredTwentyEighth) => Stencil::rest_128(),
                 Some(NoteValue::TwoHundredFiftySixth) => Stencil::rest_256(),
                 None => Stencil::padding(0.2),
-            };
-
-            rest
+            }
         }
     }
 }
