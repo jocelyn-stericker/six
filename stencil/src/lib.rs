@@ -1,4 +1,7 @@
 mod corefont;
+mod stencil_map;
+
+pub use stencil_map::StencilMap;
 
 use kurbo::{BezPath, Line, Point, Rect, TranslateScale, Vec2};
 
@@ -45,11 +48,9 @@ impl Stencil {
     /// Draw a reasonable approximation of a circle.
     ///
     /// The radial error is about 0.0273%.
-    ///
-    /// For consistency, this function accepts blot. This is added to the radius.
-    pub fn circle(radius: f64, center: Point, blot_diameter: f64) -> Stencil {
-        let rx = Vec2::new(radius + blot_diameter / 2.0, 0.0);
-        let ry = Vec2::new(0.0, radius + blot_diameter / 2.0);
+    pub fn circle(radius: f64, center: Point) -> Stencil {
+        let rx = Vec2::new(radius, 0.0);
+        let ry = Vec2::new(0.0, radius);
         let cx = rx * BEZIER_CIRCLE_FACTOR;
         let cy = ry * BEZIER_CIRCLE_FACTOR;
 
@@ -78,7 +79,7 @@ impl Stencil {
     /// bounding box.
     pub fn line(line: Line, thickness: f64) -> Stencil {
         if line.p0 == line.p1 {
-            return Self::circle(thickness / 2.0, line.p0, 0.0);
+            return Self::circle(thickness / 2.0, line.p0);
         }
 
         let normal = normal(line);
@@ -126,7 +127,7 @@ impl Stencil {
     pub fn staff_line(width: f64) -> Stencil {
         Self::line(
             Line::new(Point::new(0.0, 0.0), Point::new(width, 0.0)),
-            corefont::STAFF_LINE_THICKNESS / 4.0,
+            corefont::STAFF_LINE_THICKNESS,
         )
     }
 
@@ -136,7 +137,7 @@ impl Stencil {
             std::mem::swap(&mut y1, &mut y2);
         }
 
-        let thickness = corefont::STEM_THICKNESS / 4.0;
+        let thickness = corefont::STEM_THICKNESS;
         Self::line(
             Line::new(
                 Point::new(x, y1 + thickness / 2.0),
@@ -147,25 +148,17 @@ impl Stencil {
     }
 
     /// Initialize a stencil, in staff cordinates.
-    fn from_corefont(corefont: &(i32, [i32; 4], &str)) -> Stencil {
+    fn from_corefont(corefont: &(f64, [f64; 4], &str)) -> Stencil {
+        assert_eq!(corefont::UNITS_PER_EM, 1000);
         Stencil::Path(Path {
-            outline: TranslateScale::scale(1.0 / (corefont::UNITS_PER_EM as f64))
-                * BezPath::from_svg(corefont.2).expect("Invalid corefont"),
-            bounds: Rect::new(
-                corefont.1[0] as f64 / (corefont::UNITS_PER_EM as f64),
-                corefont.1[1] as f64 / (corefont::UNITS_PER_EM as f64),
-                corefont.1[2] as f64 / (corefont::UNITS_PER_EM as f64),
-                corefont.1[3] as f64 / (corefont::UNITS_PER_EM as f64),
-            ),
-            advance: corefont.0 as f64 / (corefont::UNITS_PER_EM as f64),
+            outline: BezPath::from_svg(corefont.2).expect("Invalid corefont"),
+            bounds: Rect::new(corefont.1[0], corefont.1[1], corefont.1[2], corefont.1[3]),
+            advance: corefont.0,
         })
     }
 
-    fn attachment(corefont: [i32; 2]) -> Point {
-        Point::new(
-            corefont[0] as f64 / (corefont::UNITS_PER_EM as f64),
-            corefont[1] as f64 / (corefont::UNITS_PER_EM as f64),
-        )
+    fn attachment(corefont: [f64; 2]) -> Point {
+        Point::new(corefont[0], corefont[1])
     }
 
     pub fn time_sig_number(mut number: u8) -> Stencil {
@@ -208,11 +201,11 @@ impl Stencil {
         let den_adv = den.advance();
 
         if num_adv > den_adv {
-            num = num.with_translation(Vec2::new(0.0, 0.247));
-            den = den.with_translation(Vec2::new((num_adv - den_adv) / 2.0, -0.247));
+            num = num.with_translation(Vec2::new(0.0, 247.0));
+            den = den.with_translation(Vec2::new((num_adv - den_adv) / 2.0, -247.0));
         } else {
-            num = num.with_translation(Vec2::new((den_adv - num_adv) / 2.0, 0.247));
-            den = den.with_translation(Vec2::new(0.0, -0.247));
+            num = num.with_translation(Vec2::new((den_adv - num_adv) / 2.0, 247.0));
+            den = den.with_translation(Vec2::new(0.0, -247.0));
         }
 
         Stencil::combine(vec![num, den])
@@ -480,15 +473,15 @@ impl Stencil {
     ///  - 8 is used for full scores.
     pub fn with_paper_size(self, rastal: u8) -> Stencil {
         match rastal {
-            0 => self.with_scale(9.2),
-            1 => self.with_scale(7.9),
-            2 => self.with_scale(7.4),
-            3 => self.with_scale(7.0),
-            4 => self.with_scale(6.5),
-            5 => self.with_scale(6.0),
-            6 => self.with_scale(5.5),
-            7 => self.with_scale(4.8),
-            8 => self.with_scale(3.7),
+            0 => self.with_scale(9.2 / 1000.0),
+            1 => self.with_scale(7.9 / 1000.0),
+            2 => self.with_scale(7.4 / 1000.0),
+            3 => self.with_scale(7.0 / 1000.0),
+            4 => self.with_scale(6.5 / 1000.0),
+            5 => self.with_scale(6.0 / 1000.0),
+            6 => self.with_scale(5.5 / 1000.0),
+            7 => self.with_scale(4.8 / 1000.0),
+            8 => self.with_scale(3.7 / 1000.0),
             _ => panic!("Expected rastal size <= 8"),
         }
     }
@@ -556,7 +549,7 @@ mod tests {
 
     #[test]
     fn time_signatures() {
-        let times = Stencil::padding(0.2)
+        let times = Stencil::padding(200.0)
             .and_right(Stencil::time_sig_fraction(4, 4))
             .and_right(Stencil::time_sig_fraction(3, 4))
             .and_right(Stencil::time_sig_fraction(5, 4))
@@ -568,7 +561,7 @@ mod tests {
             .and_right(Stencil::time_sig_common())
             .and_right(Stencil::time_sig_cut())
             .and_right(Stencil::time_sig_cancel())
-            .and_right(Stencil::padding(0.2));
+            .and_right(Stencil::padding(200.0));
 
         let right = times.advance();
 
@@ -576,7 +569,7 @@ mod tests {
             "./snapshots/time_signature_stencils.svg",
             &Stencil::staff_line(right)
                 .and(times)
-                .with_translation(Vec2::new(0.0, -0.5))
+                .with_translation(Vec2::new(0.0, -1000.0))
                 .with_paper_size(3)
                 .to_svg_doc_for_testing(),
         );
@@ -584,26 +577,28 @@ mod tests {
 
     #[test]
     fn clefs() {
-        let clefs = Stencil::padding(0.2)
+        let clefs = Stencil::padding(200.0)
             .and_right(Stencil::clef_c())
-            .and_right(Stencil::padding(0.2))
-            .and_right(Stencil::clef_f().with_translation(Vec2::new(0.0, 0.25)))
-            .and_right(Stencil::padding(0.2))
-            .and_right(Stencil::clef_g().with_translation(Vec2::new(0.0, -0.25)))
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
+            .and_right(Stencil::clef_f().with_translation(Vec2::new(0.0, 250.0)))
+            .and_right(Stencil::padding(200.0))
+            .and_right(Stencil::clef_g().with_translation(Vec2::new(0.0, -250.0)))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::clef_unpitched())
-            .and_right(Stencil::padding(0.2));
+            .and_right(Stencil::padding(200.0));
         let right = clefs.rect().x1;
 
         let staff_lines: Vec<Stencil> = (-2..=2)
-            .map(|i| Stencil::staff_line(right).with_translation(Vec2::new(0.0, (i as f64) * 0.25)))
+            .map(|i| {
+                Stencil::staff_line(right).with_translation(Vec2::new(0.0, (i as f64) * 250.0))
+            })
             .collect();
 
         snapshot(
             "./snapshots/clef_stencils.svg",
             &Stencil::combine(staff_lines)
                 .and(clefs)
-                .with_translation(Vec2::new(0.0, -1.0))
+                .with_translation(Vec2::new(0.0, -1000.0))
                 .with_paper_size(3)
                 .to_svg_doc_for_testing(),
         );
@@ -611,43 +606,45 @@ mod tests {
 
     #[test]
     fn rests() {
-        let rests = Stencil::padding(0.2)
+        let rests = Stencil::padding(200.0)
             .and_right(Stencil::rest_256())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_128())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_64())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_32())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_16())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_8())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_quarter())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_half())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_whole())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_double_whole())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_longa())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(Stencil::rest_maxima())
-            .and_right(Stencil::padding(0.2));
+            .and_right(Stencil::padding(200.0));
 
         let right = rests.rect().x1;
 
         let staff_lines: Vec<Stencil> = (-2..=2)
-            .map(|i| Stencil::staff_line(right).with_translation(Vec2::new(0.0, (i as f64) * 0.25)))
+            .map(|i| {
+                Stencil::staff_line(right).with_translation(Vec2::new(0.0, (i as f64) * 250.0))
+            })
             .collect();
 
         snapshot(
             "./snapshots/rest_stencils.svg",
             &Stencil::combine(staff_lines)
                 .and(rests)
-                .with_translation(Vec2::new(0.0, -1.0))
+                .with_translation(Vec2::new(0.0, -1000.0))
                 .with_paper_size(3)
                 .to_svg_doc_for_testing(),
         );

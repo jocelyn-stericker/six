@@ -4,5 +4,6 @@ members = [
     "render",
     "rest_note_chord",
     "rhythm",
+    "staff",
     "stencil",
 ]

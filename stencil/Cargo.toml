@@ -5,4 +5,5 @@ authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
 
 [dependencies]
+entity = {path = "../entity"}
 kurbo = {git = "https://github.com/linebender/kurbo", rev = "680b4a94d11db6d59e2be323dee721d9bd25ae56"}

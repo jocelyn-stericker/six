@@ -64,7 +64,7 @@ impl RestNoteChord {
                     _ => None,
                 };
 
-                let top = attachment.y + 3.5 / 4.0;
+                let top = attachment.y + 875.0;
                 let stem = Stencil::stem_line(
                     attachment.x,
                     attachment.y,
@@ -93,7 +93,7 @@ impl RestNoteChord {
                 Some(NoteValue::SixtyFourth) => Stencil::rest_64(),
                 Some(NoteValue::HundredTwentyEighth) => Stencil::rest_128(),
                 Some(NoteValue::TwoHundredFiftySixth) => Stencil::rest_256(),
-                None => Stencil::padding(0.2),
+                None => Stencil::padding(200.0),
             };
             head_right = stencil.rect().x1;
         };
@@ -102,13 +102,13 @@ impl RestNoteChord {
             let mut dot_stencil = Stencil::default();
             for i in 0..dots {
                 if i == 0 {
-                    dot_stencil = dot_stencil.and_right(Stencil::padding(0.45 / 4.0));
+                    dot_stencil = dot_stencil.and_right(Stencil::padding(112.5));
                 } else {
-                    dot_stencil = dot_stencil.and_right(Stencil::padding(0.05 / 4.0));
+                    dot_stencil = dot_stencil.and_right(Stencil::padding(12.5));
                 }
                 dot_stencil = dot_stencil.and_right(Stencil::augmentation_dot());
             }
-            stencil = stencil.and(dot_stencil.with_translation(Vec2::new(head_right, 0.5 / 4.0)));
+            stencil = stencil.and(dot_stencil.with_translation(Vec2::new(head_right, 125.0)));
         }
 
         stencil
@@ -133,36 +133,36 @@ mod tests {
         use kurbo::Vec2;
         use stencil::snapshot;
 
-        let notes = Stencil::padding(0.2)
+        let notes = Stencil::padding(200.0)
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::DoubleWhole, 0, None), true).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Whole, 0, None), true).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Half, 0, None), true).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Quarter, 0, None), true).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Eighth, 0, None), true).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::Sixteenth, 0, None), true).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::ThirtySecond, 0, None), true).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::SixtyFourth, 0, None), true).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::HundredTwentyEighth, 0, None), true)
                     .print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::TwoHundredFiftySixth, 0, None),
@@ -170,36 +170,36 @@ mod tests {
                 )
                 .print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::DoubleWhole, 1, None), true).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Whole, 1, None), true).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Half, 1, None), true).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Quarter, 1, None), true).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Eighth, 1, None), true).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::Sixteenth, 1, None), true).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::ThirtySecond, 1, None), true).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::SixtyFourth, 1, None), true).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::HundredTwentyEighth, 1, None), true)
                     .print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::TwoHundredFiftySixth, 1, None),
@@ -207,33 +207,33 @@ mod tests {
                 )
                 .print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::DoubleWhole, 0, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Whole, 0, None), false).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Half, 0, None), false).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::Quarter, 0, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Eighth, 0, None), false).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::Sixteenth, 0, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::ThirtySecond, 0, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::SixtyFourth, 0, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::HundredTwentyEighth, 0, None),
@@ -241,7 +241,7 @@ mod tests {
                 )
                 .print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::TwoHundredFiftySixth, 0, None),
@@ -249,33 +249,33 @@ mod tests {
                 )
                 .print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::DoubleWhole, 2, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Whole, 2, None), false).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Half, 2, None), false).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::Quarter, 2, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(RestNoteChord::new(Duration::new(NoteValue::Eighth, 2, None), false).print())
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::Sixteenth, 2, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::ThirtySecond, 2, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(Duration::new(NoteValue::SixtyFourth, 2, None), false).print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::HundredTwentyEighth, 2, None),
@@ -283,7 +283,7 @@ mod tests {
                 )
                 .print(),
             )
-            .and_right(Stencil::padding(0.2))
+            .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::TwoHundredFiftySixth, 2, None),
@@ -297,8 +297,8 @@ mod tests {
         snapshot(
             "./snapshots/rnc.svg",
             &notes
-                .and(Stencil::staff_line(right + 0.2))
-                .with_translation(Vec2::new(0.0, -2.0))
+                .and(Stencil::staff_line(right + 200.0))
+                .with_translation(Vec2::new(0.0, -2000.0))
                 .with_paper_size(3)
                 .to_svg_doc_for_testing(),
         );
