@@ -4,6 +4,7 @@ use rhythm::{Bar, RelativeRhythmicSpacing};
 use staff::{sys_print_staff, sys_print_staff_lines, Staff};
 use std::collections::HashMap;
 use stencil::{Stencil, StencilMap};
+use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Default)]
 pub struct Render {
@@ -39,6 +40,87 @@ impl Render {
         );
         sys_print_staff_lines(&self.staffs, &mut self.stencils);
     }
+}
+
+#[wasm_bindgen]
+pub fn hello_world() -> String {
+    use kurbo::Vec2;
+
+    use num_rational::Rational;
+    use rhythm::{Duration, Metre, NoteValue};
+
+    let mut render = Render::default();
+    let staff_entity = render.entities.create();
+
+    let mut staff = Staff::new();
+
+    {
+        let bar_entity = render.entities.create();
+
+        let note_entity = render.entities.create();
+        render.spacing.insert(note_entity, Default::default());
+        render.rncs.insert(
+            note_entity,
+            RestNoteChord::new(Duration::new(NoteValue::Eighth, 0, None), true),
+        );
+        render.stencils.insert(note_entity, Default::default());
+
+        let mut bar = Bar::new(Metre::new(4, 4));
+        bar.splice(
+            Rational::new(1, 4),
+            vec![(Duration::new(NoteValue::Half, 0, None), Some(note_entity))],
+        );
+        bar.splice(
+            Rational::new(3, 8),
+            vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
+        );
+
+        render.bars.insert(bar_entity, bar);
+        render.stencil_maps.insert(bar_entity, Default::default());
+
+        staff.bars.push(bar_entity);
+    }
+
+    {
+        let bar_entity = render.entities.create();
+
+        let note_entity = render.entities.create();
+        render.spacing.insert(note_entity, Default::default());
+        render.rncs.insert(
+            note_entity,
+            RestNoteChord::new(Duration::new(NoteValue::Eighth, 0, None), true),
+        );
+        render.stencils.insert(note_entity, Default::default());
+
+        let mut bar = Bar::new(Metre::new(4, 4));
+        bar.splice(
+            Rational::new(1, 4),
+            vec![(Duration::new(NoteValue::Half, 0, None), Some(note_entity))],
+        );
+        bar.splice(
+            Rational::new(3, 8),
+            vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
+        );
+
+        render.bars.insert(bar_entity, bar);
+        render.stencil_maps.insert(bar_entity, Default::default());
+
+        staff.bars.push(bar_entity);
+    }
+
+    render.staffs.insert(staff_entity, staff);
+    render.stencil_maps.insert(staff_entity, Default::default());
+
+    render.exec();
+
+    render
+        .stencil_maps
+        .get(&staff_entity)
+        .unwrap()
+        .clone()
+        .with_translation(Vec2::new(0.0, -1500.0))
+        .with_paper_size(3)
+        .to_svg_doc_for_testing(&render.stencil_maps, &render.stencils)
 }
 
 #[cfg(test)]

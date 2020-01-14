@@ -4,6 +4,9 @@ version = "0.1.0"
 authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
 
+[lib]
+crate-type = ["cdylib"]
+
 [dependencies]
 entity = { path = "../entity" }
 rest_note_chord = { path = "../rest_note_chord" }
@@ -11,6 +14,7 @@ rhythm = { path = "../rhythm" }
 staff = { path = "../staff" }
 stencil = { path = "../stencil" }
 kurbo = {git = "https://github.com/linebender/kurbo", rev = "680b4a94d11db6d59e2be323dee721d9bd25ae56"}
+wasm-bindgen = "0.2.58"
 
 [dependencies.num-rational]
 version = "0.2.2"
