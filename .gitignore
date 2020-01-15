@@ -3,3 +3,4 @@ target
 Cargo.lock
 stencil/gen_corefont/tmp
 webapp/node_modules
+webapp/dist

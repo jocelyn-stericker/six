@@ -1,0 +1,33 @@
+name: Deploy
+on: [push]
+
+jobs:
+  build_and_test:
+    name: Deploy six-eight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions-rs/toolchain@v1
+        with:
+            toolchain: stable
+            target: wasm32-unknown-unknown
+            components: clippy
+            override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: test
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-node@v1
+        with:
+          node-version: '10.x'
+      - run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh 
+      - run: cd ./webapp; npm install; npm test; npm run build
+      - uses: netlify/actions/cli@master
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        with:
+          args: deploy --dir=webapp/dist --prod
+          secrets: '["NETLIFY_AUTH_TOKEN", "NETLIFY_SITE_ID"]'
