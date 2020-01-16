@@ -10,6 +10,7 @@
 //! There is a `Join` trait which can be used to join HashSets, HashMap refs, and HashMap mut refs,
 //! based on SPECS `Join` trait. This is used to filter entities to those which are in a set or
 //! have all required components.
+#![allow(clippy::implicit_hasher)]
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -66,7 +67,7 @@ impl<'a, T> Join for &'a mut HashMap<Entity, T> {
     type Value = &'a mut T;
 
     fn join(self) -> HashMap<Entity, &'a mut T> {
-        self.into_iter().map(|(a, b)| (*a, b)).collect()
+        self.iter_mut().map(|(a, b)| (*a, b)).collect()
     }
 }
 
@@ -79,19 +80,7 @@ impl Join for &HashSet<Entity> {
 }
 
 // Trivial.
-impl Join for () {
-    type Value = ();
-
-    fn join(self) -> HashMap<Entity, ()> {
-        Default::default()
-    }
-}
-
-// Trivial.
-impl<A, AT> Join for (A,)
-where
-    A: Join<Value = AT>,
-{
+impl<A: Join<Value = AT>, AT> Join for (A,) {
     type Value = (AT,);
 
     fn join(self) -> HashMap<Entity, (AT,)> {
@@ -99,11 +88,7 @@ where
     }
 }
 
-impl<A, B, AT, BT> Join for (A, B)
-where
-    A: Join<Value = AT>,
-    B: Join<Value = BT>,
-{
+impl<A: Join<Value = AT>, B: Join<Value = BT>, AT, BT> Join for (A, B) {
     type Value = (AT, BT);
 
     fn join(self) -> HashMap<Entity, (AT, BT)> {
@@ -126,11 +111,8 @@ where
     }
 }
 
-impl<'a, A, B, C, AT, BT, CT> Join for (A, B, C)
-where
-    A: Join<Value = AT>,
-    B: Join<Value = BT>,
-    C: Join<Value = CT>,
+impl<'a, A: Join<Value = AT>, B: Join<Value = BT>, C: Join<Value = CT>, AT, BT, CT> Join
+    for (A, B, C)
 {
     type Value = (AT, BT, CT);
 
@@ -166,12 +148,17 @@ where
     }
 }
 
-impl<'a, A, B, C, D, AT, BT, CT, DT> Join for (A, B, C, D)
-where
-    A: Join<Value = AT>,
-    B: Join<Value = BT>,
-    C: Join<Value = CT>,
-    D: Join<Value = DT>,
+impl<
+        'a,
+        A: Join<Value = AT>,
+        B: Join<Value = BT>,
+        C: Join<Value = CT>,
+        D: Join<Value = DT>,
+        AT,
+        BT,
+        CT,
+        DT,
+    > Join for (A, B, C, D)
 {
     type Value = (AT, BT, CT, DT);
 
@@ -242,7 +229,6 @@ mod tests {
         y.insert(super::Entity(2), 2.0);
         y.insert(super::Entity(3), 3.0);
 
-        let _: HashMap<super::Entity, ()> = ().join();
         let _: HashMap<super::Entity, (&i64,)> = (&x,).join();
         let _: HashMap<super::Entity, &mut f32> = (&mut y).join();
 

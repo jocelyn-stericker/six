@@ -10,7 +10,7 @@ impl RelativeRhythmicSpacing {
         RelativeRhythmicSpacing(1.0 + (duration.to_f64() / shortest.to_f64()).log2())
     }
 
-    pub fn relative(&self) -> f64 {
+    pub fn relative(self) -> f64 {
         self.0
     }
 }

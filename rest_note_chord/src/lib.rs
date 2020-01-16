@@ -1,3 +1,5 @@
+#![allow(clippy::implicit_hasher, clippy::blacklisted_name)]
+
 mod sys_implicit_rests;
 mod sys_print_rnc;
 mod sys_relative_spacing;

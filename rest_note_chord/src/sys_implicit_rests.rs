@@ -12,7 +12,7 @@ pub fn sys_implicit_rests(
     spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
     render: &mut HashMap<Entity, Stencil>,
 ) {
-    for (_bar_id, bar) in bars {
+    for bar in bars.values_mut() {
         while let Some((duration, entity)) = bar.push_managed_entity(entities) {
             rnc.insert(entity, RestNoteChord::new(duration, false));
             spacing.insert(entity, RelativeRhythmicSpacing::default());

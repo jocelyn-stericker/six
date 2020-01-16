@@ -147,6 +147,36 @@ impl Stencil {
         )
     }
 
+    pub fn barline_thick(x: f64, mut y1: f64, mut y2: f64) -> Stencil {
+        if y1 > y2 {
+            std::mem::swap(&mut y1, &mut y2);
+        }
+
+        let thickness = corefont::THICK_BARLINE_THICKNESS;
+        Self::line(
+            Line::new(
+                Point::new(x, y1 + thickness / 2.0),
+                Point::new(x, y2 - thickness / 2.0),
+            ),
+            thickness,
+        )
+    }
+
+    pub fn barline_thin(x: f64, mut y1: f64, mut y2: f64) -> Stencil {
+        if y1 > y2 {
+            std::mem::swap(&mut y1, &mut y2);
+        }
+
+        let thickness = corefont::THIN_BARLINE_THICKNESS;
+        Self::line(
+            Line::new(
+                Point::new(x, y1 + thickness / 2.0),
+                Point::new(x, y2 - thickness / 2.0),
+            ),
+            thickness,
+        )
+    }
+
     /// Initialize a stencil, in staff cordinates.
     fn from_corefont(corefont: &(f64, [f64; 4], &str)) -> Stencil {
         assert_eq!(corefont::UNITS_PER_EM, 1000);
