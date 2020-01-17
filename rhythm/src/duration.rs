@@ -34,6 +34,24 @@ pub enum NoteValue {
 }
 
 impl NoteValue {
+    pub fn new(log2: isize) -> Option<NoteValue> {
+        match log2 {
+            3 => Some(NoteValue::Maxima),
+            2 => Some(NoteValue::Longa),
+            1 => Some(NoteValue::DoubleWhole),
+            0 => Some(NoteValue::Whole),
+            -1 => Some(NoteValue::Half),
+            -2 => Some(NoteValue::Quarter),
+            -3 => Some(NoteValue::Eighth),
+            -4 => Some(NoteValue::Sixteenth),
+            -5 => Some(NoteValue::ThirtySecond),
+            -6 => Some(NoteValue::SixtyFourth),
+            -7 => Some(NoteValue::HundredTwentyEighth),
+            -8 => Some(NoteValue::TwoHundredFiftySixth),
+            _ => None,
+        }
+    }
+
     /// The base-2 log of the duration, compared to a whole note, ignoring dots and tuplets.
     ///
     /// ```
@@ -162,21 +180,7 @@ impl Duration {
 
     /// The kind of note this will be rendered as.
     pub fn duration_display_base(&self) -> Option<NoteValue> {
-        match self.display_duration().to_f64().log2().floor() as isize {
-            3 => Some(NoteValue::Maxima),
-            2 => Some(NoteValue::Longa),
-            1 => Some(NoteValue::DoubleWhole),
-            0 => Some(NoteValue::Whole),
-            -1 => Some(NoteValue::Half),
-            -2 => Some(NoteValue::Quarter),
-            -3 => Some(NoteValue::Eighth),
-            -4 => Some(NoteValue::Sixteenth),
-            -5 => Some(NoteValue::ThirtySecond),
-            -6 => Some(NoteValue::SixtyFourth),
-            -7 => Some(NoteValue::HundredTwentyEighth),
-            -8 => Some(NoteValue::TwoHundredFiftySixth),
-            _ => None,
-        }
+        NoteValue::new(self.display_duration().to_f64().log2().floor() as isize)
     }
 
     /// The number of dots that will be rendered.
