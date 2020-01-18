@@ -494,6 +494,17 @@ impl Bar {
         self.optimize();
     }
 
+    pub fn remove(&mut self, rnc: Entity) {
+        for (_, entity) in &mut self.rhythm {
+            if *entity == Some(rnc) {
+                *entity = None;
+            }
+        }
+
+        self.simplify();
+        self.optimize();
+    }
+
     /// Determine how a note at a given position time be spelled, rhythmically.
     pub fn split_note(&self, t: Rational, duration: Duration) -> Vec<Duration> {
         if !duration.duration().is_positive() {
