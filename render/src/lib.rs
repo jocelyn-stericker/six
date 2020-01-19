@@ -55,13 +55,13 @@ impl Render {
         sys_print_staff_lines(&self.staffs, &mut self.stencils);
     }
 
-    pub fn append_staff(&mut self) -> Option<usize> {
+    pub fn append_staff(&mut self) -> usize {
         let entity = self.entities.create();
 
         self.staffs.insert(entity, Staff::default());
         self.stencil_maps.insert(entity, StencilMap::default());
 
-        Some(entity.id())
+        entity.id()
     }
 
     pub fn remove_staff(&mut self, staff: usize) {
@@ -71,13 +71,13 @@ impl Render {
         self.stencil_maps.remove(&staff);
     }
 
-    pub fn create_bar(&mut self, numer: u8, denom: u8) -> Option<usize> {
+    pub fn create_bar(&mut self, numer: u8, denom: u8) -> usize {
         let entity = self.entities.create();
 
         self.bars.insert(entity, Bar::new(Metre::new(numer, denom)));
         self.stencil_maps.insert(entity, StencilMap::default());
 
-        Some(entity.id())
+        entity.id()
     }
 
     pub fn append_to_staff(&mut self, staff: usize, child: usize) {
@@ -97,18 +97,18 @@ impl Render {
         }
     }
 
-    pub fn remove_bar(&mut self, staff: usize, bar: usize) {
-        let bar = Entity::new(bar);
+    pub fn remove_from_staff(&mut self, staff: usize, entity: usize) {
+        let entity = Entity::new(entity);
         let staff = Entity::new(staff);
 
         if let Some(staff) = self.staffs.get_mut(&staff) {
-            if let Some(bar_idx) = staff.children.iter().position(|&x| x == bar) {
-                staff.children.remove(bar_idx);
+            if let Some(entity_idx) = staff.children.iter().position(|&x| x == entity) {
+                staff.children.remove(entity_idx);
             }
         }
     }
 
-    pub fn create_barline(&mut self, barline: Barline) -> Option<usize> {
+    pub fn create_barline(&mut self, barline: Barline) -> usize {
         let entity = self.entities.create();
 
         self.between_bars.insert(
@@ -120,10 +120,10 @@ impl Render {
         );
         self.stencils.insert(entity, Stencil::default());
 
-        Some(entity.id())
+        entity.id()
     }
 
-    pub fn create_clef(&mut self) -> Option<usize> {
+    pub fn create_clef(&mut self) -> usize {
         let entity = self.entities.create();
 
         self.between_bars.insert(
@@ -135,28 +135,19 @@ impl Render {
         );
         self.stencils.insert(entity, Stencil::default());
 
-        Some(entity.id())
-    }
-
-    pub fn remove_between_bar(&mut self, staff: usize, between_bar: usize) {
-        let between_bar = Entity::new(between_bar);
-        let staff = Entity::new(staff);
-
-        if let Some(staff) = self.staffs.get_mut(&staff) {
-            if let Some(bar_idx) = staff.children.iter().position(|&x| x == between_bar) {
-                staff.children.remove(bar_idx);
-            }
-        }
+        entity.id()
     }
 
     pub fn create_rnc(
         &mut self,
         note_value: isize,
         dots: u8,
-        _start: &[isize],
+        start_numer: isize,
+        start_denom: isize,
         is_note: bool,
-    ) -> Option<usize> {
+    ) -> usize {
         let note_value = NoteValue::new(note_value).unwrap();
+        let start = Rational::new(start_numer, start_denom);
 
         let entity = self.entities.create();
 
@@ -164,20 +155,19 @@ impl Render {
             .insert(entity, RelativeRhythmicSpacing::default());
         self.rncs.insert(
             entity,
-            RestNoteChord::new(Duration::new(note_value, dots, None), is_note),
+            RestNoteChord::new(Duration::new(note_value, dots, None), is_note, start),
         );
         self.stencils.insert(entity, Stencil::default());
 
-        Some(entity.id())
+        entity.id()
     }
 
-    pub fn append_rnc(&mut self, bar: usize, entity: usize, start: &[isize]) {
+    pub fn append_rnc(&mut self, bar: usize, entity: usize) {
         let entity = Entity::new(entity);
-        let start = Rational::new(start[0], start[1]);
 
         if let Some(bar) = self.bars.get_mut(&Entity::new(bar)) {
             if let Some(rnc) = self.rncs.get(&entity) {
-                bar.splice(start, vec![(rnc.duration(), Some(entity))]);
+                bar.splice(rnc.start(), vec![(rnc.duration(), Some(entity))]);
             }
         }
     }
@@ -191,13 +181,14 @@ impl Render {
         }
     }
 
-    pub fn print_for_demo(&mut self, staff_entity: usize) -> String {
+    pub fn print_for_demo(&mut self) -> String {
+        let staff_entity = *self.staffs.keys().next().unwrap();
         use kurbo::Vec2;
 
         self.exec();
 
         self.stencil_maps
-            .get(&Entity::new(staff_entity))
+            .get(&staff_entity)
             .unwrap()
             .clone()
             .with_translation(Vec2::new(0.0, -1500.0))
@@ -218,31 +209,27 @@ mod tests {
         use stencil::snapshot;
 
         let mut render = Render::default();
-        let staff_entity = render.append_staff().unwrap();
-        let clef = render.create_clef().unwrap();
+        let staff_entity = render.append_staff();
+        let clef = render.create_clef();
         render.append_to_staff(staff_entity, clef);
 
-        let bar1_entity = render.create_bar(4, 4).unwrap();
+        let bar1_entity = render.create_bar(4, 4);
         render.append_to_staff(staff_entity, bar1_entity);
 
-        let rnc1 = render
-            .create_rnc(NoteValue::Eighth.log2() as isize, 0, &[1, 4], true)
-            .unwrap();
+        let rnc1 = render.create_rnc(NoteValue::Eighth.log2() as isize, 0, 1, 4, true);
 
-        render.append_rnc(bar1_entity, rnc1, &[1, 4]);
-        let barline = render.create_barline(Barline::Normal).unwrap();
+        render.append_rnc(bar1_entity, rnc1);
+        let barline = render.create_barline(Barline::Normal);
         render.append_to_staff(staff_entity, barline);
 
-        let bar2_entity = render.create_bar(4, 4).unwrap();
+        let bar2_entity = render.create_bar(4, 4);
         render.append_to_staff(staff_entity, bar2_entity);
 
-        let rnc2 = render
-            .create_rnc(NoteValue::Eighth.log2() as isize, 0, &[1, 4], true)
-            .unwrap();
+        let rnc2 = render.create_rnc(NoteValue::Eighth.log2() as isize, 0, 1, 4, true);
 
-        render.append_rnc(bar2_entity, rnc2, &[1, 4]);
+        render.append_rnc(bar2_entity, rnc2);
 
-        let final_barline = render.create_barline(Barline::Final).unwrap();
+        let final_barline = render.create_barline(Barline::Final);
         render.append_to_staff(staff_entity, final_barline);
 
         render.exec();

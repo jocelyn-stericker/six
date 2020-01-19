@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: '10.x'
       - run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh 
-      - run: cd ./webapp; npm install; npm test; npm run build
+      - run: cd ./webapp; npm install; npm run build
       - uses: netlify/actions/cli@master
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}

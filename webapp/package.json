@@ -4,20 +4,28 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo TODO",
-    "build": "rimraf dist pkg && webpack",
+    "test": "eslint ./src && tsc --noEmit",
+    "build": "rimraf dist pkg && webpack && npm test",
     "start": "rimraf dist pkg && webpack-dev-server --open -d"
   },
   "author": "Joshua Netterfield <joshua@nettek.ca>",
   "license": "AGPL-3.0",
   "dependencies": {
     "react": "16.12.0",
-    "react-reconciler": "0.24.0"
+    "react-reconciler": "0.24.0",
+    "scheduler": "^0.18.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.8.3",
+    "@babel/preset-env": "^7.8.3",
+    "@babel/preset-react": "^7.8.3",
+    "@babel/preset-typescript": "^7.8.3",
+    "@types/react-reconciler": "^0.18.0",
+    "@types/scheduler": "^0.16.1",
     "@typescript-eslint/eslint-plugin": "^2.16.0",
     "@typescript-eslint/parser": "^2.16.0",
     "@wasm-tool/wasm-pack-plugin": "^1.1.0",
+    "babel-loader": "^8.0.6",
     "copy-webpack-plugin": "^5.1.1",
     "eslint": "^6.8.0",
     "eslint-config-prettier": "^6.9.0",
