@@ -9,7 +9,8 @@ pub fn sys_print_staff_lines(
     render: &mut HashMap<Entity, Stencil>,
 ) {
     for staff in staffs.values() {
-        let staff_lines = staff.staff_lines.unwrap();
-        *render.entry(staff_lines).or_default() = Stencil::staff_line(staff.width);
+        if let Some(staff_lines) = staff.staff_lines {
+            *render.entry(staff_lines).or_default() = Stencil::staff_line(staff.width);
+        }
     }
 }

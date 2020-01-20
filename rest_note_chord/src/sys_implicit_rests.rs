@@ -29,5 +29,11 @@ pub fn sys_implicit_rests(
             spacing.remove(&entity);
             render.remove(&entity);
         }
+
+        for (duration, entity) in bar.children() {
+            if let Some(rnc) = rnc.get_mut(&entity) {
+                rnc.duration = duration;
+            }
+        }
     }
 }

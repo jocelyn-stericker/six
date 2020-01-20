@@ -1,19 +1,45 @@
-/// <reference path="./intrinsic_elements.d.ts" /> #
+import React, { useState } from "react";
+import SheetMusicView, { NoteValue, Barline } from "./sheet_music_view";
 
-import React from "react";
-import { render } from "./renderer";
-import { Barline } from "../pkg/index";
+export default function HelloRenderer() {
+  const [startNum, setStartNum] = useState(0);
 
-render(
-  <staff>
-    <clef />
-    <bar numer={4} denom={4}>
-      <rnc noteValue={-3} dots={0} start={[3, 8]} isNote={true} />
-    </bar>
-    <barline barline={Barline.Normal} />
-    <bar numer={4} denom={4}>
-      <rnc noteValue={-4} dots={0} start={[1, 4]} isNote={true} />
-    </bar>
-    <barline barline={Barline.Final} />
-  </staff>
-);
+  return (
+    <React.Fragment>
+      <input
+        min={0}
+        max={15}
+        type="number"
+        value={startNum}
+        onChange={ev => setStartNum(parseInt(ev.target.value))}
+      />
+      <SheetMusicView>
+        <song>
+          <staff>
+            <between clef={true} />
+            <bar numer={4} denom={4}>
+              <rnc
+                noteValue={NoteValue.Sixteenth}
+                dots={0}
+                startNum={startNum}
+                startDen={16}
+                isNote={true}
+              />
+            </bar>
+            <between barline={Barline.Normal} />
+            <bar numer={4} denom={4}>
+              <rnc
+                noteValue={NoteValue.Sixteenth}
+                dots={0}
+                startNum={1}
+                startDen={16}
+                isNote={true}
+              />
+            </bar>
+            <between barline={Barline.Final} />
+          </staff>
+        </song>
+      </SheetMusicView>
+    </React.Fragment>
+  );
+}

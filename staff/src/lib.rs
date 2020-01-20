@@ -15,7 +15,6 @@ pub use sys_print_staff_lines::sys_print_staff_lines;
 pub struct Staff {
     pub width: f64,
     pub staff_lines: Option<Entity>,
-    pub children: Vec<Entity>,
 }
 
 impl Staff {

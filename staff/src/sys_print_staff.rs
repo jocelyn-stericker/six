@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::Staff;
-use entity::{EntitiesRes, Entity};
+use entity::{EntitiesRes, Entity, Join};
 use kurbo::{TranslateScale, Vec2};
 use rhythm::{Bar, RelativeRhythmicSpacing};
 use stencil::{Stencil, StencilMap};
@@ -13,15 +13,16 @@ pub fn sys_print_staff(
     spacing: &HashMap<Entity, RelativeRhythmicSpacing>,
     stencils: &HashMap<Entity, Stencil>,
     stencil_maps: &mut HashMap<Entity, StencilMap>,
+    children: &HashMap<Entity, Vec<Entity>>,
 ) {
-    for (staff_entity, staff) in staffs {
+    for (staff_entity, (staff, children)) in (staffs, children).join() {
         let mut staff_advance = 0.0f64;
         let mut staff_stencil = StencilMap::default();
 
-        for child in &staff.children {
+        for child in children {
             if let Some(bar) = bars.get(&child) {
                 let mut advance_step = 0.0f64;
-                for entity in bar.children() {
+                for (_, entity) in bar.children() {
                     let stencil = &stencils[&entity];
                     let relative_spacing = spacing[&entity];
                     advance_step =
@@ -32,7 +33,7 @@ pub fn sys_print_staff(
 
                 let mut bar_stencil = StencilMap::default();
                 let mut advance = 200.0;
-                for entity in bar.children() {
+                for (_, entity) in bar.children() {
                     let relative_spacing = spacing[&entity];
 
                     bar_stencil = bar_stencil.and(
@@ -63,6 +64,6 @@ pub fn sys_print_staff(
         let staff_lines = staff.staff_lines.get_or_insert_with(|| entities.create());
         staff_stencil = staff_stencil.and(*staff_lines, None);
 
-        stencil_maps.insert(*staff_entity, staff_stencil);
+        stencil_maps.insert(staff_entity, staff_stencil);
     }
 }

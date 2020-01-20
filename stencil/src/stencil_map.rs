@@ -12,6 +12,10 @@ pub struct StencilMap {
 }
 
 impl StencilMap {
+    pub fn new() -> StencilMap {
+        StencilMap::default()
+    }
+
     pub fn and(mut self, child: Entity, transform: Option<TranslateScale>) -> StencilMap {
         self.top_zindex += 1;
         let z = self.top_zindex;

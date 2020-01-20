@@ -17,7 +17,7 @@ pub use sys_relative_spacing::sys_relative_spacing;
 pub struct RestNoteChord {
     duration: Duration,
     is_note: bool,
-    start: Rational,
+    pub start: Rational,
 }
 
 impl RestNoteChord {

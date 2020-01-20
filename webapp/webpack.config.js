@@ -28,7 +28,7 @@ module.exports = {
     ]
   },
   entry: {
-    index: "./src/index.js"
+    index: "./src/index.tsx"
   },
   output: {
     path: dist,

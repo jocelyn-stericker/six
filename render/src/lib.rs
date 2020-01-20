@@ -1,5 +1,8 @@
 #![allow(clippy::blacklisted_name)]
 
+mod sys_delete_orphans;
+mod sys_print_song;
+
 use entity::{EntitiesRes, Entity};
 use num_rational::Rational;
 use rest_note_chord::{sys_implicit_rests, sys_print_rnc, sys_relative_spacing, RestNoteChord};
@@ -11,10 +14,16 @@ use std::collections::HashMap;
 use stencil::{Stencil, StencilMap};
 use wasm_bindgen::prelude::*;
 
+#[derive(Debug, Default)]
+pub struct Song {}
+
 #[wasm_bindgen]
 #[derive(Debug, Default)]
 pub struct Render {
     entities: EntitiesRes,
+
+    root: Option<Entity>,
+    songs: HashMap<Entity, Song>,
 
     staffs: HashMap<Entity, Staff>,
     bars: HashMap<Entity, Bar>,
@@ -24,54 +33,115 @@ pub struct Render {
     stencils: HashMap<Entity, Stencil>,
     stencil_maps: HashMap<Entity, StencilMap>,
     spacing: HashMap<Entity, RelativeRhythmicSpacing>,
+
+    ordered_children: HashMap<Entity, Vec<Entity>>,
+    parents: HashMap<Entity, Entity>,
 }
 
+/// A DOM-based interface to Six Eight's ECS.
 #[wasm_bindgen]
 impl Render {
     pub fn new() -> Render {
         Self::default()
     }
 
-    pub fn exec(&mut self) {
-        sys_implicit_rests(
-            &self.entities,
-            &mut self.rncs,
-            &mut self.bars,
-            &mut self.spacing,
-            &mut self.stencils,
-        );
-        sys_relative_spacing(&self.rncs, &mut self.spacing);
-        sys_print_rnc(&self.rncs, &mut self.stencils);
-        sys_print_between_bars(&self.between_bars, &mut self.stencils);
-
-        sys_print_staff(
-            &self.entities,
-            &mut self.staffs,
-            &self.bars,
-            &self.spacing,
-            &self.stencils,
-            &mut self.stencil_maps,
-        );
-        sys_print_staff_lines(&self.staffs, &mut self.stencils);
+    /// Set the Song entity to be rendered.
+    pub fn root_set(&mut self, song: usize) {
+        if self.root.is_none() {
+            let song = Entity::new(song);
+            self.root = Some(song);
+        }
     }
 
-    pub fn append_staff(&mut self) -> usize {
+    /// Clear the Song entity to be rendered.
+    pub fn root_clear(&mut self, song: usize) {
+        if let Some(root) = self.root {
+            let song = Entity::new(song);
+            if root == song {
+                self.root = None;
+            }
+        }
+    }
+
+    /// Append `child` to the `parent` ordered container.
+    ///
+    /// If `child` already has a parent, nothing will happen.
+    pub fn child_append(&mut self, parent: usize, child: usize) {
+        let parent_id = Entity::new(parent);
+        let child = Entity::new(child);
+
+        if self.parents.contains_key(&child) {
+            return;
+        }
+
+        if let Some(ordered_children) = self.ordered_children.get_mut(&parent_id) {
+            ordered_children.push(child);
+            self.parents.insert(child, parent_id);
+        }
+    }
+
+    /// Insert `child` to the `parent` ordered container, before `before`.
+    ///
+    /// If `child` already has a parent, or `before` is not a child of `parent`, nothing will
+    /// happen.
+    pub fn child_insert_before(&mut self, parent: usize, before: usize, child: usize) {
+        let before = Entity::new(before);
+        let child = Entity::new(child);
+        let parent_id = Entity::new(parent);
+
+        if self.parents.contains_key(&child) {
+            return;
+        }
+
+        if let Some(ordered_children) = self.ordered_children.get_mut(&parent_id) {
+            if let Some(idx) = ordered_children.iter().position(|&x| x == before) {
+                ordered_children.insert(idx, child);
+                self.parents.insert(child, parent_id);
+            }
+        }
+    }
+
+    /// Remove `child` from the `parent` ordered container.
+    ///
+    /// If `child` is not a child of `parent`, nothing will happen.
+    pub fn child_remove(&mut self, parent: usize, entity: usize) {
+        let entity = Entity::new(entity);
+        let parent = Entity::new(parent);
+
+        if let Some(ordered_children) = self.ordered_children.get_mut(&parent) {
+            if let Some(entity_idx) = ordered_children.iter().position(|&x| x == entity) {
+                ordered_children.remove(entity_idx);
+                self.parents.remove(&entity);
+            }
+        }
+    }
+
+    /// Create a song, without attaching it as the document root.
+    pub fn song_create(&mut self) -> usize {
         let entity = self.entities.create();
 
-        self.staffs.insert(entity, Staff::default());
+        self.songs.insert(entity, Song::default());
+        self.ordered_children.insert(entity, vec![]);
         self.stencil_maps.insert(entity, StencilMap::default());
 
         entity.id()
     }
 
-    pub fn remove_staff(&mut self, staff: usize) {
-        let staff = Entity::new(staff);
+    /// Create a staff, without attaching it to a song.
+    pub fn staff_create(&mut self) -> usize {
+        let entity = self.entities.create();
 
-        self.staffs.remove(&staff);
-        self.stencil_maps.remove(&staff);
+        self.staffs.insert(entity, Staff::default());
+        self.stencil_maps.insert(entity, StencilMap::default());
+        self.ordered_children.insert(entity, vec![]);
+
+        entity.id()
     }
 
-    pub fn create_bar(&mut self, numer: u8, denom: u8) -> usize {
+    /// Create a bar, without attaching it to a staff.
+    ///
+    /// `numer` and `denom` are the numerator and denominator of the time signature in this bar.
+    pub fn bar_create(&mut self, numer: u8, denom: u8) -> usize {
         let entity = self.entities.create();
 
         self.bars.insert(entity, Bar::new(Metre::new(numer, denom)));
@@ -80,65 +150,40 @@ impl Render {
         entity.id()
     }
 
-    pub fn append_to_staff(&mut self, staff: usize, child: usize) {
+    /// Inserts a RestNoteChord into a bar.
+    ///
+    /// Note that children of bars are not ordered, instead children have a `start` property.
+    pub fn bar_insert(&mut self, bar: usize, child: usize) {
         let child = Entity::new(child);
-        if let Some(staff) = self.staffs.get_mut(&Entity::new(staff)) {
-            staff.children.push(child);
-        }
-    }
+        let bar_id = Entity::new(bar);
 
-    pub fn insert_to_staff_before(&mut self, staff: usize, before: usize, child: usize) {
-        let before = Entity::new(before);
-        let child = Entity::new(child);
-        if let Some(staff) = self.staffs.get_mut(&Entity::new(staff)) {
-            if let Some(idx) = staff.children.iter().position(|&x| x == before) {
-                staff.children.insert(idx, child);
+        if self.parents.contains_key(&child) {
+            return;
+        }
+
+        if let Some(bar) = self.bars.get_mut(&bar_id) {
+            if let Some(rnc) = self.rncs.get(&child) {
+                bar.splice(rnc.start(), vec![(rnc.duration(), Some(child))]);
+                self.parents.insert(child, bar_id);
             }
         }
     }
 
-    pub fn remove_from_staff(&mut self, staff: usize, entity: usize) {
-        let entity = Entity::new(entity);
-        let staff = Entity::new(staff);
+    /// Remove a RestNoteChord from a bar.
+    ///
+    /// Note that children of bars are not ordered, instead children have a `start` property.
+    pub fn bar_remove(&mut self, bar: usize, child: usize) {
+        let bar_id = Entity::new(bar);
+        let child = Entity::new(child);
 
-        if let Some(staff) = self.staffs.get_mut(&staff) {
-            if let Some(entity_idx) = staff.children.iter().position(|&x| x == entity) {
-                staff.children.remove(entity_idx);
-            }
+        if let Some(bar) = self.bars.get_mut(&bar_id) {
+            bar.remove(child);
+            self.parents.remove(&child);
         }
     }
 
-    pub fn create_barline(&mut self, barline: Barline) -> usize {
-        let entity = self.entities.create();
-
-        self.between_bars.insert(
-            entity,
-            BetweenBars {
-                barline: Some(barline),
-                clef: false,
-            },
-        );
-        self.stencils.insert(entity, Stencil::default());
-
-        entity.id()
-    }
-
-    pub fn create_clef(&mut self) -> usize {
-        let entity = self.entities.create();
-
-        self.between_bars.insert(
-            entity,
-            BetweenBars {
-                barline: None,
-                clef: true,
-            },
-        );
-        self.stencils.insert(entity, Stencil::default());
-
-        entity.id()
-    }
-
-    pub fn create_rnc(
+    /// Create a RestNoteChord, without attaching it to a bar.
+    pub fn rnc_create(
         &mut self,
         note_value: isize,
         dots: u8,
@@ -162,38 +207,92 @@ impl Render {
         entity.id()
     }
 
-    pub fn append_rnc(&mut self, bar: usize, entity: usize) {
-        let entity = Entity::new(entity);
+    pub fn rnc_update_time(&mut self, rnc: usize, start_numer: isize, start_denom: isize) {
+        let rnc_id = Entity::new(rnc);
+        let bars = &mut self.bars;
 
-        if let Some(bar) = self.bars.get_mut(&Entity::new(bar)) {
-            if let Some(rnc) = self.rncs.get(&entity) {
-                bar.splice(rnc.start(), vec![(rnc.duration(), Some(entity))]);
-            }
+        if let (Some(rnc), Some(bar)) = (
+            self.rncs.get_mut(&rnc_id),
+            self.parents.get(&rnc_id).and_then(|e| bars.get_mut(e)),
+        ) {
+            bar.remove(rnc_id);
+            rnc.start = Rational::new(start_numer, start_denom);
+            bar.splice(rnc.start(), vec![(rnc.duration(), Some(rnc_id))]);
         }
     }
 
-    pub fn remove_rnc(&mut self, bar: usize, rnc: usize) {
-        let bar = Entity::new(bar);
-        let rnc = Entity::new(rnc);
+    /// Insert content that lives before or after a bar, without attaching it to a staff.
+    ///
+    /// This includes signatures, barlines, clefs, etc.
+    pub fn between_bars_create(&mut self, barline: Option<Barline>, clef: bool) -> usize {
+        let entity = self.entities.create();
 
-        if let Some(bar) = self.bars.get_mut(&bar) {
-            bar.remove(rnc);
-        }
+        self.between_bars.insert(
+            entity,
+            BetweenBars {
+                barline: barline,
+                clef,
+            },
+        );
+        self.stencils.insert(entity, Stencil::default());
+
+        entity.id()
+    }
+
+    /* Frame */
+
+    pub fn exec(&mut self) {
+        sys_delete_orphans::sys_delete_orphans(
+            &self.parents,
+            self.root,
+            &mut self.songs,
+            &mut self.staffs,
+            &mut self.bars,
+            &mut self.between_bars,
+            &mut self.stencils,
+            &mut self.stencil_maps,
+            &mut self.spacing,
+            &mut self.ordered_children,
+        );
+
+        sys_implicit_rests(
+            &self.entities,
+            &mut self.rncs,
+            &mut self.bars,
+            &mut self.spacing,
+            &mut self.stencils,
+        );
+        sys_relative_spacing(&self.rncs, &mut self.spacing);
+        sys_print_rnc(&self.rncs, &mut self.stencils);
+        sys_print_between_bars(&self.between_bars, &mut self.stencils);
+
+        sys_print_staff(
+            &self.entities,
+            &mut self.staffs,
+            &self.bars,
+            &self.spacing,
+            &self.stencils,
+            &mut self.stencil_maps,
+            &self.ordered_children,
+        );
+        sys_print_staff_lines(&self.staffs, &mut self.stencils);
+
+        sys_print_song::sys_print_song(&self.songs, &self.ordered_children, &mut self.stencil_maps);
     }
 
     pub fn print_for_demo(&mut self) -> String {
-        let staff_entity = *self.staffs.keys().next().unwrap();
         use kurbo::Vec2;
 
         self.exec();
 
-        self.stencil_maps
-            .get(&staff_entity)
-            .unwrap()
-            .clone()
-            .with_translation(Vec2::new(0.0, -1500.0))
-            .with_paper_size(3)
-            .to_svg_doc_for_testing(&self.stencil_maps, &self.stencils)
+        if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
+            root.clone()
+                .with_translation(Vec2::new(0.0, -1500.0))
+                .with_paper_size(3)
+                .to_svg_doc_for_testing(&self.stencil_maps, &self.stencils)
+        } else {
+            String::default()
+        }
     }
 }
 
@@ -203,47 +302,42 @@ mod tests {
 
     #[test]
     fn it_works() {
-        use kurbo::Vec2;
-
         use rhythm::NoteValue;
         use stencil::snapshot;
 
         let mut render = Render::default();
-        let staff_entity = render.append_staff();
-        let clef = render.create_clef();
-        render.append_to_staff(staff_entity, clef);
+        let song = render.song_create();
 
-        let bar1_entity = render.create_bar(4, 4);
-        render.append_to_staff(staff_entity, bar1_entity);
+        let staff = render.staff_create();
+        let clef = render.between_bars_create(None, true);
+        render.child_append(staff, clef);
 
-        let rnc1 = render.create_rnc(NoteValue::Eighth.log2() as isize, 0, 1, 4, true);
+        let bar1 = render.bar_create(4, 4);
+        render.child_append(staff, bar1);
 
-        render.append_rnc(bar1_entity, rnc1);
-        let barline = render.create_barline(Barline::Normal);
-        render.append_to_staff(staff_entity, barline);
+        let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8, true);
 
-        let bar2_entity = render.create_bar(4, 4);
-        render.append_to_staff(staff_entity, bar2_entity);
+        render.bar_insert(bar1, rnc1);
+        let barline = render.between_bars_create(Some(Barline::Normal), false);
+        render.child_append(staff, barline);
 
-        let rnc2 = render.create_rnc(NoteValue::Eighth.log2() as isize, 0, 1, 4, true);
+        let bar2 = render.bar_create(4, 4);
+        render.child_append(staff, bar2);
 
-        render.append_rnc(bar2_entity, rnc2);
+        let rnc2 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 4, true);
 
-        let final_barline = render.create_barline(Barline::Final);
-        render.append_to_staff(staff_entity, final_barline);
+        render.bar_insert(bar2, rnc2);
+
+        let final_barline = render.between_bars_create(Some(Barline::Final), false);
+        render.child_append(staff, final_barline);
+
+        render.child_append(song, staff);
+        render.root_set(song);
 
         render.exec();
 
-        snapshot(
-            "./snapshots/hello_world.svg",
-            &render
-                .stencil_maps
-                .get(&Entity::new(staff_entity))
-                .unwrap()
-                .clone()
-                .with_translation(Vec2::new(0.0, -1500.0))
-                .with_paper_size(3)
-                .to_svg_doc_for_testing(&render.stencil_maps, &render.stencils),
-        );
+        render.rnc_update_time(rnc1, 4, 16);
+
+        snapshot("./snapshots/hello_world.svg", &render.print_for_demo());
     }
 }
