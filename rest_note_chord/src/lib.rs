@@ -15,17 +15,21 @@ pub use sys_relative_spacing::sys_relative_spacing;
 
 #[derive(Debug)]
 pub struct RestNoteChord {
-    duration: Duration,
+    pub duration: Duration,
     is_note: bool,
     pub start: Rational,
+    pub natural_duration: Duration,
+    pub natural_start: Rational,
 }
 
 impl RestNoteChord {
     pub fn new(duration: Duration, is_note: bool, start: Rational) -> RestNoteChord {
         RestNoteChord {
+            natural_duration: duration,
             duration,
             is_note,
             start,
+            natural_start: start,
         }
     }
 
@@ -133,6 +137,8 @@ impl Default for RestNoteChord {
             duration: Duration::new(NoteValue::Quarter, 0, None),
             is_note: false,
             start: Rational::new(0, 1),
+            natural_duration: Duration::new(NoteValue::Quarter, 0, None),
+            natural_start: Rational::new(0, 1),
         }
     }
 }

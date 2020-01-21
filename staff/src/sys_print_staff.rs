@@ -22,7 +22,7 @@ pub fn sys_print_staff(
         for child in children {
             if let Some(bar) = bars.get(&child) {
                 let mut advance_step = 0.0f64;
-                for (_, entity) in bar.children() {
+                for (_, _, entity, _) in bar.children() {
                     let stencil = &stencils[&entity];
                     let relative_spacing = spacing[&entity];
                     advance_step =
@@ -33,7 +33,7 @@ pub fn sys_print_staff(
 
                 let mut bar_stencil = StencilMap::default();
                 let mut advance = 200.0;
-                for (_, entity) in bar.children() {
+                for (_, _, entity, _) in bar.children() {
                     let relative_spacing = spacing[&entity];
 
                     bar_stencil = bar_stencil.and(

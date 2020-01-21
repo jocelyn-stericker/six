@@ -3,7 +3,7 @@
 mod sys_delete_orphans;
 mod sys_print_song;
 
-use entity::{EntitiesRes, Entity};
+use entity::{EntitiesRes, Entity, Join};
 use num_rational::Rational;
 use rest_note_chord::{sys_implicit_rests, sys_print_rnc, sys_relative_spacing, RestNoteChord};
 use rhythm::{Bar, Duration, Metre, NoteValue, RelativeRhythmicSpacing};
@@ -207,17 +207,40 @@ impl Render {
         entity.id()
     }
 
-    pub fn rnc_update_time(&mut self, rnc: usize, start_numer: isize, start_denom: isize) {
+    pub fn rnc_update_time(
+        &mut self,
+        rnc: usize,
+        note_value: isize,
+        dots: u8,
+        start_numer: isize,
+        start_denom: isize,
+    ) {
+        let note_value = NoteValue::new(note_value).unwrap();
         let rnc_id = Entity::new(rnc);
         let bars = &mut self.bars;
+        if let Some(parent_id) = self.parents.get(&rnc_id) {
+            if let (Some(rnc), Some(bar)) = (self.rncs.get_mut(&rnc_id), bars.get_mut(parent_id)) {
+                bar.remove(rnc_id);
+                rnc.start = Rational::new(start_numer, start_denom);
+                rnc.duration = Duration::new(note_value, dots, None);
+                rnc.natural_duration = rnc.duration;
+                rnc.natural_start = rnc.start;
+                bar.splice(rnc.start(), vec![(rnc.duration(), Some(rnc_id))]);
+            }
 
-        if let (Some(rnc), Some(bar)) = (
-            self.rncs.get_mut(&rnc_id),
-            self.parents.get(&rnc_id).and_then(|e| bars.get_mut(e)),
-        ) {
-            bar.remove(rnc_id);
-            rnc.start = Rational::new(start_numer, start_denom);
-            bar.splice(rnc.start(), vec![(rnc.duration(), Some(rnc_id))]);
+            // Fix previously overlapping notes.
+            for (other_rnc_id, (rnc, parent)) in (&mut self.rncs, &self.parents).join() {
+                if (rnc.natural_duration != rnc.duration || rnc.natural_start != rnc.start)
+                    && parent == parent_id
+                {
+                    if let Some(bar) = bars.get_mut(parent_id) {
+                        bar.remove(other_rnc_id);
+                        rnc.duration = rnc.natural_duration;
+                        rnc.start = rnc.natural_start;
+                        bar.splice(rnc.start(), vec![(rnc.duration(), Some(other_rnc_id))]);
+                    }
+                }
+            }
         }
     }
 
@@ -227,13 +250,8 @@ impl Render {
     pub fn between_bars_create(&mut self, barline: Option<Barline>, clef: bool) -> usize {
         let entity = self.entities.create();
 
-        self.between_bars.insert(
-            entity,
-            BetweenBars {
-                barline: barline,
-                clef,
-            },
-        );
+        self.between_bars
+            .insert(entity, BetweenBars { barline, clef });
         self.stencils.insert(entity, Stencil::default());
 
         entity.id()
@@ -336,7 +354,7 @@ mod tests {
 
         render.exec();
 
-        render.rnc_update_time(rnc1, 4, 16);
+        render.rnc_update_time(rnc1, NoteValue::Eighth.log2() as isize, 0, 4, 16);
 
         snapshot("./snapshots/hello_world.svg", &render.print_for_demo());
     }

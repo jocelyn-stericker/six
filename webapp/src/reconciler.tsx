@@ -27,24 +27,31 @@ interface Instance {
   entity: number;
 }
 
-export interface SongProps {}
+export interface SongProps {
+  key?: string | number | null | undefined;
+  children: React.ReactNode;
+}
 
 export interface StaffProps {
-  children: any;
+  key?: string | number | null | undefined;
+  children: React.ReactNode;
 }
 
 export interface BarProps {
+  key?: string | number | null | undefined;
   numer: number;
   denom: number;
   children: any;
 }
 
 export interface BetweenBarsProps {
+  key?: string | number | null | undefined;
   clef?: boolean;
   barline?: Barline | undefined;
 }
 
 export interface RncProps {
+  key?: string | number | null | undefined;
   noteValue: number;
   dots: number;
   startNum: number;
@@ -197,7 +204,9 @@ const Reconciler = ReactReconciler({
     if (
       type === "rnc" &&
       (oldProps.startNum !== newProps.startNum ||
-        oldProps.startDen !== newProps.startDen)
+        oldProps.startDen !== newProps.startDen ||
+        oldProps.noteValue !== newProps.noteValue ||
+        oldProps.dots !== newProps.dots)
     ) {
       changes.push("time");
     }
@@ -219,6 +228,8 @@ const Reconciler = ReactReconciler({
         if (change === "time") {
           instance.container.rnc_update_time(
             instance.entity,
+            newProps.noteValue,
+            newProps.dots,
             newProps.startNum,
             newProps.startDen
           );

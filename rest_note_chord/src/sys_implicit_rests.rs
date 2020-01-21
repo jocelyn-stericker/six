@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::RestNoteChord;
-use entity::{EntitiesRes, Entity};
+use entity::{EntitiesRes, Entity, Join};
 use num_rational::Rational;
 use rhythm::{Bar, RelativeRhythmicSpacing};
 use stencil::Stencil;
@@ -13,6 +13,10 @@ pub fn sys_implicit_rests(
     spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
     render: &mut HashMap<Entity, Stencil>,
 ) {
+    for (_key, rnc) in rnc.join() {
+        rnc.start = Rational::new(-1, 1);
+    }
+
     for bar in bars.values_mut() {
         while let Some((duration, entity)) = bar.push_managed_entity(entities) {
             // TODO: get correct start
@@ -30,9 +34,14 @@ pub fn sys_implicit_rests(
             render.remove(&entity);
         }
 
-        for (duration, entity) in bar.children() {
+        for (duration, start, entity, is_managed) in bar.children() {
             if let Some(rnc) = rnc.get_mut(&entity) {
                 rnc.duration = duration;
+                rnc.start = start;
+                if is_managed {
+                    rnc.natural_duration = duration;
+                    rnc.natural_start = rnc.start;
+                }
             }
         }
     }

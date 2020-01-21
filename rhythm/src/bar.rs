@@ -627,12 +627,24 @@ impl Bar {
     }
 
     /// Rest/note/chords (RNCs)
-    pub fn children(&self) -> Vec<(Duration, Entity)> {
+    pub fn children(&self) -> Vec<(Duration, Rational, Entity, bool)> {
         let mut managed = self.managed().iter();
+        let mut start = Rational::zero();
 
         self.rhythm
             .iter()
-            .map(|(rhy, entity)| (*rhy, entity.unwrap_or_else(|| *managed.next().unwrap())))
+            .map(|(rhy, entity)| {
+                let data = (
+                    *rhy,
+                    start,
+                    entity.unwrap_or_else(|| *managed.next().unwrap()),
+                    entity.is_none(),
+                );
+
+                start += rhy.duration();
+
+                data
+            })
             .collect()
     }
 }
