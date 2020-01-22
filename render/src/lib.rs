@@ -247,14 +247,61 @@ impl Render {
     /// Insert content that lives before or after a bar, without attaching it to a staff.
     ///
     /// This includes signatures, barlines, clefs, etc.
-    pub fn between_bars_create(&mut self, barline: Option<Barline>, clef: bool) -> usize {
+    pub fn between_bars_create(
+        &mut self,
+        barline: Option<Barline>,
+        clef: bool,
+        time_numer: Option<u8>,
+        time_denom: Option<u8>,
+    ) -> usize {
         let entity = self.entities.create();
 
-        self.between_bars
-            .insert(entity, BetweenBars { barline, clef });
+        let time = if let (Some(time_numer), Some(time_denom)) = (time_numer, time_denom) {
+            Some((time_numer, time_denom))
+        } else {
+            None
+        };
+
+        self.between_bars.insert(
+            entity,
+            BetweenBars {
+                barline,
+                clef,
+                time,
+            },
+        );
         self.stencils.insert(entity, Stencil::default());
 
         entity.id()
+    }
+
+    /// Insert content that lives before or after a bar, without attaching it to a staff.
+    ///
+    /// This includes signatures, barlines, clefs, etc.
+    pub fn between_bars_update(
+        &mut self,
+        entity: usize,
+        barline: Option<Barline>,
+        clef: bool,
+        time_numer: Option<u8>,
+        time_denom: Option<u8>,
+    ) {
+        let entity = Entity::new(entity);
+
+        let time = if let (Some(time_numer), Some(time_denom)) = (time_numer, time_denom) {
+            Some((time_numer, time_denom))
+        } else {
+            None
+        };
+
+        self.between_bars.insert(
+            entity,
+            BetweenBars {
+                barline,
+                clef,
+                time,
+            },
+        );
     }
 
     /* Frame */
@@ -267,6 +314,7 @@ impl Render {
             &mut self.staffs,
             &mut self.bars,
             &mut self.between_bars,
+            &mut self.rncs,
             &mut self.stencils,
             &mut self.stencil_maps,
             &mut self.spacing,
@@ -278,9 +326,10 @@ impl Render {
             &mut self.rncs,
             &mut self.bars,
             &mut self.spacing,
+            &mut self.parents,
             &mut self.stencils,
         );
-        sys_relative_spacing(&self.rncs, &mut self.spacing);
+        sys_relative_spacing(&self.rncs, &self.parents, &mut self.spacing);
         sys_print_rnc(&self.rncs, &mut self.stencils);
         sys_print_between_bars(&self.between_bars, &mut self.stencils);
 
@@ -327,7 +376,7 @@ mod tests {
         let song = render.song_create();
 
         let staff = render.staff_create();
-        let clef = render.between_bars_create(None, true);
+        let clef = render.between_bars_create(None, true, Some(4), Some(4));
         render.child_append(staff, clef);
 
         let bar1 = render.bar_create(4, 4);
@@ -336,17 +385,17 @@ mod tests {
         let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8, true);
 
         render.bar_insert(bar1, rnc1);
-        let barline = render.between_bars_create(Some(Barline::Normal), false);
+        let barline = render.between_bars_create(Some(Barline::Normal), false, None, None);
         render.child_append(staff, barline);
 
         let bar2 = render.bar_create(4, 4);
         render.child_append(staff, bar2);
 
-        let rnc2 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 4, true);
+        let rnc2 = render.rnc_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4, true);
 
         render.bar_insert(bar2, rnc2);
 
-        let final_barline = render.between_bars_create(Some(Barline::Final), false);
+        let final_barline = render.between_bars_create(Some(Barline::Final), false, None, None);
         render.child_append(staff, final_barline);
 
         render.child_append(song, staff);

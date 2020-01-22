@@ -11,13 +11,14 @@ pub fn sys_implicit_rests(
     rnc: &mut HashMap<Entity, RestNoteChord>,
     bars: &mut HashMap<Entity, Bar>,
     spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
+    parents: &mut HashMap<Entity, Entity>,
     render: &mut HashMap<Entity, Stencil>,
 ) {
     for (_key, rnc) in rnc.join() {
         rnc.start = Rational::new(-1, 1);
     }
 
-    for bar in bars.values_mut() {
+    for (bar_id, bar) in bars {
         while let Some((duration, entity)) = bar.push_managed_entity(entities) {
             // TODO: get correct start
             rnc.insert(
@@ -25,12 +26,14 @@ pub fn sys_implicit_rests(
                 RestNoteChord::new(duration, false, Rational::new(0, 1)),
             );
             spacing.insert(entity, RelativeRhythmicSpacing::default());
+            parents.insert(entity, *bar_id);
             render.insert(entity, Stencil::default());
         }
 
         while let Some(entity) = bar.pop_managed_entity() {
             rnc.remove(&entity);
             spacing.remove(&entity);
+            parents.remove(&entity);
             render.remove(&entity);
         }
 

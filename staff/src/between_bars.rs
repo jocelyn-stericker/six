@@ -11,6 +11,7 @@ pub enum Barline {
 #[derive(Default, Debug)]
 pub struct BetweenBars {
     pub clef: bool,
+    pub time: Option<(u8, u8)>,
     pub barline: Option<Barline>,
 }
 
@@ -23,7 +24,6 @@ impl BetweenBars {
                 stencil = stencil
                     .and_right(Stencil::padding(100.0))
                     .and_right(Stencil::barline_thin(0.0, -500.0, 500.0))
-                    .and_right(Stencil::padding(100.0));
             }
             Some(Barline::Final) => {
                 stencil = stencil
@@ -40,6 +40,10 @@ impl BetweenBars {
                 .and_right(Stencil::padding(100.0))
                 .and_right(Stencil::clef_unpitched())
                 .and_right(Stencil::padding(100.0));
+        }
+
+        if let Some((num, den)) = self.time {
+            stencil = stencil.and_right(Stencil::time_sig_fraction(num, den));
         }
 
         stencil

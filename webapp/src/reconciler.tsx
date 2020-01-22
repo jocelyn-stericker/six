@@ -47,6 +47,8 @@ export interface BarProps {
 export interface BetweenBarsProps {
   key?: string | number | null | undefined;
   clef?: boolean;
+  tsNum?: number;
+  tsDen?: number;
   barline?: Barline | undefined;
 }
 
@@ -99,7 +101,9 @@ function createInstance<T extends keyof JSX.IntrinsicElements>(
       type: "between",
       entity: container.between_bars_create(
         spec.props.barline,
-        spec.props.clef || false
+        spec.props.clef || false,
+        spec.props.tsNum || undefined,
+        spec.props.tsDen || undefined
       )
     };
   }
@@ -211,6 +215,15 @@ const Reconciler = ReactReconciler({
       changes.push("time");
     }
 
+    if (
+      type === "between" &&
+      (oldProps.clef !== newProps.clef ||
+        oldProps.tsNum !== newProps.tsNum ||
+        oldProps.tsDen !== newProps.tsDen)
+    ) {
+      changes.push("display");
+    }
+
     return changes;
   },
   commitUpdate(
@@ -232,6 +245,19 @@ const Reconciler = ReactReconciler({
             newProps.dots,
             newProps.startNum,
             newProps.startDen
+          );
+        }
+      }
+    }
+    if (type === "between") {
+      for (const change of updatePayload) {
+        if (change === "display") {
+          instance.container.between_bars_update(
+            instance.entity,
+            newProps.barline,
+            newProps.clef,
+            newProps.tsNum,
+            newProps.tsDen
           );
         }
       }

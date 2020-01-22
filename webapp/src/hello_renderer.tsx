@@ -8,12 +8,24 @@ interface Note {
 }
 
 export default function HelloRenderer() {
+  const [num, setNum] = useState(4);
   const [notes, setNotes] = useState<Array<Note>>([
     { startNum: 0, duration: -3, dots: 0 }
   ]);
 
   return (
     <React.Fragment>
+      <div>
+        <input
+          min={1}
+          max={15}
+          type="number"
+          value={num}
+          onChange={ev => {
+            setNum(parseInt(ev.target.value));
+          }}
+        />
+      </div>
       {notes.map((note, idx) => (
         <div key={idx}>
           <input
@@ -32,7 +44,7 @@ export default function HelloRenderer() {
             }}
           />
           <input
-            min={-5}
+            min={-6}
             max={0}
             type="number"
             value={note.duration}
@@ -76,7 +88,7 @@ export default function HelloRenderer() {
       <SheetMusicView>
         <song>
           <staff>
-            <between clef={true} />
+            <between clef={true} tsNum={num} tsDen={4} />
             <bar numer={4} denom={4}>
               {notes.map(({ dots, duration, startNum }, idx) => (
                 <rnc

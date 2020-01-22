@@ -124,9 +124,90 @@ impl Stencil {
         })
     }
 
+    /// Draw a rounded rectangle
+    ///
+    /// This stencil has user-specified blot. The total thickness includes blot.
+    pub fn round_filled_box(rect: Rect, mut blot_diameter: f64) -> Stencil {
+        let Rect { mut x0, mut y0, .. } = rect;
+
+        blot_diameter = blot_diameter.min(rect.height()).min(rect.width());
+
+        if blot_diameter < 0.0 {
+            return Stencil::default();
+        }
+
+        x0 += blot_diameter / 2.0;
+        y0 += blot_diameter / 2.0;
+
+        let width = Vec2::new(rect.width() - blot_diameter, 0.0);
+        let height = Vec2::new(0.0, rect.height() - blot_diameter);
+
+        let rx = Vec2::new(blot_diameter / 2.0, 0.0);
+        let ry = Vec2::new(0.0, blot_diameter / 2.0);
+        let cx = rx * BEZIER_CIRCLE_FACTOR;
+        let cy = ry * BEZIER_CIRCLE_FACTOR;
+
+        let mut path = BezPath::new();
+        let origin = Point::new(x0, y0);
+
+        // Start at the bottom right.
+        path.move_to(origin - ry);
+
+        // Bottom-left blot
+        path.curve_to(origin - ry - cx, origin - rx - cy, origin - rx);
+
+        // Left
+        path.line_to(origin + height - rx);
+
+        // Top-left blot
+        if blot_diameter > 0.0 {
+            path.curve_to(
+                origin + height - rx + cy,
+                origin + height + ry - cx,
+                origin + height + ry,
+            );
+        }
+
+        // Top
+        path.line_to(origin + height + width + ry);
+
+        // Top-right blot
+        if blot_diameter > 0.0 {
+            path.curve_to(
+                origin + height + width + ry + cx,
+                origin + height + width + rx + cy,
+                origin + height + width + rx,
+            );
+        }
+
+        // Right
+        path.line_to(origin + width + rx);
+
+        // Bottom-right blot
+        if blot_diameter > 0.0 {
+            path.curve_to(
+                origin + width + rx - cy,
+                origin + width - ry + cx,
+                origin + width - ry,
+            );
+        }
+
+        // Bottom
+        path.line_to(origin - ry);
+        path.close_path();
+        Stencil::Path(Path {
+            bounds: rect,
+            outline: path,
+            advance: rect.x1,
+        })
+    }
+
     pub fn staff_line(width: f64) -> Stencil {
         Self::line(
-            Line::new(Point::new(0.0, 0.0), Point::new(width, 0.0)),
+            Line::new(
+                Point::new(corefont::STAFF_LINE_THICKNESS / 2.0, 0.0),
+                Point::new(width - corefont::STAFF_LINE_THICKNESS / 2.0, 0.0),
+            ),
             corefont::STAFF_LINE_THICKNESS,
         )
     }
@@ -153,12 +234,9 @@ impl Stencil {
         }
 
         let thickness = corefont::THICK_BARLINE_THICKNESS;
-        Self::line(
-            Line::new(
-                Point::new(x, y1 + thickness / 2.0),
-                Point::new(x, y2 - thickness / 2.0),
-            ),
-            thickness,
+        Self::round_filled_box(
+            Rect::new(x - thickness / 2.0, y1, x + thickness / 2.0, y2),
+            corefont::THIN_BARLINE_THICKNESS,
         )
     }
 
