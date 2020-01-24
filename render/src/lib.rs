@@ -347,6 +347,24 @@ impl Render {
         sys_print_song::sys_print_song(&self.songs, &self.ordered_children, &mut self.stencil_maps);
     }
 
+    pub fn stencils(&self) -> String {
+        let mut lines: Vec<String> = Vec::new();
+        for (entity, stencil) in &self.stencils {
+            lines.push(entity.id().to_string());
+            lines.push(stencil.to_svg());
+        }
+        lines.join("\n")
+    }
+
+    pub fn stencil_maps(&self) -> String {
+        let mut lines: Vec<String> = Vec::new();
+        for (entity, stencil) in &self.stencil_maps {
+            lines.push(entity.id().to_string());
+            lines.push(stencil.to_json());
+        }
+        lines.join("\n")
+    }
+
     pub fn print_for_demo(&mut self) -> String {
         use kurbo::Vec2;
 

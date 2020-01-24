@@ -21,6 +21,9 @@ export default function SheetMusicView(props: Props) {
 
   useLayoutEffect(() => {
     render(props.children, container);
+    container.exec();
+    console.log(container.stencils());
+    console.log(container.stencil_maps());
     setSvg(container.print_for_demo());
   }, [container, props.children]);
 

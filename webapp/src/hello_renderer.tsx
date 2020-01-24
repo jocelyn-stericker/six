@@ -102,7 +102,7 @@ export default function HelloRenderer() {
               ))}
             </bar>
             <between barline={Barline.Normal} />
-            <bar numer={4} denom={4}>
+            <bar numer={num} denom={4}>
               <rnc
                 noteValue={NoteValue.Sixteenth}
                 dots={0}
