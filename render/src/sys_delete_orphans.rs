@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use crate::Song;
 use entity::Entity;
 use rest_note_chord::RestNoteChord;
-use rhythm::{Bar, RelativeRhythmicSpacing};
+use rhythm::{Bar, RelativeRhythmicSpacing, Start};
 use staff::{BetweenBars, Staff};
 use stencil::{Stencil, StencilMap};
 
@@ -17,6 +17,7 @@ pub fn sys_delete_orphans(
     between_bars: &mut HashMap<Entity, BetweenBars>,
     rncs: &mut HashMap<Entity, RestNoteChord>,
     // These are secondary components. They do not necessarily need parents.
+    starts: &mut HashMap<Entity, Start>,
     stencils: &mut HashMap<Entity, Stencil>,
     stencil_maps: &mut HashMap<Entity, StencilMap>,
     spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
@@ -50,6 +51,7 @@ pub fn sys_delete_orphans(
             spacing.remove(key);
             ordered_children.remove(key);
             rncs.remove(key);
+            starts.remove(key);
         }
     }
 }

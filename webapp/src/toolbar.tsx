@@ -77,12 +77,15 @@ export default function Toolbar(props: Props) {
                   </Tooltip>
                   <Card>
                     <Checkbox
-                      label="Sixteenth or shorter"
                       checked={props.sixteenth}
                       onChange={ev =>
                         props.onSixteenthChanged(ev.currentTarget.checked)
                       }
-                    />
+                    >
+                      <>
+                        Shorter than 16<sup>th</sup> notes
+                      </>
+                    </Checkbox>
                     <Checkbox
                       label="Tuplets"
                       checked={props.tuplets}
@@ -97,21 +100,22 @@ export default function Toolbar(props: Props) {
             </Radio>
             <Radio className="six-navbar-control" value="select">
               <Tooltip position="bottom">
-                <>Select Notes</>
-                <>Add dynamics/articulation to notes, remove notes, &hellip;</>
+                <>Edit Notes</>
+                <>
+                  Dynamics, articulation, lyrics, chords, note deletion,
+                  &hellip;
+                </>
               </Tooltip>
             </Radio>
-            <Tooltip position="bottom">
-              <Radio
-                className="six-navbar-control"
-                label="Edit Bars & Signatures"
-                value="bars"
-              />
-              <>
-                Change clefs/signatures/instructions/phrasing, add/remove
-                bars/repeats, ...
-              </>
-            </Tooltip>
+            <Radio className="six-navbar-control" value="bars">
+              <Tooltip position="bottom">
+                <>Edit Bars & Signatures</>
+                <>
+                  Clefs, signatures, instructions, phrasing, bars, repeats,
+                  &hellip;
+                </>
+              </Tooltip>
+            </Radio>
           </RadioGroup>
         </Navbar.Group>
       </Navbar>

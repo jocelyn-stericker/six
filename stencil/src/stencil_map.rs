@@ -6,7 +6,7 @@ use kurbo::{TranslateScale, Vec2};
 
 #[derive(Debug, Clone, Default)]
 pub struct StencilMap {
-    transform: Option<TranslateScale>,
+    pub(crate) transform: Option<TranslateScale>,
     children: HashMap<Entity, (isize, Option<TranslateScale>)>,
     top_zindex: isize,
 }
@@ -93,6 +93,12 @@ impl StencilMap {
                 .into_iter()
                 .enumerate()
                 .map(|(i, (entity, transform))| {
+                    let transform = match (self.transform, transform) {
+                        (Some(a), Some(b)) => Some(a * b),
+                        (Some(a), None) | (None, Some(a)) => Some(a),
+                        (None, None) => None,
+                    };
+
                     if let Some(transform) = transform {
                         let (translate, scale) = transform.as_tuple();
                         [

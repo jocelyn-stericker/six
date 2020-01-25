@@ -2,16 +2,20 @@
 
 mod sys_delete_orphans;
 mod sys_print_song;
+use sys_delete_orphans::sys_delete_orphans;
+use sys_print_song::sys_print_song;
 
 use entity::{EntitiesRes, Entity, Join};
+use kurbo::Rect;
 use num_rational::Rational;
-use rest_note_chord::{sys_implicit_rests, sys_print_rnc, sys_relative_spacing, RestNoteChord};
-use rhythm::{Bar, Duration, Metre, NoteValue, RelativeRhythmicSpacing};
+use rest_note_chord::{sys_print_rnc, sys_relative_spacing, sys_update_rnc_timing, RestNoteChord};
+use rhythm::{Bar, Duration, Metre, NoteValue, RelativeRhythmicSpacing, Start};
 use staff::{
-    sys_print_between_bars, sys_print_staff, sys_print_staff_lines, Barline, BetweenBars, Staff,
+    sys_print_between_bars, sys_print_staff, sys_print_staff_lines, sys_update_starts, Barline,
+    BetweenBars, Staff,
 };
 use std::collections::HashMap;
-use stencil::{Stencil, StencilMap};
+use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Default)]
@@ -32,6 +36,8 @@ pub struct Render {
 
     stencils: HashMap<Entity, Stencil>,
     stencil_maps: HashMap<Entity, StencilMap>,
+    world_bbox: HashMap<Entity, Rect>,
+    starts: HashMap<Entity, Start>,
     spacing: HashMap<Entity, RelativeRhythmicSpacing>,
 
     ordered_children: HashMap<Entity, Vec<Entity>>,
@@ -146,6 +152,7 @@ impl Render {
 
         self.bars.insert(entity, Bar::new(Metre::new(numer, denom)));
         self.stencil_maps.insert(entity, StencilMap::default());
+        self.starts.insert(entity, Start::default());
 
         entity.id()
     }
@@ -162,8 +169,8 @@ impl Render {
         }
 
         if let Some(bar) = self.bars.get_mut(&bar_id) {
-            if let Some(rnc) = self.rncs.get(&child) {
-                bar.splice(rnc.start(), vec![(rnc.duration(), Some(child))]);
+            if let (Some(rnc), Some(start)) = (self.rncs.get(&child), self.starts.get(&child)) {
+                bar.splice(start.beat, vec![(rnc.duration(), Some(child))]);
                 self.parents.insert(child, bar_id);
             }
         }
@@ -200,7 +207,15 @@ impl Render {
             .insert(entity, RelativeRhythmicSpacing::default());
         self.rncs.insert(
             entity,
-            RestNoteChord::new(Duration::new(note_value, dots, None), is_note, start),
+            RestNoteChord::new(Duration::new(note_value, dots, None), is_note),
+        );
+        self.starts.insert(
+            entity,
+            Start {
+                bar: 0,
+                beat: start,
+                natural_beat: start,
+            },
         );
         self.stencils.insert(entity, Stencil::default());
 
@@ -219,25 +234,31 @@ impl Render {
         let rnc_id = Entity::new(rnc);
         let bars = &mut self.bars;
         if let Some(parent_id) = self.parents.get(&rnc_id) {
-            if let (Some(rnc), Some(bar)) = (self.rncs.get_mut(&rnc_id), bars.get_mut(parent_id)) {
+            if let (Some(rnc), Some(bar), Some(start)) = (
+                self.rncs.get_mut(&rnc_id),
+                bars.get_mut(parent_id),
+                self.starts.get_mut(&rnc_id),
+            ) {
                 bar.remove(rnc_id);
-                rnc.start = Rational::new(start_numer, start_denom);
+                start.beat = Rational::new(start_numer, start_denom);
+                start.natural_beat = start.beat;
                 rnc.duration = Duration::new(note_value, dots, None);
                 rnc.natural_duration = rnc.duration;
-                rnc.natural_start = rnc.start;
-                bar.splice(rnc.start(), vec![(rnc.duration(), Some(rnc_id))]);
+                bar.splice(start.beat, vec![(rnc.duration(), Some(rnc_id))]);
             }
 
             // Fix previously overlapping notes.
-            for (other_rnc_id, (rnc, parent)) in (&mut self.rncs, &self.parents).join() {
-                if (rnc.natural_duration != rnc.duration || rnc.natural_start != rnc.start)
+            for (other_rnc_id, (rnc, parent, start)) in
+                (&mut self.rncs, &self.parents, &mut self.starts).join()
+            {
+                if (rnc.natural_duration != rnc.duration || start.natural_beat != start.beat)
                     && parent == parent_id
                 {
                     if let Some(bar) = bars.get_mut(parent_id) {
                         bar.remove(other_rnc_id);
                         rnc.duration = rnc.natural_duration;
-                        rnc.start = rnc.natural_start;
-                        bar.splice(rnc.start(), vec![(rnc.duration(), Some(other_rnc_id))]);
+                        start.beat = start.natural_beat;
+                        bar.splice(start.beat, vec![(rnc.duration(), Some(other_rnc_id))]);
                     }
                 }
             }
@@ -270,6 +291,7 @@ impl Render {
                 time,
             },
         );
+        self.starts.insert(entity, Start::default());
         self.stencils.insert(entity, Stencil::default());
 
         entity.id()
@@ -307,7 +329,7 @@ impl Render {
     /* Frame */
 
     pub fn exec(&mut self) {
-        sys_delete_orphans::sys_delete_orphans(
+        sys_delete_orphans(
             &self.parents,
             self.root,
             &mut self.songs,
@@ -315,15 +337,24 @@ impl Render {
             &mut self.bars,
             &mut self.between_bars,
             &mut self.rncs,
+            &mut self.starts,
             &mut self.stencils,
             &mut self.stencil_maps,
             &mut self.spacing,
             &mut self.ordered_children,
         );
 
-        sys_implicit_rests(
+        sys_update_starts(
+            &self.staffs,
+            &self.ordered_children,
+            &self.bars,
+            &mut self.starts,
+        );
+
+        sys_update_rnc_timing(
             &self.entities,
             &mut self.rncs,
+            &mut self.starts,
             &mut self.bars,
             &mut self.spacing,
             &mut self.parents,
@@ -344,7 +375,13 @@ impl Render {
         );
         sys_print_staff_lines(&self.staffs, &mut self.stencils);
 
-        sys_print_song::sys_print_song(&self.songs, &self.ordered_children, &mut self.stencil_maps);
+        sys_print_song(&self.songs, &self.ordered_children, &mut self.stencil_maps);
+        sys_update_world_bboxes(
+            &self.songs,
+            &self.stencils,
+            &self.stencil_maps,
+            &mut self.world_bbox,
+        );
     }
 
     pub fn stencils(&self) -> String {
@@ -365,15 +402,34 @@ impl Render {
         lines.join("\n")
     }
 
-    pub fn print_for_demo(&mut self) -> String {
-        use kurbo::Vec2;
+    pub fn get_root_id(&self) -> Option<usize> {
+        self.root.map(|root| root.id())
+    }
 
+    pub fn get_stencil_bboxes(&self) -> String {
+        let mut lines: Vec<String> = Vec::new();
+        for (entity, bbox) in &self.world_bbox {
+            let start = self.starts.get(entity);
+            lines.push(entity.id().to_string());
+            lines.push(format!(
+                "[{},{},{},{},{},{},{}]",
+                bbox.x0,
+                bbox.y0,
+                bbox.x1,
+                bbox.y1,
+                start.map(|s| s.bar as isize).unwrap_or(-1),
+                start.map(|s| *s.beat.numer()).unwrap_or(0),
+                start.map(|s| *s.beat.denom()).unwrap_or(1),
+            ));
+        }
+        lines.join("\n")
+    }
+
+    pub fn print_for_demo(&mut self) -> String {
         self.exec();
 
         if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
             root.clone()
-                .with_translation(Vec2::new(0.0, -1500.0))
-                .with_paper_size(3)
                 .to_svg_doc_for_testing(&self.stencil_maps, &self.stencils)
         } else {
             String::default()

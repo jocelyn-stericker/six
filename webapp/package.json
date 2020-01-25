@@ -6,7 +6,8 @@
   "scripts": {
     "test": "eslint ./src --ext tsx,ts,js,jsx && tsc --noEmit",
     "build": "rimraf dist pkg && webpack && npm test",
-    "start": "rimraf dist pkg && webpack-dev-server --open -d"
+    "start": "rimraf dist pkg && webpack-dev-server --open -d",
+    "start-share": "rimraf dist pkg && webpack-dev-server --host 0.0.0.0 -d"
   },
   "author": "Joshua Netterfield <joshua@nettek.ca>",
   "license": "AGPL-3.0",

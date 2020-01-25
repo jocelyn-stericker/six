@@ -1,7 +1,9 @@
 mod corefont;
 mod stencil_map;
+mod sys_update_world_bboxes;
 
 pub use stencil_map::StencilMap;
+pub use sys_update_world_bboxes::sys_update_world_bboxes;
 
 use kurbo::{BezPath, Line, Point, Rect, TranslateScale, Vec2};
 
@@ -594,9 +596,15 @@ impl Stencil {
         }
     }
 
+    /// Generate an SVG representation of the string, without newlines.
     pub fn to_svg(&self) -> String {
         match self {
-            Stencil::Path(path) => ["<path d=\"", &path.outline.to_svg(), "\" />"].concat(),
+            Stencil::Path(path) => [
+                "<path d=\"",
+                &path.outline.to_svg().replace('\n', ""),
+                "\" />",
+            ]
+            .concat(),
             Stencil::TranslateScale(ts, child) => {
                 let (translation, scale) = ts.as_tuple();
 

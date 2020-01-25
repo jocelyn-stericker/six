@@ -15,10 +15,10 @@ pub struct Bar {
     /// The Rests, Notes, and Chords (RNCs) that fill up this bar.
     ///
     /// If the entity is None, that means it's an implicit rest that is managed
-    /// by sys_implicit_rests.
+    /// by sys_update_rnc_timing.
     rhythm: Vec<(Duration, Option<Entity>)>,
 
-    /// Automatically-generated ("managed") rests, managed by sys_implicit_rests.
+    /// Automatically-generated ("managed") rests, managed by sys_update_rnc_timing.
     managed: Vec<Entity>,
 }
 

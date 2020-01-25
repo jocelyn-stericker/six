@@ -7,7 +7,7 @@ interface Note {
   dots: number;
 }
 
-export default function HelloRenderer() {
+function HelloRenderer() {
   const [num, _setNum] = useState(4);
   const [notes, _setNotes] = useState<Array<Note>>([
     { startNum: 0, duration: -3, dots: 0 }
@@ -48,3 +48,5 @@ export default function HelloRenderer() {
     </React.Fragment>
   );
 }
+
+export default React.memo(HelloRenderer);
