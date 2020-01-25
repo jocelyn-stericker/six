@@ -1,0 +1,44 @@
+.six-heading {
+    font-weight: bold;
+}
+
+.six-note-editor {
+    margin: 12px;
+    padding: 4px;
+}
+
+.six-note-editor svg {
+    /* HACK: overwrite width/height in svg */
+    width: 100%;
+    height: 100%;
+}
+
+.six-navbar-settings {
+    height: 0;
+    display: inline-block;
+}
+
+.six-note-editor-noteview {
+    border-radius: 0;
+    padding: 0;
+}
+
+.six-note-editor-noteview-placeholder {
+    background: white;
+    width: 100%;
+    height: 100vh;
+}
+
+.six-navbar {
+    position: sticky;
+    top: 0;
+}
+
+.six-navbar-control {
+    margin-bottom: 0;
+}
+
+.six-navbar-control-padright {
+    padding-right: 16px;
+}
+

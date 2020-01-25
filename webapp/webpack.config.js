@@ -12,6 +12,14 @@ module.exports = {
   module: {
     rules: [
       {
+        test: /\.(eot|ttf|woff|woff2|svg|png|gif|jpe?g)$/,
+        use: [{ loader: "file-loader" }]
+      },
+      {
+        test: /\.css$/i,
+        use: ["style-loader", "css-loader"]
+      },
+      {
         test: /\.m?[jt]sx?$/,
         exclude: /(node_modules|bower_components)/,
         use: {
