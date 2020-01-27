@@ -106,6 +106,10 @@ export default function SheetMusicView(props: Props) {
 
   const svg = useRef<SVGSVGElement>(null);
 
+  const [hoverTime, setHoverTime] = useState<[number, number, number] | null>(
+    null
+  );
+
   return (
     <svg
       viewBox="0 0 215.9 279.4"
@@ -138,6 +142,9 @@ export default function SheetMusicView(props: Props) {
           })
           .map(e => parseInt(e[0]));
 
+        const time = container.get_time_for_cursor(pt.x, pt.y);
+        setHoverTime(time ? [time[0], time[1], time[2]] : null);
+
         setHovering(hovering);
       }}
     >
@@ -154,7 +161,6 @@ export default function SheetMusicView(props: Props) {
             return null;
           }
           const [x, y, x2, y2, bar, n, d] = stencilMeta[id];
-          console.log(bar, n / d);
           return (
             <React.Fragment key={id}>
               <path
@@ -181,6 +187,18 @@ export default function SheetMusicView(props: Props) {
             </React.Fragment>
           );
         })}
+        <text
+          x={1}
+          y={-1}
+          style={{
+            fontSize: 2,
+            transform: "scale(1, -1)",
+            transformOrigin: "50% 50%",
+            transformBox: "fill-box"
+          }}
+        >
+          {JSON.stringify(hoverTime)}
+        </text>
       </g>
     </svg>
   );

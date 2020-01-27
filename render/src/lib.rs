@@ -425,6 +425,38 @@ impl Render {
         lines.join("\n")
     }
 
+    /// Returns [bar, num, den]
+    pub fn get_time_for_cursor(&self, x: f64, y: f64) -> Option<Vec<usize>> {
+        for (_id, (bbox, bar, start)) in (&self.world_bbox, &self.bars, &self.starts).join() {
+            if x >= bbox.x0 && x <= bbox.x1 && y >= bbox.y0 && y <= bbox.y1 {
+                let child_starts: Vec<_> = bar
+                    .children()
+                    .into_iter()
+                    .map(|c| (self.world_bbox.get(&c.2), c.1))
+                    .collect();
+                for (i, (child_bbox, child_start_beat)) in child_starts.iter().enumerate().rev() {
+                    if let Some(child_bbox) = child_bbox {
+                        if child_bbox.x0 <= x {
+                            return Some(vec![
+                                start.bar,
+                                *child_start_beat.numer() as usize,
+                                *child_start_beat.denom() as usize,
+                                i,
+                            ]);
+                        }
+                    }
+                }
+
+                return Some(vec![
+                    start.bar,
+                    *start.beat.numer() as usize,
+                    *start.beat.denom() as usize,
+                ]);
+            }
+        }
+        None
+    }
+
     pub fn print_for_demo(&mut self) -> String {
         self.exec();
 

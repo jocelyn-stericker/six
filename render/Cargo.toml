@@ -3,6 +3,9 @@ name = "render"
 version = "0.1.0"
 authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
+license = "AGPL-3.0-or-later"
+description = "A DOM-based interface to render sheet music"
+repository = "https://github.com/jnetterf/six"
 
 [lib]
 crate-type = ["cdylib"]

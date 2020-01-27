@@ -45,6 +45,9 @@ fn update_world_bbox(
                 }
             });
         }
+        if let Some(explicit_rect) = stencil_map.explicit_rect() {
+            rect = Some(transform * explicit_rect);
+        }
         rect.unwrap_or_default()
     } else {
         Rect::default()

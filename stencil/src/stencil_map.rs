@@ -2,11 +2,12 @@ use std::collections::HashMap;
 
 use crate::Stencil;
 use entity::Entity;
-use kurbo::{TranslateScale, Vec2};
+use kurbo::{Rect, TranslateScale, Vec2};
 
 #[derive(Debug, Clone, Default)]
 pub struct StencilMap {
     pub(crate) transform: Option<TranslateScale>,
+    explicit_rect: Option<Rect>,
     children: HashMap<Entity, (isize, Option<TranslateScale>)>,
     top_zindex: isize,
 }
@@ -45,6 +46,14 @@ impl StencilMap {
     pub fn with_scale(mut self, scale: f64) -> StencilMap {
         self.transform = Some(TranslateScale::scale(scale) * self.transform.unwrap_or_default());
         self
+    }
+
+    pub fn explicit_rect(&self) -> Option<Rect> {
+        self.explicit_rect
+    }
+
+    pub fn set_explicit_rect(&mut self, rect: Rect) {
+        self.explicit_rect = Some(rect);
     }
 
     /// Convert from staff-size (1 unit is 1 staff) to paper-size (1 unit is 1 mm)

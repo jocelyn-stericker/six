@@ -3,6 +3,9 @@ name = "rest_note_chord"
 version = "0.1.0"
 authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
+license = "AGPL-3.0-or-later"
+description = "Render rest, notes, and chords"
+repository = "https://github.com/jnetterf/six"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

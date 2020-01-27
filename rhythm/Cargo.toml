@@ -3,6 +3,9 @@ name = "rhythm"
 version = "0.1.0"
 authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
+license = "AGPL-3.0-or-later"
+description = "Types and algorithms for spelling and managing rhythms and meter"
+repository = "https://github.com/jnetterf/six"
 
 [dependencies]
 entity = {path = "../entity"}

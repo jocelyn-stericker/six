@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::Staff;
 use entity::{EntitiesRes, Entity, Join};
-use kurbo::{TranslateScale, Vec2};
+use kurbo::{Rect, TranslateScale, Vec2};
 use rhythm::{Bar, RelativeRhythmicSpacing};
 use stencil::{Stencil, StencilMap};
 
@@ -32,7 +32,8 @@ pub fn sys_print_staff(
                 let advance_step = advance_step + 100.0; // freeze
 
                 let mut bar_stencil = StencilMap::default();
-                let mut advance = 200.0;
+                let start = 200f64;
+                let mut advance = start;
                 for (_, _, entity, _) in bar.children() {
                     let relative_spacing = spacing[&entity];
 
@@ -42,6 +43,8 @@ pub fn sys_print_staff(
                     );
                     advance += advance_step * relative_spacing.relative();
                 }
+
+                bar_stencil.set_explicit_rect(Rect::new(start, -1000f64, advance, 1000f64));
 
                 stencil_maps.insert(*child, bar_stencil);
 
