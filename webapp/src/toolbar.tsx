@@ -1,124 +1,107 @@
 import React from "react";
+import cx from "classnames";
 
-import {
-  Popover,
-  Tooltip,
-  Card,
-  Button,
-  ButtonGroup,
-  Navbar,
-  Radio,
-  RadioGroup,
-  Checkbox
-} from "@blueprintjs/core";
+import { NOTES, SELECT, EDIT, SAVE, OPEN, UNDO, RESET } from "./toolbar_icons";
+import LazyTooltip from "./lazy_tooltip";
 
 export type Tool = "notes" | "bars" | "select";
 
 export interface Props {
   tool: Tool;
   canUndo: boolean;
-  sixteenth: boolean;
-  tuplets: boolean;
 
   onSetTool: (tool: Tool) => void;
   onSave: () => void;
   onOpen: () => void;
   onUndo: () => void;
-  onSixteenthChanged: (on: boolean) => void;
-  onTupletChanged: (on: boolean) => void;
+  onReset: () => void;
 }
 
 export default function Toolbar(props: Props) {
   return (
-    <React.Fragment>
-      <Navbar className="six-navbar">
-        <Navbar.Group align="left">
-          <Navbar.Heading className="six-heading">Six Eight</Navbar.Heading>
-          <ButtonGroup>
-            <Tooltip position="bottom" usePortal={false}>
-              <Button icon="floppy-disk" onClick={props.onSave} />
-              <React.Fragment>Save as PDF&hellip;</React.Fragment>
-            </Tooltip>
-            <Tooltip position="bottom" usePortal={false}>
-              <Button icon="document-open" onClick={props.onOpen} />
-              <React.Fragment>Open Six Eight PDF&hellip;</React.Fragment>
-            </Tooltip>
-            <Tooltip position="bottom" usePortal={false}>
-              <Button
-                icon="undo"
-                disabled={!props.canUndo}
-                onClick={props.onUndo}
-              />
-              <React.Fragment>Undo</React.Fragment>
-            </Tooltip>
-          </ButtonGroup>
-          <Navbar.Divider />
-        </Navbar.Group>
-        <Navbar.Group>
-          <RadioGroup
-            inline={true}
-            selectedValue={props.tool}
-            onChange={ev => props.onSetTool(ev.currentTarget.value as any)}
-          >
-            <Radio className="six-navbar-control" value="notes">
-              Add Notes (
-              <span className="six-navbar-settings">
-                <Popover minimal={true}>
-                  <Tooltip position="bottom">
-                    <Button
-                      icon="settings"
-                      minimal={true}
-                      intent="primary"
-                      small={true}
-                      active={props.sixteenth || props.tuplets}
-                      disabled={props.tool !== "notes"}
-                    />
-                    <>Insertion Options</>
-                  </Tooltip>
-                  <Card>
-                    <Checkbox
-                      checked={props.sixteenth}
-                      onChange={ev =>
-                        props.onSixteenthChanged(ev.currentTarget.checked)
-                      }
-                    >
-                      <>
-                        Shorter than 16<sup>th</sup> notes
-                      </>
-                    </Checkbox>
-                    <Checkbox
-                      label="Tuplets"
-                      checked={props.tuplets}
-                      onChange={ev =>
-                        props.onTupletChanged(ev.currentTarget.checked)
-                      }
-                    />
-                  </Card>
-                </Popover>
-              </span>
-              )
-            </Radio>
-            <Radio className="six-navbar-control" value="select">
-              <Tooltip position="bottom">
-                <>Edit Notes</>
-                <>
-                  Dynamics, articulation, lyrics, chords, note deletion,
-                  &hellip;
-                </>
-              </Tooltip>
-            </Radio>
-            <Radio className="six-navbar-control" value="bars">
-              <Tooltip position="bottom">
-                <>Edit Bars & Signatures</>
-                <>
-                  Clefs, signatures, instructions, phrasing, bars, repeats,
-                  &hellip;
-                </>
-              </Tooltip>
-            </Radio>
-          </RadioGroup>
-        </Navbar.Group>
-      </Navbar>
-    </React.Fragment>
+    <div className="six-note-toolbar">
+      <LazyTooltip position="right" content="Add Notes">
+        <div
+          className={cx(
+            "six-note-toolbar-mode",
+            props.tool === "notes" && "six-note-toolbar-mode-selected"
+          )}
+          onClick={() => props.onSetTool("notes")}
+        >
+          <svg viewBox="0 0 20 20" width="100%">
+            <path d={NOTES} />
+          </svg>
+        </div>
+      </LazyTooltip>
+      <LazyTooltip
+        position="right"
+        content={<>Select, Decorate, and Delete Notes</>}
+      >
+        <div
+          className={cx(
+            "six-note-toolbar-mode",
+            props.tool === "select" && "six-note-toolbar-mode-selected"
+          )}
+          onClick={() => props.onSetTool("select")}
+        >
+          <svg viewBox="0 0 20 20" width="100%">
+            <path d={SELECT} />
+          </svg>
+        </div>
+      </LazyTooltip>
+      <LazyTooltip position="right" content={<>Edit Bars and Signatures</>}>
+        <div
+          className={cx(
+            "six-note-toolbar-mode",
+            props.tool === "bars" && "six-note-toolbar-mode-selected"
+          )}
+          onClick={() => props.onSetTool("bars")}
+        >
+          <svg viewBox="0 0 20 20" width="100%">
+            <path d={EDIT} />
+          </svg>
+        </div>
+      </LazyTooltip>
+      <div className="six-note-toolbar-spacer" />
+      <LazyTooltip position="right" content={<>Save as PDF&hellip;</>}>
+        <div className="six-note-toolbar-action" onClick={props.onSave}>
+          <svg viewBox="0 0 20 20" width="100%">
+            <path d={SAVE} />
+          </svg>
+        </div>
+      </LazyTooltip>
+      <LazyTooltip position="right" content={<>Open Six Eight PDF&hellip;</>}>
+        <div className="six-note-toolbar-action" onClick={props.onOpen}>
+          <svg viewBox="0 0 20 20" width="100%">
+            <path d={OPEN} />
+          </svg>
+        </div>
+      </LazyTooltip>
+      <LazyTooltip position="right" content={<>Reset to Default Document</>}>
+        <div className="six-note-toolbar-action">
+          <svg viewBox="0 0 20 20" width="100%">
+            <path d={RESET} onClick={props.onReset} />
+          </svg>
+        </div>
+      </LazyTooltip>
+      <LazyTooltip position="right" content={<>Undo</>}>
+        <div
+          className={cx(
+            "six-note-toolbar-action",
+            !props.canUndo && "six-note-toolbar-action-disabled"
+          )}
+          onClick={props.onUndo}
+        >
+          <svg viewBox="0 0 20 20" width="100%">
+            <path d={UNDO} onClick={props.onUndo} />
+          </svg>
+        </div>
+      </LazyTooltip>
+      <div className="six-note-toolbar-title">
+        Six
+        <br />
+        Eight
+      </div>
+    </div>
   );
 }

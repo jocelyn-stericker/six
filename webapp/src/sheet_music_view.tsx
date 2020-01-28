@@ -113,8 +113,7 @@ export default function SheetMusicView(props: Props) {
   return (
     <svg
       viewBox="0 0 215.9 279.4"
-      width="215.9mm"
-      height="279.4mm"
+      width="100%"
       ref={svg}
       onMouseMove={ev => {
         if (!svg || !svg.current || !stencilMeta) {

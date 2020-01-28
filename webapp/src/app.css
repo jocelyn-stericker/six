@@ -1,16 +1,112 @@
-.six-heading {
-    font-weight: bold;
+/*
+ * Colour scheme: https://www.happyhues.co/palettes/10
+ *
+ *  - bg: #004643
+ *  - headline: #fffffe 
+ *  - paragraph: #abd1c6
+ *  - button: #f9bc60
+ *  - button text: #001e1d
+ *
+ *  - ill. stroke: #001e1d
+ *  - ill. main: #e8e4e6
+ *  - ill. highlight: #f9bc60
+ *  - ill. secondary: #abd1c6
+ *  - ill. tertiary: #e16162
+ */
+
+html {
+    box-sizing: border-box;
+}
+
+body {
+    background: #004643;
+    line-height: 1.28581;
+    font-size: 14px;
+}
+
+*, ::before, ::after {
+    box-sizing: inherit;
+}
+
+body, .ui-text {
+ font-family: system-ui, -apple-system, "BlinkMacSystemFont", "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Open Sans", "Helvetica Neue", "Icons16", sans-serif;
 }
 
 .six-note-editor {
     margin: 12px;
     padding: 4px;
+    display: flex;
 }
 
-.six-note-editor svg {
-    /* HACK: overwrite width/height in svg */
-    width: 100%;
-    height: 100%;
+.six-note-toolbar {
+    width: 50px;
+    display: flex;
+    flex-direction: column;
+    color: black;
+    fill: black;
+    position: sticky;
+    top: 16px;
+    align-self: flex-start;
+    height: calc(100vh - 32px);
+}
+
+.six-note-toolbar-title {
+    color: #fffffe;
+    font-size: 14px;
+    padding: 8px 0;
+    text-align: center;
+    font-weight: bold;
+}
+
+.six-note-toolbar-mode {
+    background: #f9bc60;
+    fill: #001e1d;
+    padding: 12px;
+    border-left: 2px solid transparent;
+    border-right: 2px solid transparent;
+    cursor: pointer;
+    height: 46px;
+}
+
+.six-note-toolbar-mode:hover {
+    border-right: 2px solid #f9bc60;
+    fill: white;
+    background: #e16162;
+}
+
+.six-note-toolbar-spacer {
+    flex: 1;
+}
+
+.six-note-toolbar-mode-selected {
+    border-right: 2px solid #f9bc60;
+    fill: black;
+    background: #e16162;
+    cursor: default;
+}
+
+.six-note-toolbar-mode-selected:hover {
+    fill: #001e1d;
+}
+
+.six-note-toolbar-action {
+    fill: #f9bc60;
+    padding: 12px;
+    cursor: pointer;
+    height: 46px;
+    border-left: 2px solid transparent;
+    border-right: 2px solid transparent;
+}
+
+.six-note-toolbar-action:hover {
+    fill: black;
+    background: #f9bc60;
+}
+
+.six-note-toolbar-action-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+    cursor: no-entry;
 }
 
 .six-navbar-settings {
@@ -19,8 +115,10 @@
 }
 
 .six-note-editor-noteview {
+    background: white;
     border-radius: 0;
     padding: 0;
+    flex: 1;
 }
 
 .six-note-editor-noteview-placeholder {

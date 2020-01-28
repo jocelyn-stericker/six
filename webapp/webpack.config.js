@@ -1,6 +1,9 @@
 const path = require("path");
 const CopyPlugin = require("copy-webpack-plugin");
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
+const BundleAnalyzerPlugin = require("webpack-bundle-analyzer")
+  .BundleAnalyzerPlugin;
+const { NormalModuleReplacementPlugin } = require("webpack");
 
 const dist = path.resolve(__dirname, "dist");
 
@@ -51,6 +54,18 @@ module.exports = {
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, "..", "render"),
       outDir: path.resolve(__dirname, "pkg")
-    })
-  ]
+    }),
+
+    new NormalModuleReplacementPlugin(
+      /.*\/generated\/iconSvgPaths.*/,
+      path.resolve(__dirname, "src/icons.js")
+    ),
+
+    new NormalModuleReplacementPlugin(
+      /.*dom4.*/,
+      path.resolve(__dirname, "src/blank.js")
+    )
+
+    // new BundleAnalyzerPlugin()
+  ].filter(a => !!a)
 };
