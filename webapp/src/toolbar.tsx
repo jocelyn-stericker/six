@@ -20,13 +20,20 @@ export interface Props {
 export default function Toolbar(props: Props) {
   return (
     <div className="six-note-toolbar">
-      <LazyTooltip position="right" content="Add Notes">
+      <LazyTooltip
+        position="right"
+        content="Add Notes"
+        hoverOpenDelay={0}
+        transitionDuration={0}
+        lazy={false}
+      >
         <div
           className={cx(
             "six-note-toolbar-mode",
             props.tool === "notes" && "six-note-toolbar-mode-selected"
           )}
           onClick={() => props.onSetTool("notes")}
+          onTouchStart={() => props.onSetTool("notes")}
         >
           <svg viewBox="0 0 20 20" width="100%">
             <path d={NOTES} />
@@ -36,6 +43,10 @@ export default function Toolbar(props: Props) {
       <LazyTooltip
         position="right"
         content={<>Select, Decorate, and Delete Notes</>}
+        hoverOpenDelay={0}
+        transitionDuration={0}
+        lazy={false}
+        interactionKind="hover"
       >
         <div
           className={cx(
@@ -43,19 +54,26 @@ export default function Toolbar(props: Props) {
             props.tool === "select" && "six-note-toolbar-mode-selected"
           )}
           onClick={() => props.onSetTool("select")}
+          onTouchStart={() => props.onSetTool("select")}
         >
           <svg viewBox="0 0 20 20" width="100%">
             <path d={SELECT} />
           </svg>
         </div>
       </LazyTooltip>
-      <LazyTooltip position="right" content={<>Edit Bars and Signatures</>}>
+      <LazyTooltip
+        position="right"
+        content={<>Edit Bars and Signatures</>}
+        hoverOpenDelay={0}
+        transitionDuration={0}
+      >
         <div
           className={cx(
             "six-note-toolbar-mode",
             props.tool === "bars" && "six-note-toolbar-mode-selected"
           )}
           onClick={() => props.onSetTool("bars")}
+          onTouchStart={() => props.onSetTool("bars")}
         >
           <svg viewBox="0 0 20 20" width="100%">
             <path d={EDIT} />
@@ -63,28 +81,48 @@ export default function Toolbar(props: Props) {
         </div>
       </LazyTooltip>
       <div className="six-note-toolbar-spacer" />
-      <LazyTooltip position="right" content={<>Save as PDF&hellip;</>}>
+      <LazyTooltip
+        position="right"
+        content={<>Save as PDF&hellip;</>}
+        hoverOpenDelay={0}
+        transitionDuration={0}
+      >
         <div className="six-note-toolbar-action" onClick={props.onSave}>
           <svg viewBox="0 0 20 20" width="100%">
             <path d={SAVE} />
           </svg>
         </div>
       </LazyTooltip>
-      <LazyTooltip position="right" content={<>Open Six Eight PDF&hellip;</>}>
+      <LazyTooltip
+        position="right"
+        content={<>Open Six Eight PDF&hellip;</>}
+        hoverOpenDelay={0}
+        transitionDuration={0}
+      >
         <div className="six-note-toolbar-action" onClick={props.onOpen}>
           <svg viewBox="0 0 20 20" width="100%">
             <path d={OPEN} />
           </svg>
         </div>
       </LazyTooltip>
-      <LazyTooltip position="right" content={<>Reset to Default Document</>}>
-        <div className="six-note-toolbar-action">
+      <LazyTooltip
+        position="right"
+        content={<>Reset to Default Document</>}
+        hoverOpenDelay={0}
+        transitionDuration={0}
+      >
+        <div className="six-note-toolbar-action" onClick={props.onReset}>
           <svg viewBox="0 0 20 20" width="100%">
-            <path d={RESET} onClick={props.onReset} />
+            <path d={RESET} />
           </svg>
         </div>
       </LazyTooltip>
-      <LazyTooltip position="right" content={<>Undo</>}>
+      <LazyTooltip
+        position="right"
+        content={<>Undo</>}
+        hoverOpenDelay={0}
+        transitionDuration={0}
+      >
         <div
           className={cx(
             "six-note-toolbar-action",
@@ -93,7 +131,7 @@ export default function Toolbar(props: Props) {
           onClick={props.onUndo}
         >
           <svg viewBox="0 0 20 20" width="100%">
-            <path d={UNDO} onClick={props.onUndo} />
+            <path d={UNDO} onClick={props.onUndo} onTouchStart={props.onUndo} />
           </svg>
         </div>
       </LazyTooltip>

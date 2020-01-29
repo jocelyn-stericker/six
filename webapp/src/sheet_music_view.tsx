@@ -5,6 +5,7 @@ export { Render, NoteValue, Barline } from "./reconciler";
 
 interface Props {
   children: any;
+  onClick: (time: null | [number, number, number]) => void;
 }
 
 /** [entity, x, y, scale] */
@@ -115,6 +116,9 @@ export default function SheetMusicView(props: Props) {
       viewBox="0 0 215.9 279.4"
       width="100%"
       ref={svg}
+      onClick={() => {
+        props.onClick(hoverTime);
+      }}
       onMouseMove={ev => {
         if (!svg || !svg.current || !stencilMeta) {
           return;

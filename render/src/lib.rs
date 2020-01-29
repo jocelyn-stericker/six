@@ -427,23 +427,43 @@ impl Render {
 
     /// Returns [bar, num, den]
     pub fn get_time_for_cursor(&self, x: f64, y: f64) -> Option<Vec<usize>> {
+        let quant = Rational::new(1, 8);
         for (_id, (bbox, bar, start)) in (&self.world_bbox, &self.bars, &self.starts).join() {
             if x >= bbox.x0 && x <= bbox.x1 && y >= bbox.y0 && y <= bbox.y1 {
                 let child_starts: Vec<_> = bar
                     .children()
                     .into_iter()
-                    .map(|c| (self.world_bbox.get(&c.2), c.1))
+                    .map(|c| {
+                        (
+                            self.world_bbox
+                                .get(&c.2)
+                                .map(|rect| rect.x0)
+                                .unwrap_or_default(),
+                            c.1,
+                        )
+                    })
                     .collect();
-                for (i, (child_bbox, child_start_beat)) in child_starts.iter().enumerate().rev() {
-                    if let Some(child_bbox) = child_bbox {
-                        if child_bbox.x0 <= x {
-                            return Some(vec![
-                                start.bar,
-                                *child_start_beat.numer() as usize,
-                                *child_start_beat.denom() as usize,
-                                i,
-                            ]);
-                        }
+                for (i, (child_left, child_start_beat)) in child_starts.iter().enumerate().rev() {
+                    if *child_left <= x {
+                        let next = child_starts
+                            .get(i + 1)
+                            .copied()
+                            .unwrap_or((bbox.x1, bar.metre().duration()));
+                        let time_delta = next.1 - child_start_beat;
+                        let quant = quant.min(time_delta);
+                        let steps = time_delta / quant;
+                        let steps = ((*steps.numer() as f64) / (*steps.denom() as f64)).ceil();
+
+                        let pct = (x - *child_left) / (next.0 - *child_left);
+                        let step = (pct * steps).round() as usize;
+                        let beat = child_start_beat + quant * (step as isize);
+
+                        return Some(vec![
+                            start.bar,
+                            *beat.numer() as usize,
+                            *beat.denom() as usize,
+                            i,
+                        ]);
                     }
                 }
 
