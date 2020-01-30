@@ -29,6 +29,7 @@ interface Instance {
 
 export interface SongProps {
   key?: string | number | null | undefined;
+  freezeSpacing?: number | undefined;
   children: React.ReactNode;
 }
 
@@ -78,7 +79,11 @@ function createInstance<T extends keyof JSX.IntrinsicElements>(
     return {
       container,
       type: "song",
-      entity: container.song_create()
+      entity: container.song_create(
+        typeof spec.props.freezeSpacing === "number"
+          ? spec.props.freezeSpacing
+          : undefined
+      )
     };
   }
   if (spec.type === "staff") {
@@ -205,6 +210,10 @@ const Reconciler = ReactReconciler({
   ) {
     // TODO: ALL the changes
     let changes = [];
+    if (type === "song" && oldProps.freezeSpacing !== newProps.freezeSpacing) {
+      changes.push("spacing");
+    }
+
     if (
       type === "rnc" &&
       (oldProps.startNum !== newProps.startNum ||
@@ -236,6 +245,16 @@ const Reconciler = ReactReconciler({
     newProps: any,
     _finishedWork
   ) {
+    if (type === "song") {
+      for (const change of updatePayload) {
+        if (change === "spacing") {
+          instance.container.song_set_freeze_spacing(
+            instance.entity,
+            newProps.freezeSpacing
+          );
+        }
+      }
+    }
     if (type === "rnc") {
       for (const change of updatePayload) {
         if (change === "time") {

@@ -3,11 +3,14 @@ use std::collections::HashMap;
 
 use crate::RestNoteChord;
 use entity::{Entity, Join};
-use rhythm::RelativeRhythmicSpacing;
+use rhythm::{Bar, RelativeRhythmicSpacing};
+use stencil::Stencil;
 
 pub fn sys_relative_spacing(
     rnc: &HashMap<Entity, RestNoteChord>,
     parents: &HashMap<Entity, Entity>,
+    bars: &HashMap<Entity, Bar>,
+    stencils: &HashMap<Entity, Stencil>,
     spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
 ) {
     let mut shortest_per_bar: HashMap<Entity, Rational> = HashMap::new();
@@ -20,7 +23,38 @@ pub fn sys_relative_spacing(
         *entry = (*entry).min(dur);
     }
 
-    for (_id, (rnc, parent, spacing)) in (rnc, parents, spacing).join() {
-        *spacing = RelativeRhythmicSpacing::new(shortest_per_bar[&parent], &rnc.duration);
+    for (id, (rnc, parent)) in (rnc, parents).join() {
+        *spacing.get_mut(&id).unwrap() =
+            RelativeRhythmicSpacing::new(shortest_per_bar[&parent], &rnc.duration);
+    }
+
+    for bar_id in shortest_per_bar.keys() {
+        if let Some(bar) = bars.get(bar_id) {
+            let mut advance_step = 0.0f64;
+            for (_, _, entity, _) in bar.children() {
+                let stencil = &stencils[&entity];
+                let relative_spacing = spacing[&entity];
+                advance_step = advance_step.max(stencil.rect().x1 / relative_spacing.relative());
+            }
+
+            let advance_step = advance_step + 100.0; // freeze
+
+            let start = 200f64;
+            let mut advance = start;
+            for (_, t, entity, _) in bar.children() {
+                let relative_spacing = spacing[&entity];
+                let end = advance + advance_step * relative_spacing.relative();
+
+                let rnc = &rnc[&entity];
+                let spacing = spacing.get_mut(&entity).unwrap();
+
+                *spacing = RelativeRhythmicSpacing::new(shortest_per_bar[&bar_id], &rnc.duration);
+                spacing.t = t;
+                spacing.start_x = advance;
+                spacing.end_x = end;
+
+                advance = end;
+            }
+        }
     }
 }

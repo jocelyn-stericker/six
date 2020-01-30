@@ -11,6 +11,7 @@ interface Note {
 
 function HelloRenderer() {
   const [num, _setNum] = useState(4);
+  const [hover, setHover] = useState(false);
   const [notes, setNotes] = useState<Array<Note>>([
     { bar: 0, startNum: 0, startDen: 16, duration: -3, dots: 0 },
     { bar: 1, startNum: 1, startDen: 16, duration: -4, dots: 0 }
@@ -19,6 +20,8 @@ function HelloRenderer() {
   return (
     <React.Fragment>
       <SheetMusicView
+        onEnter={() => setHover(true)}
+        onExit={() => setHover(false)}
         onClick={time => {
           if (time) {
             setNotes([
@@ -34,7 +37,7 @@ function HelloRenderer() {
           }
         }}
       >
-        <song>
+        <song freezeSpacing={hover ? 1 : undefined}>
           <staff>
             <between clef={true} tsNum={num} tsDen={4} />
             <bar numer={4} denom={4}>

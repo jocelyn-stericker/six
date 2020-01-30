@@ -21,16 +21,6 @@ pub fn sys_print_staff(
 
         for child in children {
             if let Some(bar) = bars.get(&child) {
-                let mut advance_step = 0.0f64;
-                for (_, _, entity, _) in bar.children() {
-                    let stencil = &stencils[&entity];
-                    let relative_spacing = spacing[&entity];
-                    advance_step =
-                        advance_step.max(stencil.rect().x1 / relative_spacing.relative());
-                }
-
-                let advance_step = advance_step + 100.0; // freeze
-
                 let mut bar_stencil = StencilMap::default();
                 let start = 200f64;
                 let mut advance = start;
@@ -39,9 +29,12 @@ pub fn sys_print_staff(
 
                     bar_stencil = bar_stencil.and(
                         entity,
-                        Some(TranslateScale::translate(Vec2::new(advance, 0.0))),
+                        Some(TranslateScale::translate(Vec2::new(
+                            relative_spacing.start_x,
+                            0.0,
+                        ))),
                     );
-                    advance += advance_step * relative_spacing.relative();
+                    advance = advance.max(relative_spacing.end_x);
                 }
 
                 bar_stencil.set_explicit_rect(Rect::new(start, -1000f64, advance, 1000f64));

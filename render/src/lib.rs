@@ -19,7 +19,10 @@ use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Default)]
-pub struct Song {}
+pub struct Song {
+    previous_freeze_spacing: Option<isize>,
+    freeze_spacing: Option<isize>,
+}
 
 #[wasm_bindgen]
 #[derive(Debug, Default)]
@@ -123,14 +126,27 @@ impl Render {
     }
 
     /// Create a song, without attaching it as the document root.
-    pub fn song_create(&mut self) -> usize {
+    pub fn song_create(&mut self, freeze_spacing: Option<isize>) -> usize {
         let entity = self.entities.create();
 
-        self.songs.insert(entity, Song::default());
+        self.songs.insert(
+            entity,
+            Song {
+                freeze_spacing,
+                previous_freeze_spacing: None,
+            },
+        );
         self.ordered_children.insert(entity, vec![]);
         self.stencil_maps.insert(entity, StencilMap::default());
 
         entity.id()
+    }
+
+    pub fn song_set_freeze_spacing(&mut self, entity: usize, freeze_spacing: Option<isize>) {
+        let entity = Entity::new(entity);
+        if let Some(song) = self.songs.get_mut(&entity) {
+            song.freeze_spacing = freeze_spacing;
+        }
     }
 
     /// Create a staff, without attaching it to a song.
@@ -360,8 +376,25 @@ impl Render {
             &mut self.parents,
             &mut self.stencils,
         );
-        sys_relative_spacing(&self.rncs, &self.parents, &mut self.spacing);
+
+        let keep_spacing = self
+            .root
+            .and_then(|root| self.songs.get(&root))
+            .map(|root| {
+                root.freeze_spacing.is_some() && root.previous_freeze_spacing == root.freeze_spacing
+            })
+            .unwrap_or(false);
+
         sys_print_rnc(&self.rncs, &mut self.stencils);
+        if !keep_spacing {
+            sys_relative_spacing(
+                &self.rncs,
+                &self.parents,
+                &self.bars,
+                &self.stencils,
+                &mut self.spacing,
+            );
+        }
         sys_print_between_bars(&self.between_bars, &mut self.stencils);
 
         sys_print_staff(
@@ -382,6 +415,10 @@ impl Render {
             &self.stencil_maps,
             &mut self.world_bbox,
         );
+
+        if let Some(root) = self.root.and_then(|root| self.songs.get_mut(&root)) {
+            root.previous_freeze_spacing = root.freeze_spacing;
+        }
     }
 
     pub fn stencils(&self) -> String {
@@ -499,7 +536,7 @@ mod tests {
         use stencil::snapshot;
 
         let mut render = Render::default();
-        let song = render.song_create();
+        let song = render.song_create(None);
 
         let staff = render.staff_create();
         let clef = render.between_bars_create(None, true, Some(4), Some(4));
