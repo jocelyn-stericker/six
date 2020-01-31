@@ -40,36 +40,29 @@ function HelloRenderer() {
         <song freezeSpacing={hover ? 1 : undefined}>
           <staff>
             <between clef={true} tsNum={num} tsDen={4} />
-            <bar numer={4} denom={4}>
-              {notes
-                .filter(note => note.bar === 0)
-                .map(({ dots, duration, startNum, startDen }, idx) => (
-                  <rnc
-                    key={idx}
-                    noteValue={duration}
-                    dots={dots}
-                    startNum={startNum}
-                    startDen={startDen}
-                    isNote={true}
+            {Array(4)
+              .fill(null)
+              .map((_, idx) => (
+                <React.Fragment key={idx}>
+                  <bar numer={4} denom={4}>
+                    {notes
+                      .filter(note => note.bar === idx)
+                      .map(({ dots, duration, startNum, startDen }, idx) => (
+                        <rnc
+                          key={idx}
+                          noteValue={duration}
+                          dots={dots}
+                          startNum={startNum}
+                          startDen={startDen}
+                          isNote={true}
+                        />
+                      ))}
+                  </bar>
+                  <between
+                    barline={idx == 3 ? Barline.Final : Barline.Normal}
                   />
-                ))}
-            </bar>
-            <between barline={Barline.Normal} />
-            <bar numer={num} denom={4}>
-              {notes
-                .filter(note => note.bar === 1)
-                .map(({ dots, duration, startNum, startDen }, idx) => (
-                  <rnc
-                    key={idx}
-                    noteValue={duration}
-                    dots={dots}
-                    startNum={startNum}
-                    startDen={startDen}
-                    isNote={true}
-                  />
-                ))}
-            </bar>
-            <between barline={Barline.Final} />
+                </React.Fragment>
+              ))}
           </staff>
         </song>
       </SheetMusicView>

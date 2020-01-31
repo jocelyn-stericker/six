@@ -42,7 +42,7 @@ export interface BarProps {
   key?: string | number | null | undefined;
   numer: number;
   denom: number;
-  children: any;
+  children?: any;
 }
 
 export interface BetweenBarsProps {

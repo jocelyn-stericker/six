@@ -4,9 +4,6 @@ import ReactDOM from "react-dom";
 import "normalize.css";
 import "./app.css";
 import Toolbar, { Tool } from "./toolbar";
-// import "@blueprintjs/core/lib/css/blueprint.css";
-// import { Card } from "@blueprintjs/core";
-// import "@blueprintjs/icons/lib/css/blueprint-icons.css";
 
 const HelloRenderer = React.lazy(() => import("./hello_renderer"));
 

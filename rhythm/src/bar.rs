@@ -1,4 +1,4 @@
-use crate::duration::Duration;
+use crate::duration::{Duration, NoteValue};
 use crate::metre::{Metre, MetreSegment, Subdivision, Superdivision};
 use entity::{EntitiesRes, Entity};
 use num_integer::Integer;
@@ -581,6 +581,10 @@ impl Bar {
     }
 
     fn target_managed_count(&self) -> usize {
+        if self.whole_rest() {
+            return 1;
+        }
+
         let mut target_managed_count = 0;
         for rnc in &self.rhythm {
             if rnc.1.is_none() {
@@ -591,11 +595,18 @@ impl Bar {
         target_managed_count
     }
 
-    /// If targed_managed_count < managed_count, create a new managed entity.
+    /// If target_managed_count < managed_count, create a new managed entity.
     ///
     /// Returns the duration and ID for the created managed entity.
     pub fn push_managed_entity(&mut self, entities: &EntitiesRes) -> Option<(Duration, Entity)> {
         let mut managed_idx = self.managed.len();
+
+        if self.whole_rest() && managed_idx == 0 {
+            let entity = entities.create();
+            self.managed.push(entity);
+            // TODO: this should only appear as 4 beats, not actually be four beats.
+            return Some((Duration::new(NoteValue::Whole, 0, None), entity));
+        }
 
         for note in &self.rhythm {
             if note.1.is_none() {
@@ -630,6 +641,16 @@ impl Bar {
     pub fn children(&self) -> Vec<(Duration, Rational, Entity, bool)> {
         let mut managed = self.managed().iter();
         let mut start = Rational::zero();
+
+        if self.whole_rest() {
+            // TODO: whole rests are only 4 beats in 1/1, 2/2, 4/4, 8/8, etc.
+            return vec![(
+                Duration::new(NoteValue::Whole, 0, None),
+                start,
+                *managed.next().unwrap(),
+                true,
+            )];
+        }
 
         self.rhythm
             .iter()
