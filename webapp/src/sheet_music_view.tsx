@@ -5,7 +5,10 @@ export { Render, NoteValue, Barline } from "./reconciler";
 
 interface Props {
   children: any;
-  onClick: (time: null | [number, number, number]) => void;
+  onClick: (
+    time: null | [number, number, number],
+    mode: "rnc" | "between-bars"
+  ) => void;
   onEnter: () => void;
   onExit: () => void;
 }
@@ -119,7 +122,17 @@ export default function SheetMusicView(props: Props) {
       width="100%"
       ref={svg}
       onClick={() => {
-        props.onClick(hoverTime);
+        if (!stencilMeta) {
+          return;
+        }
+
+        for (const obj of hovering) {
+          if (container.is_between_bars(obj)) {
+            const [_x, _y, _x2, _y2, bar, n, d] = stencilMeta[obj];
+            props.onClick([bar, n, d], "between-bars");
+          }
+        }
+        props.onClick(hoverTime, "rnc");
       }}
       onPointerEnter={() => {
         props.onEnter();

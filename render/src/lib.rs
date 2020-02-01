@@ -462,6 +462,11 @@ impl Render {
         lines.join("\n")
     }
 
+    pub fn is_between_bars(&self, entity: usize) -> bool {
+        let entity = Entity::new(entity);
+        self.between_bars.contains_key(&entity)
+    }
+
     /// Returns [bar, num, den]
     pub fn get_time_for_cursor(&self, x: f64, y: f64) -> Option<Vec<usize>> {
         let quant = Rational::new(1, 8);

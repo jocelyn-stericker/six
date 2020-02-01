@@ -37,6 +37,19 @@ pub fn sys_relative_spacing(
                 advance_step = advance_step.max(stencil.rect().x1 / relative_spacing.relative());
             }
 
+            let mut width_with_advance_step = 0.0;
+            for (_, _, entity, _) in bar.children() {
+                let relative_spacing = spacing[&entity];
+                width_with_advance_step += advance_step * relative_spacing.relative();
+            }
+
+            // TODO: this should only apply when we are editing a bar.
+            const MIN_WIDTH: f64 = 3000.0;
+            if width_with_advance_step < MIN_WIDTH {
+                advance_step *= MIN_WIDTH / width_with_advance_step;
+            }
+            drop(width_with_advance_step);
+
             let advance_step = advance_step + 100.0; // freeze
 
             let start = 200f64;

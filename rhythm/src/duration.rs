@@ -117,6 +117,8 @@ const MAX_DOTS: u8 = 4;
 pub struct Duration {
     display: Rational,
     tuplet: Rational,
+
+    whole_rest: bool,
 }
 
 impl Duration {
@@ -137,17 +139,26 @@ impl Duration {
         Duration {
             display,
             tuplet: tuplet.unwrap_or_else(Rational::one),
+            whole_rest: false,
         }
     }
 
     /// Create a duration with a displayed duration, in whole notes, and a tuplet.
     pub fn exact(display: Rational, tuplet: Option<Rational>) -> Duration {
-        let maybe_valid = Duration {
+        Duration {
             display,
             tuplet: tuplet.unwrap_or_else(Rational::one),
-        };
+            whole_rest: false,
+        }
+    }
 
-        (maybe_valid)
+    /// Create a whole rest for a specified bar duration.
+    pub fn new_whole_rest(display: Rational) -> Duration {
+        Duration {
+            display,
+            tuplet: Rational::one(),
+            whole_rest: true,
+        }
     }
 
     /// Return whether this is a valid duration for a single note.
@@ -155,7 +166,7 @@ impl Duration {
     /// A valid duration has a base type between a 1/256th note and a maxima note and at most 3
     /// dots.
     pub fn printable(&self) -> bool {
-        self.duration_display_base().is_some() && self.display_dots().is_some()
+        self.whole_rest || self.duration_display_base().is_some() && self.display_dots().is_some()
     }
 
     /// A multiplier which converts the true duration into how it is displayed.
@@ -180,11 +191,19 @@ impl Duration {
 
     /// The kind of note this will be rendered as.
     pub fn duration_display_base(&self) -> Option<NoteValue> {
+        if self.whole_rest {
+            return Some(NoteValue::Whole);
+        }
+
         NoteValue::new(self.display_duration().to_f64().log2().floor() as isize)
     }
 
     /// The number of dots that will be rendered.
     pub fn display_dots(&self) -> Option<usize> {
+        if self.whole_rest {
+            return Some(0);
+        }
+
         let len = self.display_duration();
         let base = self.duration_display_base()?.count();
         let mut dots: usize = 0;

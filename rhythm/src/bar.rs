@@ -1,4 +1,4 @@
-use crate::duration::{Duration, NoteValue};
+use crate::duration::Duration;
 use crate::metre::{Metre, MetreSegment, Subdivision, Superdivision};
 use entity::{EntitiesRes, Entity};
 use num_integer::Integer;
@@ -604,8 +604,7 @@ impl Bar {
         if self.whole_rest() && managed_idx == 0 {
             let entity = entities.create();
             self.managed.push(entity);
-            // TODO: this should only appear as 4 beats, not actually be four beats.
-            return Some((Duration::new(NoteValue::Whole, 0, None), entity));
+            return Some((Duration::new_whole_rest(self.metre.duration()), entity));
         }
 
         for note in &self.rhythm {
@@ -643,9 +642,8 @@ impl Bar {
         let mut start = Rational::zero();
 
         if self.whole_rest() {
-            // TODO: whole rests are only 4 beats in 1/1, 2/2, 4/4, 8/8, etc.
             return vec![(
-                Duration::new(NoteValue::Whole, 0, None),
+                Duration::new_whole_rest(self.metre.duration()),
                 start,
                 *managed.next().unwrap(),
                 true,

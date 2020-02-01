@@ -17,7 +17,6 @@ pub fn sys_update_rnc_timing(
     for (bar_id, bar) in bars {
         let bar_start = starts.get(bar_id).cloned().unwrap_or_default();
         while let Some((duration, entity)) = bar.push_managed_entity(entities) {
-            // TODO: get correct start
             rnc.insert(entity, RestNoteChord::new(duration, false));
             starts.insert(entity, Start::default());
             spacing.insert(entity, RelativeRhythmicSpacing::default());
