@@ -6,11 +6,9 @@ use stencil::Stencil;
 
 pub fn sys_print_staff_lines(
     staffs: &HashMap<Entity, Staff>,
-    render: &mut HashMap<Entity, Stencil>,
+    stencils: &mut HashMap<Entity, Stencil>,
 ) {
     for staff in staffs.values() {
-        if let Some(staff_lines) = staff.staff_lines {
-            *render.entry(staff_lines).or_default() = Stencil::staff_line(staff.width);
-        }
+        *stencils.entry(staff.staff_lines).or_default() = Stencil::staff_line(staff.width);
     }
 }

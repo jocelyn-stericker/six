@@ -8,13 +8,16 @@ use sys_print_song::sys_print_song;
 use entity::{EntitiesRes, Entity, Join};
 use kurbo::Rect;
 use num_rational::Rational;
-use rest_note_chord::{sys_print_rnc, sys_relative_spacing, sys_update_rnc_timing, RestNoteChord};
+use rest_note_chord::{
+    sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_relative_spacing,
+    sys_update_rnc_timing, RestNoteChord, SpaceTimeWarp,
+};
 use rhythm::{Bar, Duration, Metre, NoteValue, RelativeRhythmicSpacing, Start};
 use staff::{
-    sys_print_between_bars, sys_print_staff, sys_print_staff_lines, sys_update_starts, Barline,
-    BetweenBars, Staff,
+    sys_print_between_bars, sys_print_staff, sys_print_staff_lines, sys_update_bar_numbers,
+    Barline, BetweenBars, Staff,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
 use wasm_bindgen::prelude::*;
 
@@ -30,21 +33,20 @@ pub struct Render {
     entities: EntitiesRes,
 
     root: Option<Entity>,
-    songs: HashMap<Entity, Song>,
+    parents: HashMap<Entity, Entity>,
 
+    songs: HashMap<Entity, Song>,
     staffs: HashMap<Entity, Staff>,
     bars: HashMap<Entity, Bar>,
     between_bars: HashMap<Entity, BetweenBars>,
     rncs: HashMap<Entity, RestNoteChord>,
-
     stencils: HashMap<Entity, Stencil>,
     stencil_maps: HashMap<Entity, StencilMap>,
     world_bbox: HashMap<Entity, Rect>,
     starts: HashMap<Entity, Start>,
     spacing: HashMap<Entity, RelativeRhythmicSpacing>,
-
     ordered_children: HashMap<Entity, Vec<Entity>>,
-    parents: HashMap<Entity, Entity>,
+    warps: HashMap<Entity, SpaceTimeWarp>,
 }
 
 /// A DOM-based interface to Six Eight's ECS.
@@ -152,8 +154,11 @@ impl Render {
     /// Create a staff, without attaching it to a song.
     pub fn staff_create(&mut self) -> usize {
         let entity = self.entities.create();
+        let staff_lines_entity = self.entities.create();
 
-        self.staffs.insert(entity, Staff::default());
+        self.parents.insert(staff_lines_entity, entity);
+        self.staffs.insert(entity, Staff::new(staff_lines_entity));
+
         self.stencil_maps.insert(entity, StencilMap::default());
         self.ordered_children.insert(entity, vec![]);
 
@@ -342,25 +347,67 @@ impl Render {
         );
     }
 
+    fn entities(&self) -> HashSet<Entity> {
+        vec![
+            self.songs.keys().copied().collect::<HashSet<Entity>>(),
+            self.staffs.keys().copied().collect::<HashSet<Entity>>(),
+            self.bars.keys().copied().collect::<HashSet<Entity>>(),
+            self.between_bars
+                .keys()
+                .copied()
+                .collect::<HashSet<Entity>>(),
+            self.rncs.keys().copied().collect::<HashSet<Entity>>(),
+            self.stencils.keys().copied().collect::<HashSet<Entity>>(),
+            self.stencil_maps
+                .keys()
+                .copied()
+                .collect::<HashSet<Entity>>(),
+            self.world_bbox.keys().copied().collect::<HashSet<Entity>>(),
+            self.starts.keys().copied().collect::<HashSet<Entity>>(),
+            self.spacing.keys().copied().collect::<HashSet<Entity>>(),
+            self.ordered_children
+                .keys()
+                .copied()
+                .collect::<HashSet<Entity>>(),
+        ]
+        .into_iter()
+        .flatten()
+        .collect()
+    }
+
     /* Frame */
 
+    fn keep_spacing(&self) -> bool {
+        self.root
+            .and_then(|root| self.songs.get(&root))
+            .map(|root| {
+                root.freeze_spacing.is_some() && root.previous_freeze_spacing == root.freeze_spacing
+            })
+            .unwrap_or(false)
+    }
+
     pub fn exec(&mut self) {
+        let entities = self.entities();
         sys_delete_orphans(
-            &self.parents,
             self.root,
-            &mut self.songs,
-            &mut self.staffs,
-            &mut self.bars,
-            &mut self.between_bars,
-            &mut self.rncs,
-            &mut self.starts,
-            &mut self.stencils,
-            &mut self.stencil_maps,
-            &mut self.spacing,
-            &mut self.ordered_children,
+            &mut self.parents,
+            &entities,
+            &mut [
+                &mut self.songs,
+                &mut self.staffs,
+                &mut self.bars,
+                &mut self.between_bars,
+                &mut self.rncs,
+                &mut self.starts,
+                &mut self.stencils,
+                &mut self.stencil_maps,
+                &mut self.spacing,
+                &mut self.ordered_children,
+                &mut self.warps,
+            ],
         );
 
-        sys_update_starts(
+        sys_update_bar_numbers(
             &self.staffs,
             &self.ordered_children,
             &self.bars,
@@ -377,16 +424,10 @@ impl Render {
             &mut self.stencils,
         );
 
-        let keep_spacing = self
-            .root
-            .and_then(|root| self.songs.get(&root))
-            .map(|root| {
-                root.freeze_spacing.is_some() && root.previous_freeze_spacing == root.freeze_spacing
-            })
-            .unwrap_or(false);
-
         sys_print_rnc(&self.rncs, &mut self.stencils);
-        if !keep_spacing {
+        if self.keep_spacing() {
+            sys_apply_warp(&self.bars, &mut self.spacing, &self.warps);
+        } else {
             sys_relative_spacing(
                 &self.rncs,
                 &self.parents,
@@ -394,11 +435,11 @@ impl Render {
                 &self.stencils,
                 &mut self.spacing,
             );
+            sys_record_space_time_warp(&self.bars, &self.spacing, &mut self.warps);
         }
         sys_print_between_bars(&self.between_bars, &mut self.stencils);
 
         sys_print_staff(
-            &self.entities,
             &mut self.staffs,
             &self.bars,
             &self.spacing,
@@ -574,5 +615,22 @@ mod tests {
         render.rnc_update_time(rnc1, NoteValue::Eighth.log2() as isize, 0, 4, 16);
 
         snapshot("./snapshots/hello_world.svg", &render.print_for_demo());
+
+        // Make sure we can clean up and no entities are left over.
+        render.root_clear(song);
+        render.exec();
+
+        assert_eq!(render.parents.len(), 0);
+        assert_eq!(render.songs.len(), 0);
+        assert_eq!(render.staffs.len(), 0);
+        assert_eq!(render.bars.len(), 0);
+        assert_eq!(render.between_bars.len(), 0);
+        assert_eq!(render.rncs.len(), 0);
+        assert_eq!(render.stencils.len(), 0);
+        assert_eq!(render.stencil_maps.len(), 0);
+        assert_eq!(render.world_bbox.len(), 0);
+        assert_eq!(render.starts.len(), 0);
+        assert_eq!(render.spacing.len(), 0);
+        assert_eq!(render.ordered_children.len(), 0);
     }
 }

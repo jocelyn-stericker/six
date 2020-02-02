@@ -2,6 +2,7 @@
 
 mod sys_print_rnc;
 mod sys_relative_spacing;
+mod sys_space_time_warp;
 mod sys_update_rnc_timing;
 
 use kurbo::Vec2;
@@ -10,8 +11,14 @@ use stencil::Stencil;
 
 pub use sys_print_rnc::sys_print_rnc;
 pub use sys_relative_spacing::sys_relative_spacing;
+pub use sys_space_time_warp::{sys_apply_warp, sys_record_space_time_warp, SpaceTimeWarp};
 pub use sys_update_rnc_timing::sys_update_rnc_timing;
 
+/// A Rest, Note, or Chord.
+///
+/// There are two kinds of RNCs:
+///  - explicit RNCs, created by the user.
+///  - managed RNCs: rests created sys_update_rnc_timing.
 #[derive(Debug)]
 pub struct RestNoteChord {
     pub duration: Duration,

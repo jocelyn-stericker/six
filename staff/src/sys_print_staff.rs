@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 
 use crate::Staff;
-use entity::{EntitiesRes, Entity, Join};
+use entity::{Entity, Join};
 use kurbo::{Rect, TranslateScale, Vec2};
 use rhythm::{Bar, RelativeRhythmicSpacing};
 use stencil::{Stencil, StencilMap};
 
 pub fn sys_print_staff(
-    entities: &EntitiesRes,
     staffs: &mut HashMap<Entity, Staff>,
     bars: &HashMap<Entity, Bar>,
     spacing: &HashMap<Entity, RelativeRhythmicSpacing>,
@@ -57,8 +56,7 @@ pub fn sys_print_staff(
 
         staff.width = staff_advance;
 
-        let staff_lines = staff.staff_lines.get_or_insert_with(|| entities.create());
-        staff_stencil = staff_stencil.and(*staff_lines, None);
+        staff_stencil = staff_stencil.and(staff.staff_lines, None);
 
         stencil_maps.insert(staff_entity, staff_stencil);
     }

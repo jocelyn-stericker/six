@@ -9,8 +9,8 @@ interface Props {
     time: null | [number, number, number],
     mode: "rnc" | "between-bars"
   ) => void;
-  onEnter: () => void;
-  onExit: () => void;
+  onEnterBar: (bar: number) => void;
+  onExitBar: () => void;
 }
 
 /** [entity, x, y, scale] */
@@ -134,12 +134,6 @@ export default function SheetMusicView(props: Props) {
         }
         props.onClick(hoverTime, "rnc");
       }}
-      onPointerEnter={() => {
-        props.onEnter();
-      }}
-      onPointerLeave={() => {
-        props.onExit();
-      }}
       onMouseMove={ev => {
         if (!svg || !svg.current || !stencilMeta) {
           return;
@@ -167,6 +161,19 @@ export default function SheetMusicView(props: Props) {
           .map(e => parseInt(e[0]));
 
         const time = container.get_time_for_cursor(pt.x, pt.y);
+
+        const barChanged =
+          (hoverTime && !time) ||
+          (!hoverTime && time) ||
+          (hoverTime && time && hoverTime[0] !== time[0]);
+        if (barChanged) {
+          if (time) {
+            props.onEnterBar(time[0]);
+          } else {
+            props.onExitBar();
+          }
+        }
+
         setHoverTime(time ? [time[0], time[1], time[2]] : null);
 
         setHovering(hovering);

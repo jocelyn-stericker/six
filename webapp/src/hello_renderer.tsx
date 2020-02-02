@@ -1,27 +1,23 @@
 import React, { useState } from "react";
 import SheetMusicView, { Barline } from "./sheet_music_view";
+import { Action, State } from "./store";
 
 const BetweenBarEdit = React.lazy(() => import("./between_bar_edit"));
 
-interface Note {
-  bar: number;
-  startNum: number;
-  startDen: number;
-  duration: number;
-  dots: number;
+interface Props {
+  appState: State;
+  dispatch: (action: Action) => void;
 }
 
-function HelloRenderer() {
+function HelloRenderer({ appState, dispatch }: Props) {
   const [showBetweenBarEdit, setShowBetweenBarEdit] = useState(false);
-  const [[num, den], setTs] = useState([3, 4]);
-  const [hover, setHover] = useState(false);
-  const [notes, setNotes] = useState<Array<Note>>([]);
+  const [hoverBar, setHoverBar] = useState<number | null>(null);
 
   return (
     <React.Fragment>
       <SheetMusicView
-        onEnter={() => setHover(true)}
-        onExit={() => setHover(false)}
+        onEnterBar={bar => setHoverBar(bar)}
+        onExitBar={() => setHoverBar(null)}
         onClick={(time, mode) => {
           if (!time) {
             return;
@@ -32,45 +28,53 @@ function HelloRenderer() {
             return;
           }
           if (mode === "rnc") {
-            setNotes([
-              ...notes,
-              {
-                bar: time[0],
-                startNum: time[1],
-                startDen: time[2],
-                duration: -3,
-                dots: 0
-              }
-            ]);
+            dispatch({
+              type: "ADD_NOTE",
+              bar: time[0],
+              num: time[1],
+              den: time[2],
+              duration: -3,
+              dots: 0
+            });
           }
         }}
       >
-        <song freezeSpacing={hover ? 1 : undefined} key={`${num}_${den}`}>
+        <song
+          freezeSpacing={hoverBar == null ? undefined : hoverBar}
+          key={`${appState.song.global.tsNum}_${appState.song.global.tsDen}`}
+        >
           <staff>
-            <between clef={true} tsNum={num} tsDen={den} />
-            {Array(4)
-              .fill(null)
-              .map((_, idx) => (
-                <React.Fragment key={idx}>
-                  <bar numer={num} denom={den}>
-                    {notes
-                      .filter(note => note.bar === idx)
-                      .map(({ dots, duration, startNum, startDen }, idx) => (
-                        <rnc
-                          key={idx}
-                          noteValue={duration}
-                          dots={dots}
-                          startNum={startNum}
-                          startDen={startDen}
-                          isNote={true}
-                        />
-                      ))}
-                  </bar>
-                  <between
-                    barline={idx == 3 ? Barline.Final : Barline.Normal}
-                  />
-                </React.Fragment>
-              ))}
+            <between
+              clef={true}
+              tsNum={appState.song.global.tsNum}
+              tsDen={appState.song.global.tsDen}
+            />
+            {appState.song.part.bars.map((bar, idx) => (
+              <React.Fragment key={idx}>
+                <bar
+                  numer={appState.song.global.tsNum}
+                  denom={appState.song.global.tsDen}
+                >
+                  {bar.notes.map(
+                    ({ dots, duration, startNum, startDen }, idx) => (
+                      <rnc
+                        key={idx}
+                        noteValue={duration}
+                        dots={dots}
+                        startNum={startNum}
+                        startDen={startDen}
+                        isNote={true}
+                      />
+                    )
+                  )}
+                </bar>
+                <between
+                  barline={
+                    bar.barline === "normal" ? Barline.Normal : Barline.Final
+                  }
+                />
+              </React.Fragment>
+            ))}
           </staff>
         </song>
       </SheetMusicView>
@@ -78,9 +82,17 @@ function HelloRenderer() {
         <React.Suspense fallback={null}>
           <BetweenBarEdit
             onClose={() => setShowBetweenBarEdit(false)}
-            tsNum={num}
-            tsDen={den}
-            setTs={setTs}
+            tsNum={appState.song.global.tsNum}
+            tsDen={appState.song.global.tsDen}
+            setTs={([num, den]) =>
+              dispatch({
+                type: "SET_TS",
+                num,
+                den,
+                prevNum: appState.song.global.tsNum,
+                prevDen: appState.song.global.tsDen
+              })
+            }
           />
         </React.Suspense>
       )}

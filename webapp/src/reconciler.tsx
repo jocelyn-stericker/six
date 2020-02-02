@@ -71,7 +71,7 @@ type CreateInstanceParam =
   | { type: "rnc"; props: RncProps }
   | { type: never; props: never };
 
-function createInstance<T extends keyof JSX.IntrinsicElements>(
+function createInstance(
   spec: CreateInstanceParam,
   container: Render
 ): Instance | null {
@@ -166,7 +166,7 @@ const Reconciler = ReactReconciler({
     appendChild(parent, child);
   },
 
-  removeChildFromContainer(container: Render, child: Instance) {
+  removeChildFromContainer(_container: Render, child: Instance) {
     child.container.root_clear(child.entity);
   },
   removeChild(parent: Instance, child: Instance) {
@@ -200,7 +200,7 @@ const Reconciler = ReactReconciler({
   },
 
   prepareUpdate(
-    instance: Instance,
+    _instance: Instance,
     type,
     // TODO
     oldProps: any,

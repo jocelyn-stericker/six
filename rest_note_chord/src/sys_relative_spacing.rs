@@ -19,7 +19,7 @@ pub fn sys_relative_spacing(
         let dur = rnc.duration.duration();
         let entry = shortest_per_bar
             .entry(*parent)
-            .or_insert(Rational::new(1, 8));
+            .or_insert_with(|| Rational::new(1, 8));
         *entry = (*entry).min(dur);
     }
 
@@ -48,7 +48,6 @@ pub fn sys_relative_spacing(
             if width_with_advance_step < MIN_WIDTH {
                 advance_step *= MIN_WIDTH / width_with_advance_step;
             }
-            drop(width_with_advance_step);
 
             let advance_step = advance_step + 100.0; // freeze
 

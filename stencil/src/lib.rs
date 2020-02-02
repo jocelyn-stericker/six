@@ -1,3 +1,5 @@
+#![allow(clippy::implicit_hasher)]
+
 mod corefont;
 mod stencil_map;
 mod sys_update_world_bboxes;
