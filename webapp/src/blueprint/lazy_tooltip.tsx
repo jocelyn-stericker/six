@@ -1,6 +1,6 @@
 import React from "react";
 
-const Tooltip = React.lazy(() => import("./blueprint/tooltip"));
+const Tooltip = React.lazy(() => import("./tooltip"));
 
 export default function LazyTooltip(
   props: React.ComponentProps<typeof import("@blueprintjs/core").Tooltip> & {

@@ -1,10 +1,10 @@
 /// <reference path="./intrinsic_elements.d.ts" /> #
 
-import { Render, Barline } from "../pkg/index";
+import { Render, Barline } from "../../rust_render_built/index";
 import { unstable_now as now } from "scheduler";
 import ReactReconciler from "react-reconciler";
 
-export { Render, Barline } from "../pkg/index";
+export { Render, Barline } from "../../rust_render_built/index";
 
 export enum NoteValue {
   Maxima = 3,

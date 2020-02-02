@@ -1,0 +1,9 @@
+body .bp3-tooltip .bp3-popover-content {
+    background: #004643;
+    color: #abd1c6;
+}
+
+body .bp3-tooltip .bp3-popover-arrow-fill,
+body .bp3-tooltip .bp3-popover-arrow-border {
+    fill: #004643;
+}

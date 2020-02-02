@@ -53,17 +53,17 @@ module.exports = {
 
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, "..", "render"),
-      outDir: path.resolve(__dirname, "pkg")
+      outDir: path.resolve(__dirname, "rust_render_built")
     }),
 
     new NormalModuleReplacementPlugin(
       /.*\/generated\/iconSvgPaths.*/,
-      path.resolve(__dirname, "src/icons.js")
+      path.resolve(__dirname, "src/blueprint/icons.js")
     ),
 
     new NormalModuleReplacementPlugin(
       /.*dom4.*/,
-      path.resolve(__dirname, "src/blank.js")
+      path.resolve(__dirname, "src/blueprint/blank.js")
     )
 
     // new BundleAnalyzerPlugin()

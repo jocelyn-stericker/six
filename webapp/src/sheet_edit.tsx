@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import SheetMusicView, { Barline } from "./sheet_music_view";
+import Sheet, { Barline } from "./sheet";
 import { Action, State } from "./store";
 
 const BetweenBarEdit = React.lazy(() => import("./between_bar_edit"));
@@ -9,13 +9,13 @@ interface Props {
   dispatch: (action: Action) => void;
 }
 
-function HelloRenderer({ appState, dispatch }: Props) {
+function SheetEdit({ appState, dispatch }: Props) {
   const [showBetweenBarEdit, setShowBetweenBarEdit] = useState(false);
   const [hoverBar, setHoverBar] = useState<number | null>(null);
 
   return (
     <React.Fragment>
-      <SheetMusicView
+      <Sheet
         onEnterBar={bar => setHoverBar(bar)}
         onExitBar={() => setHoverBar(null)}
         onClick={(time, mode) => {
@@ -77,7 +77,7 @@ function HelloRenderer({ appState, dispatch }: Props) {
             ))}
           </staff>
         </song>
-      </SheetMusicView>
+      </Sheet>
       {showBetweenBarEdit && (
         <React.Suspense fallback={null}>
           <BetweenBarEdit
@@ -100,4 +100,4 @@ function HelloRenderer({ appState, dispatch }: Props) {
   );
 }
 
-export default React.memo(HelloRenderer);
+export default React.memo(SheetEdit);

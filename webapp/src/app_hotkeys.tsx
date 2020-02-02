@@ -6,7 +6,7 @@ export interface Props {
   onRedo: () => void;
 }
 
-class SixHotkeys extends React.Component<Props> {
+class AppHotkeys extends React.Component<Props> {
   render() {
     return <div />;
   }
@@ -31,4 +31,4 @@ class SixHotkeys extends React.Component<Props> {
   }
 }
 
-export default HotkeysTarget(SixHotkeys);
+export default HotkeysTarget(AppHotkeys);

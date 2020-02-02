@@ -2,7 +2,8 @@ import React from "react";
 import cx from "classnames";
 
 import { NOTES, SELECT, EDIT, SAVE, OPEN, UNDO, RESET } from "./toolbar_icons";
-import LazyTooltip from "./lazy_tooltip";
+import LazyTooltip from "./blueprint/lazy_tooltip";
+import "./toolbar.css";
 
 export type Tool = "notes" | "bars" | "select";
 

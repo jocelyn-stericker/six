@@ -68,6 +68,40 @@ export interface State {
   redoStack: Array<ApplyInvertAction>;
 }
 
+export function getInitialState(): State {
+  return {
+    song: {
+      v: "0.10.0",
+      global: {
+        tsNum: 4,
+        tsDen: 4
+      },
+      part: {
+        bars: [
+          {
+            notes: [],
+            barline: "normal"
+          },
+          {
+            notes: [],
+            barline: "normal"
+          },
+          {
+            notes: [],
+            barline: "normal"
+          },
+          {
+            notes: [],
+            barline: "final"
+          }
+        ]
+      }
+    },
+    undoStack: [],
+    redoStack: []
+  };
+}
+
 function invert(action: ApplyInvertAction): ApplyInvertAction {
   switch (action.type) {
     case "REMOVE_NOTE":
@@ -167,38 +201,4 @@ export function reduce(state: State, action: Action): State {
       return getInitialState();
     }
   }
-}
-
-export function getInitialState(): State {
-  return {
-    song: {
-      v: "0.10.0",
-      global: {
-        tsNum: 4,
-        tsDen: 4
-      },
-      part: {
-        bars: [
-          {
-            notes: [],
-            barline: "normal"
-          },
-          {
-            notes: [],
-            barline: "normal"
-          },
-          {
-            notes: [],
-            barline: "normal"
-          },
-          {
-            notes: [],
-            barline: "final"
-          }
-        ]
-      }
-    },
-    undoStack: [],
-    redoStack: []
-  };
 }
