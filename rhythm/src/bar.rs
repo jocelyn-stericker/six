@@ -147,6 +147,7 @@ impl Bar {
                     next_division_start = *division_starts.peek().unwrap();
 
                     let p = t_read.min(next_division_start);
+                    let new_duration = p - division_start;
                     if !self.try_amend(division_start, new.last_mut(), t_write, new_duration) {
                         new.push((Duration::exact(new_duration, None), None));
                     }
@@ -358,7 +359,6 @@ impl Bar {
                                     ((done_time - div_start) / quant).to_integer() as usize;
                                 let end_q =
                                     ((done_time + dur - div_start) / quant).to_integer() as usize;
-                                // eprintln!(">> {} {} {:?}", end_q, div_parts, tuplet_kind);
                                 if end_q <= div_parts {
                                     let powers = self.get_powers(
                                         div_parts,
@@ -374,7 +374,6 @@ impl Bar {
                                                 * 2;
                                         }
                                     }
-                                    // eprintln!("{:?} {} {} {}", powers, start_q, end_q, score);
                                 }
                             }
 
@@ -2108,6 +2107,43 @@ mod bar_tests {
                 ],
             );
         }
+    }
+
+    #[test]
+    fn regression_splice_12_8_unprintable() {
+        let mut bar = Bar::new(Metre::new(12, 8));
+        bar.splice(
+            Rational::zero(),
+            vec![(
+                Duration::new(NoteValue::Eighth, 0, None),
+                Some(Entity::new(1)),
+            )],
+        );
+        bar.splice(
+            Rational::new(11, 8),
+            vec![(
+                Duration::new(NoteValue::Eighth, 0, None),
+                Some(Entity::new(2)),
+            )],
+        );
+        assert_eq!(
+            bar.rhythm(),
+            &vec![
+                (
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(1))
+                ),
+                (Duration::new(NoteValue::Eighth, 0, None), None),
+                (Duration::new(NoteValue::Eighth, 0, None), None),
+                (Duration::new(NoteValue::Quarter, 1, None), None),
+                (Duration::new(NoteValue::Quarter, 1, None), None),
+                (Duration::new(NoteValue::Quarter, 0, None), None),
+                (
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Some(Entity::new(2)),
+                ),
+            ],
+        );
     }
 
     #[test]
