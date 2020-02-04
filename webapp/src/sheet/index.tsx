@@ -9,8 +9,8 @@ interface Props {
     time: null | [number, number, number],
     mode: "rnc" | "between-bars"
   ) => void;
-  onEnterBar: (bar: number) => void;
-  onExitBar: () => void;
+  onHoverTimeChanged: (time: [number, number, number] | null) => void;
+  hoverTime: [number, number, number] | null;
 }
 
 /** [entity, x, y, scale] */
@@ -18,6 +18,8 @@ type StencilMapItem = [number, number, number, number];
 type StencilOrStencilMap = string | Array<StencilMapItem>;
 /** [x, y, x2, y2, barIdx, timeFracNum, timeFracDen] */
 type StencilMeta = [number, number, number, number, number, number, number];
+
+const DEBUG = false;
 
 function StencilView({
   id,
@@ -111,10 +113,7 @@ export default function SheetMusicView(props: Props) {
   }, [container, props.children]);
 
   const svg = useRef<SVGSVGElement>(null);
-
-  const [hoverTime, setHoverTime] = useState<[number, number, number] | null>(
-    null
-  );
+  const { hoverTime } = props;
 
   return (
     <svg
@@ -162,19 +161,16 @@ export default function SheetMusicView(props: Props) {
 
         const time = container.get_time_for_cursor(pt.x, pt.y);
 
-        const barChanged =
-          (hoverTime && !time) ||
-          (!hoverTime && time) ||
-          (hoverTime && time && hoverTime[0] !== time[0]);
-        if (barChanged) {
-          if (time) {
-            props.onEnterBar(time[0]);
-          } else {
-            props.onExitBar();
-          }
+        if (
+          Boolean(props.hoverTime) !== Boolean(time) ||
+          (time &&
+            props.hoverTime &&
+            (time[0] !== props.hoverTime[0] ||
+              time[1] !== props.hoverTime[1] ||
+              time[2] !== props.hoverTime[2]))
+        ) {
+          props.onHoverTimeChanged(time ? [time[0], time[1], time[2]] : null);
         }
-
-        setHoverTime(time ? [time[0], time[1], time[2]] : null);
 
         setHovering(hovering);
       }}
@@ -187,49 +183,38 @@ export default function SheetMusicView(props: Props) {
             stencilMeta={stencilMeta}
           />
         )}
-        {hovering.map(id => {
-          if (!stencilMeta || !stencilMeta[id]) {
-            return null;
-          }
-          const [x, y, x2, y2, bar, n, d] = stencilMeta[id];
-          return (
-            <React.Fragment key={id}>
-              <path
-                d={`M${x} ${y}L${x} ${y2}L${x2} ${y2}L${x2} ${y}Z`}
-                style={{
-                  fill: "none",
-                  stroke: "deepskyblue",
-                  strokeWidth: 0.5
-                }}
-              />
-              <text
-                x={x}
-                y={y}
-                style={{
-                  fontSize: 2,
-                  transform: "scale(1,-1)",
-                  transformOrigin: "50% 50%",
-                  transformBox: "fill-box"
-                }}
-                className="serif"
-              >
-                {bar}|{n / d}
-              </text>
-            </React.Fragment>
-          );
-        })}
-        <text
-          x={1}
-          y={-1}
-          style={{
-            fontSize: 2,
-            transform: "scale(1, -1)",
-            transformOrigin: "50% 50%",
-            transformBox: "fill-box"
-          }}
-        >
-          {JSON.stringify(hoverTime)}
-        </text>
+        {DEBUG &&
+          hovering.map(id => {
+            if (!stencilMeta || !stencilMeta[id]) {
+              return null;
+            }
+            const [x, y, x2, y2, bar, n, d] = stencilMeta[id];
+            return (
+              <React.Fragment key={id}>
+                <path
+                  d={`M${x} ${y}L${x} ${y2}L${x2} ${y2}L${x2} ${y}Z`}
+                  style={{
+                    fill: "none",
+                    stroke: "deepskyblue",
+                    strokeWidth: 0.5
+                  }}
+                />
+                <text
+                  x={x}
+                  y={y}
+                  style={{
+                    fontSize: 2,
+                    transform: "scale(1,-1)",
+                    transformOrigin: "50% 50%",
+                    transformBox: "fill-box"
+                  }}
+                  className="serif"
+                >
+                  {bar}|{n / d}
+                </text>
+              </React.Fragment>
+            );
+          })}
       </g>
     </svg>
   );

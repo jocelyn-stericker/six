@@ -23,7 +23,6 @@ use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Default)]
 pub struct Song {
-    previous_freeze_spacing: Option<isize>,
     freeze_spacing: Option<isize>,
 }
 
@@ -131,13 +130,7 @@ impl Render {
     pub fn song_create(&mut self, freeze_spacing: Option<isize>) -> usize {
         let entity = self.entities.create();
 
-        self.songs.insert(
-            entity,
-            Song {
-                freeze_spacing,
-                previous_freeze_spacing: None,
-            },
-        );
+        self.songs.insert(entity, Song { freeze_spacing });
         self.ordered_children.insert(entity, vec![]);
         self.stencil_maps.insert(entity, StencilMap::default());
 
@@ -207,6 +200,7 @@ impl Render {
         if let Some(bar) = self.bars.get_mut(&bar_id) {
             bar.remove(child);
             self.parents.remove(&child);
+            self.fixup_bar(bar_id);
         }
     }
 
@@ -253,11 +247,10 @@ impl Render {
     ) {
         let note_value = NoteValue::new(note_value).unwrap();
         let rnc_id = Entity::new(rnc);
-        let bars = &mut self.bars;
-        if let Some(parent_id) = self.parents.get(&rnc_id) {
+        if let Some(parent_id) = self.parents.get(&rnc_id).copied() {
             if let (Some(rnc), Some(bar), Some(start)) = (
                 self.rncs.get_mut(&rnc_id),
-                bars.get_mut(parent_id),
+                self.bars.get_mut(&parent_id),
                 self.starts.get_mut(&rnc_id),
             ) {
                 bar.remove(rnc_id);
@@ -267,20 +260,23 @@ impl Render {
                 rnc.natural_duration = rnc.duration;
                 bar.splice(start.beat, vec![(rnc.duration(), Some(rnc_id))]);
             }
+            self.fixup_bar(parent_id);
+        }
+    }
 
-            // Fix previously overlapping notes.
+    fn fixup_bar(&mut self, parent_id: Entity) {
+        // Fix previously overlapping notes.
+        if let Some(bar) = self.bars.get_mut(&parent_id) {
             for (other_rnc_id, (rnc, parent, start)) in
                 (&mut self.rncs, &self.parents, &mut self.starts).join()
             {
                 if (rnc.natural_duration != rnc.duration || start.natural_beat != start.beat)
-                    && parent == parent_id
+                    && *parent == parent_id
                 {
-                    if let Some(bar) = bars.get_mut(parent_id) {
-                        bar.remove(other_rnc_id);
-                        rnc.duration = rnc.natural_duration;
-                        start.beat = start.natural_beat;
-                        bar.splice(start.beat, vec![(rnc.duration(), Some(other_rnc_id))]);
-                    }
+                    bar.remove(other_rnc_id);
+                    rnc.duration = rnc.natural_duration;
+                    start.beat = start.natural_beat;
+                    bar.splice(start.beat, vec![(rnc.duration(), Some(other_rnc_id))]);
                 }
             }
         }
@@ -380,9 +376,7 @@ impl Render {
     fn keep_spacing(&self) -> bool {
         self.root
             .and_then(|root| self.songs.get(&root))
-            .map(|root| {
-                root.freeze_spacing.is_some() && root.previous_freeze_spacing == root.freeze_spacing
-            })
+            .map(|root| root.freeze_spacing.is_some())
             .unwrap_or(false)
     }
 
@@ -456,10 +450,6 @@ impl Render {
             &self.stencil_maps,
             &mut self.world_bbox,
         );
-
-        if let Some(root) = self.root.and_then(|root| self.songs.get_mut(&root)) {
-            root.previous_freeze_spacing = root.freeze_spacing;
-        }
     }
 
     pub fn stencils(&self) -> String {

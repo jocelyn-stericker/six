@@ -11,13 +11,15 @@ interface Props {
 
 function SheetEdit({ appState, dispatch }: Props) {
   const [showBetweenBarEdit, setShowBetweenBarEdit] = useState(false);
-  const [hoverBar, setHoverBar] = useState<number | null>(null);
+  const [hoverTime, setHoverTime] = useState<[number, number, number] | null>(
+    null
+  );
 
   return (
     <React.Fragment>
       <Sheet
-        onEnterBar={bar => setHoverBar(bar)}
-        onExitBar={() => setHoverBar(null)}
+        hoverTime={hoverTime}
+        onHoverTimeChanged={time => setHoverTime(time)}
         onClick={(time, mode) => {
           if (!time) {
             return;
@@ -40,7 +42,7 @@ function SheetEdit({ appState, dispatch }: Props) {
         }}
       >
         <song
-          freezeSpacing={hoverBar == null ? undefined : hoverBar}
+          freezeSpacing={hoverTime == null ? undefined : hoverTime[0]}
           key={`${appState.song.global.tsNum}_${appState.song.global.tsDen}`}
         >
           <staff>
@@ -49,23 +51,36 @@ function SheetEdit({ appState, dispatch }: Props) {
               tsNum={appState.song.global.tsNum}
               tsDen={appState.song.global.tsDen}
             />
-            {appState.song.part.bars.map((bar, idx) => (
-              <React.Fragment key={idx}>
+            {appState.song.part.bars.map((bar, barIdx) => (
+              <React.Fragment key={barIdx}>
                 <bar
                   numer={appState.song.global.tsNum}
                   denom={appState.song.global.tsDen}
                 >
                   {bar.notes.map(
-                    ({ dots, duration, startNum, startDen }, idx) => (
-                      <rnc
-                        key={idx}
-                        noteValue={duration}
-                        dots={dots}
-                        startNum={startNum}
-                        startDen={startDen}
-                        isNote={true}
-                      />
-                    )
+                    ({ dots, duration, startNum, startDen }, idx) =>
+                      (!hoverTime ||
+                        hoverTime[0] !== barIdx ||
+                        hoverTime[1] !== startNum ||
+                        hoverTime[2] !== startDen) && (
+                        <rnc
+                          key={idx}
+                          noteValue={duration}
+                          dots={dots}
+                          startNum={startNum}
+                          startDen={startDen}
+                          isNote={true}
+                        />
+                      )
+                  )}
+                  {hoverTime && hoverTime[0] === barIdx && (
+                    <rnc
+                      noteValue={-3}
+                      dots={0}
+                      startNum={hoverTime[1]}
+                      startDen={hoverTime[2]}
+                      isNote={true}
+                    />
                   )}
                 </bar>
                 <between
