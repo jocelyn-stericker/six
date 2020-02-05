@@ -479,8 +479,15 @@ impl Render {
         for (entity, bbox) in &self.world_bbox {
             let start = self.starts.get(entity);
             lines.push(entity.id().to_string());
+            let kind = if self.rncs.contains_key(entity) {
+                0
+            } else if self.between_bars.contains_key(entity) {
+                1
+            } else {
+                -1
+            };
             lines.push(format!(
-                "[{},{},{},{},{},{},{}]",
+                "[{},{},{},{},{},{},{},{}]",
                 bbox.x0,
                 bbox.y0,
                 bbox.x1,
@@ -488,14 +495,10 @@ impl Render {
                 start.map(|s| s.bar as isize).unwrap_or(-1),
                 start.map(|s| *s.beat.numer()).unwrap_or(0),
                 start.map(|s| *s.beat.denom()).unwrap_or(1),
+                kind,
             ));
         }
         lines.join("\n")
-    }
-
-    pub fn is_between_bars(&self, entity: usize) -> bool {
-        let entity = Entity::new(entity);
-        self.between_bars.contains_key(&entity)
     }
 
     /// Returns [bar, num, den]

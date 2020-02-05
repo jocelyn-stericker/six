@@ -22,12 +22,7 @@ export default function BetweenBarEdit({
   setTs
 }: Props) {
   return (
-    <Dialog
-      isOpen={true}
-      onClose={onClose}
-      usePortal={false}
-      title="Edit Barline / Signatures"
-    >
+    <Dialog isOpen={true} onClose={onClose} title="Edit Barline / Signatures">
       <div className={Classes.DIALOG_BODY}>
         <Checkbox label="Set Time Signature" checked={true} disabled={true} />
         <div style={{ display: "block", marginBottom: 4 }}>

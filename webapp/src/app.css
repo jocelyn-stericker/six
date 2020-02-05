@@ -48,6 +48,8 @@ html body, html .ui-text {
     border-radius: 0;
     padding: 0;
     flex: 1;
+    display: block;
+    z-index: 0;
 }
 
 .six-note-editor-noteview-placeholder {
@@ -56,3 +58,11 @@ html body, html .ui-text {
     height: 100vh;
 }
 
+.six-note-editor-active-target-bg {
+    z-index: -1;
+    background: #abd1c6;
+}
+
+svg {
+    z-index: -1;
+}

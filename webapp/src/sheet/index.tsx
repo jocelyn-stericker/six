@@ -2,6 +2,8 @@ import React, { useLayoutEffect, useState, useEffect, useRef } from "react";
 import { Render, render } from "./reconciler";
 
 export { Render, NoteValue, Barline } from "./reconciler";
+export const TYPE_RNC = 0;
+export const TYPE_BETWEEN_BARS = 1;
 
 interface Props {
   children: any;
@@ -9,6 +11,14 @@ interface Props {
     time: null | [number, number, number],
     mode: "rnc" | "between-bars"
   ) => void;
+  onHoverElementChanged: (
+    props: {
+      id: number;
+      kind: number;
+      bbox: [number, number, number, number];
+    } | null
+  ) => void;
+  hoverElement: number | null;
   onHoverTimeChanged: (time: [number, number, number] | null) => void;
   hoverTime: [number, number, number] | null;
 }
@@ -16,8 +26,17 @@ interface Props {
 /** [entity, x, y, scale] */
 type StencilMapItem = [number, number, number, number];
 type StencilOrStencilMap = string | Array<StencilMapItem>;
-/** [x, y, x2, y2, barIdx, timeFracNum, timeFracDen] */
-type StencilMeta = [number, number, number, number, number, number, number];
+/** [x, y, x2, y2, barIdx, timeFracNum, timeFracDen, kind] */
+type StencilMeta = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number
+];
 
 const DEBUG = false;
 
@@ -126,8 +145,8 @@ export default function SheetMusicView(props: Props) {
         }
 
         for (const obj of hovering) {
-          if (container.is_between_bars(obj)) {
-            const [_x, _y, _x2, _y2, bar, n, d] = stencilMeta[obj];
+          const [_x, _y, _x2, _y2, bar, n, d, kind] = stencilMeta[obj];
+          if (kind === TYPE_BETWEEN_BARS) {
             props.onClick([bar, n, d], "between-bars");
           }
         }
@@ -148,16 +167,42 @@ export default function SheetMusicView(props: Props) {
         pt.y = -pt.y;
 
         // TODO: ask rust, or use r*tree, or both
-        const hovering = Object.entries(stencilMeta)
-          .filter(([_id, meta]) => {
-            return (
-              pt.x >= meta[0] &&
-              pt.x <= meta[2] &&
-              pt.y >= meta[1] &&
-              pt.y <= meta[3]
-            );
-          })
-          .map(e => parseInt(e[0]));
+        const hovering = Object.entries(stencilMeta).filter(([_id, meta]) => {
+          return (
+            pt.x >= meta[0] &&
+            pt.x <= meta[2] &&
+            pt.y >= meta[1] &&
+            pt.y <= meta[3] &&
+            (meta[7] === TYPE_BETWEEN_BARS || meta[7] === TYPE_RNC)
+          );
+        });
+
+        if (hovering.length === 1) {
+          const item = hovering[0];
+          const id = parseInt(item[0]);
+          const meta = item[1];
+          if (id !== props.hoverElement) {
+            let pt2 = svg.current.createSVGPoint();
+            pt2.x = meta[0];
+            pt2.y = -meta[1];
+            pt2 = pt2.matrixTransform(ctm);
+
+            let pt3 = svg.current.createSVGPoint();
+            pt3.x = meta[2];
+            pt3.y = -meta[3];
+            pt3 = pt3.matrixTransform(ctm);
+
+            console.log(pt2, pt3);
+
+            props.onHoverElementChanged({
+              id,
+              kind: meta[7],
+              bbox: [pt2.x, pt3.y, pt3.x, pt2.y]
+            });
+          }
+        } else if (props.hoverElement != null) {
+          props.onHoverElementChanged(null);
+        }
 
         const time = container.get_time_for_cursor(pt.x, pt.y);
 
@@ -172,7 +217,7 @@ export default function SheetMusicView(props: Props) {
           props.onHoverTimeChanged(time ? [time[0], time[1], time[2]] : null);
         }
 
-        setHovering(hovering);
+        setHovering(hovering.map(e => parseInt(e[0])));
       }}
     >
       <g transform="scale(1, -1)">
