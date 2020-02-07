@@ -1,7 +1,7 @@
 import React from "react";
 import cx from "classnames";
 
-import { NOTES, SELECT, EDIT, SAVE, OPEN, UNDO, RESET } from "./toolbar_icons";
+import { NOTES, EDIT, SAVE, OPEN, UNDO, RESET } from "./toolbar_icons";
 import LazyTooltip from "./blueprint/lazy_tooltip";
 import "./toolbar.css";
 
@@ -38,27 +38,6 @@ export default function Toolbar(props: Props) {
         >
           <svg viewBox="0 0 20 20" width="100%">
             <path d={NOTES} />
-          </svg>
-        </div>
-      </LazyTooltip>
-      <LazyTooltip
-        position="right"
-        content={<>Select, Decorate, and Delete Notes</>}
-        hoverOpenDelay={0}
-        transitionDuration={0}
-        lazy={false}
-        interactionKind="hover"
-      >
-        <div
-          className={cx(
-            "six-note-toolbar-mode",
-            props.tool === "select" && "six-note-toolbar-mode-selected"
-          )}
-          onClick={() => props.onSetTool("select")}
-          onTouchStart={() => props.onSetTool("select")}
-        >
-          <svg viewBox="0 0 20 20" width="100%">
-            <path d={SELECT} />
           </svg>
         </div>
       </LazyTooltip>

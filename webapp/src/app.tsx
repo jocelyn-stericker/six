@@ -34,7 +34,7 @@ export default function App() {
           <React.Suspense
             fallback={<div className="six-note-editor-noteview-placeholder" />}
           >
-            <SheetEdit appState={appState} dispatch={dispatch} />
+            <SheetEdit tool={tool} appState={appState} dispatch={dispatch} />
           </React.Suspense>
         </div>
       </div>
