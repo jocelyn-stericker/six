@@ -1,8 +1,15 @@
 /// <reference path="./intrinsic_elements.d.ts" /> #
 
-import { Render, Barline } from "../../rust_render_built/index";
+import { Render as _Render, Barline } from "../../rust_render_built/index";
 import { unstable_now as now } from "scheduler";
 import ReactReconciler from "react-reconciler";
+
+interface RenderExtra {
+  classNames: { [key: string]: string };
+  boundingClassNames: { [key: string]: string };
+}
+
+type Render = _Render & RenderExtra;
 
 export { Render, Barline } from "../../rust_render_built/index";
 
@@ -31,11 +38,15 @@ export interface SongProps {
   key?: string | number | null | undefined;
   freezeSpacing?: number | undefined;
   children: React.ReactNode;
+  className?: any;
+  boundingClassName?: any;
 }
 
 export interface StaffProps {
   key?: string | number | null | undefined;
   children: React.ReactNode;
+  className?: any;
+  boundingClassName?: any;
 }
 
 export interface BarProps {
@@ -43,6 +54,8 @@ export interface BarProps {
   numer: number;
   denom: number;
   children?: any;
+  className?: any;
+  boundingClassName?: any;
 }
 
 export interface BetweenBarsProps {
@@ -51,6 +64,8 @@ export interface BetweenBarsProps {
   tsNum?: number;
   tsDen?: number;
   barline?: Barline | undefined;
+  className?: any;
+  boundingClassName?: any;
 }
 
 export interface RncProps {
@@ -60,6 +75,8 @@ export interface RncProps {
   startNum: number;
   startDen: number;
   isNote: boolean;
+  className?: any;
+  boundingClassName?: any;
 }
 
 // TODO: dedupe with JSX.IntrinsicElements
@@ -75,58 +92,52 @@ function createInstance(
   spec: CreateInstanceParam,
   container: Render
 ): Instance | null {
+  let type: "song" | "staff" | "bar" | "between" | "rnc";
+  let entity;
+
   if (spec.type === "song") {
-    return {
-      container,
-      type: "song",
-      entity: container.song_create(
-        typeof spec.props.freezeSpacing === "number"
-          ? spec.props.freezeSpacing
-          : undefined
-      )
-    };
-  }
-  if (spec.type === "staff") {
-    return {
-      container,
-      type: "staff",
-      entity: container.staff_create()
-    };
-  }
-  if (spec.type === "bar") {
-    return {
-      container,
-      type: "bar",
-      entity: container.bar_create(spec.props.numer, spec.props.denom)
-    };
-  }
-  if (spec.type === "between") {
-    return {
-      container,
-      type: "between",
-      entity: container.between_bars_create(
-        spec.props.barline,
-        spec.props.clef || false,
-        spec.props.tsNum || undefined,
-        spec.props.tsDen || undefined
-      )
-    };
-  }
-  if (spec.type === "rnc") {
-    return {
-      container,
-      type: "rnc",
-      entity: container.rnc_create(
-        spec.props.noteValue,
-        spec.props.dots,
-        spec.props.startNum,
-        spec.props.startDen,
-        spec.props.isNote
-      )
-    };
+    type = "song";
+    entity = container.song_create(
+      typeof spec.props.freezeSpacing === "number"
+        ? spec.props.freezeSpacing
+        : undefined
+    );
+  } else if (spec.type === "staff") {
+    type = "staff";
+    entity = container.staff_create();
+  } else if (spec.type === "bar") {
+    (type = "bar"),
+      (entity = container.bar_create(spec.props.numer, spec.props.denom));
+  } else if (spec.type === "between") {
+    type = "between";
+    entity = container.between_bars_create(
+      spec.props.barline,
+      spec.props.clef || false,
+      spec.props.tsNum || undefined,
+      spec.props.tsDen || undefined
+    );
+  } else if (spec.type === "rnc") {
+    type = "rnc";
+    entity = container.rnc_create(
+      spec.props.noteValue,
+      spec.props.dots,
+      spec.props.startNum,
+      spec.props.startDen,
+      spec.props.isNote
+    );
+  } else {
+    throw new Error(`Invalid type in sheet music reconciler: <${spec.type} />`);
   }
 
-  throw new Error(`Invalid type in sheet music reconciler: <${spec.type} />`);
+  if ("className" in spec.props) {
+    container.classNames[entity] = spec.props.className;
+  }
+
+  if ("boundingClassName" in spec.props) {
+    container.boundingClassNames[entity] = spec.props.boundingClassName;
+  }
+
+  return { container, type, entity };
 }
 
 function appendChild(parent: Instance, child: Instance) {
@@ -153,7 +164,7 @@ const Reconciler = ReactReconciler({
     _hostContext,
     _internalInstanceHandle
   ) {
-    return null;
+    throw new Error("Text not supported.");
   },
 
   appendChildToContainer(container, child: Instance) {
@@ -201,17 +212,27 @@ const Reconciler = ReactReconciler({
 
   prepareUpdate(
     _instance: Instance,
-    type,
-    // TODO
-    oldProps: any,
-    newProps: any,
+    _type,
+    _oldProps: any,
+    _newProps: any,
     _rootContainerInstance: Render,
     _currentHostContext
   ) {
-    // TODO: ALL the changes
-    let changes = [];
+    return {};
+  },
+  commitUpdate(
+    instance: Instance,
+    _updatePayload: any,
+    type,
+    oldProps: any,
+    newProps: any,
+    _finishedWork
+  ) {
     if (type === "song" && oldProps.freezeSpacing !== newProps.freezeSpacing) {
-      changes.push("spacing");
+      instance.container.song_set_freeze_spacing(
+        instance.entity,
+        newProps.freezeSpacing
+      );
     }
 
     if (
@@ -221,7 +242,13 @@ const Reconciler = ReactReconciler({
         oldProps.noteValue !== newProps.noteValue ||
         oldProps.dots !== newProps.dots)
     ) {
-      changes.push("time");
+      instance.container.rnc_update_time(
+        instance.entity,
+        newProps.noteValue,
+        newProps.dots,
+        newProps.startNum,
+        newProps.startDen
+      );
     }
 
     if (
@@ -230,56 +257,22 @@ const Reconciler = ReactReconciler({
         oldProps.tsNum !== newProps.tsNum ||
         oldProps.tsDen !== newProps.tsDen)
     ) {
-      changes.push("display");
+      instance.container.between_bars_update(
+        instance.entity,
+        newProps.barline,
+        newProps.clef,
+        newProps.tsNum,
+        newProps.tsDen
+      );
     }
 
-    return changes;
-  },
-  commitUpdate(
-    instance: Instance,
-    // TODO
-    updatePayload: any,
-    type,
-    _oldProps,
-    // TODO
-    newProps: any,
-    _finishedWork
-  ) {
-    if (type === "song") {
-      for (const change of updatePayload) {
-        if (change === "spacing") {
-          instance.container.song_set_freeze_spacing(
-            instance.entity,
-            newProps.freezeSpacing
-          );
-        }
-      }
+    if (oldProps.className !== newProps.className) {
+      instance.container.classNames[instance.entity] = newProps.className;
     }
-    if (type === "rnc") {
-      for (const change of updatePayload) {
-        if (change === "time") {
-          instance.container.rnc_update_time(
-            instance.entity,
-            newProps.noteValue,
-            newProps.dots,
-            newProps.startNum,
-            newProps.startDen
-          );
-        }
-      }
-    }
-    if (type === "between") {
-      for (const change of updatePayload) {
-        if (change === "display") {
-          instance.container.between_bars_update(
-            instance.entity,
-            newProps.barline,
-            newProps.clef,
-            newProps.tsNum,
-            newProps.tsDen
-          );
-        }
-      }
+
+    if (oldProps.boundingClassName !== newProps.boundingClassName) {
+      instance.container.boundingClassNames[instance.entity] =
+        newProps.boundingClassName;
     }
   },
 
@@ -287,7 +280,9 @@ const Reconciler = ReactReconciler({
     return false;
   },
   getChildHostContext() {},
-  getPublicInstance() {},
+  getPublicInstance(x) {
+    return x;
+  },
   getRootHostContext() {},
   prepareForCommit() {},
   resetAfterCommit() {},

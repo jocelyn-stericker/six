@@ -44,17 +44,20 @@ function StencilView({
   id,
   stencils,
   stencilMeta,
-  transform
+  transform,
+  classNames
 }: {
   id: number;
   stencils: { [key: string]: StencilOrStencilMap };
   stencilMeta: { [key: string]: StencilMeta };
   transform?: string;
+  classNames: { [key: string]: string };
 }) {
   const stencil = stencils[id];
   if (typeof stencil === "string") {
     return (
       <g
+        className={classNames[id] || undefined}
         transform={transform}
         data-entity-id={id}
         dangerouslySetInnerHTML={{ __html: stencil }}
@@ -62,13 +65,18 @@ function StencilView({
     );
   } else {
     return (
-      <g transform={transform} data-entity-id={id}>
+      <g
+        transform={transform}
+        data-entity-id={id}
+        className={classNames[id] || undefined}
+      >
         {stencil.map(([childId, x, y, scale]) => (
           <StencilView
             key={childId}
             id={childId}
             stencils={stencils}
             stencilMeta={stencilMeta}
+            classNames={classNames}
             transform={
               typeof x === "number"
                 ? `translate(${x}, ${y}) scale(${scale})`
@@ -83,7 +91,13 @@ function StencilView({
 
 export default function SheetMusicView(props: Props) {
   // create/destroy Rust container
-  const [container] = useState(() => Render.new());
+  const [container] = useState(() => {
+    const render = Object.assign(Render.new(), {
+      classNames: {} as { [key: string]: string },
+      boundingClassNames: {} as { [key: string]: string }
+    });
+    return render;
+  });
   useEffect(() => {
     return () => {
       container.free();
@@ -192,8 +206,6 @@ export default function SheetMusicView(props: Props) {
             pt3.y = -meta[3];
             pt3 = pt3.matrixTransform(ctm);
 
-            console.log(pt2, pt3);
-
             props.onHoverElementChanged({
               id,
               kind: meta[7],
@@ -221,12 +233,34 @@ export default function SheetMusicView(props: Props) {
       }}
     >
       <g transform="scale(1, -1)">
+        {stencilMeta &&
+          Object.entries(container.boundingClassNames).map(
+            ([id, className]) => {
+              const meta = stencilMeta[id as any];
+              if (!meta || !className) {
+                return null;
+              }
+              return (
+                <rect
+                  key={id}
+                  x={meta[0]}
+                  y={meta[1]}
+                  width={meta[2] - meta[0]}
+                  height={meta[3] - meta[1]}
+                  className={className}
+                />
+              );
+            }
+          )}
         {root && stencils && stencils[root] && stencilMeta && (
-          <StencilView
-            id={root}
-            stencils={stencils}
-            stencilMeta={stencilMeta}
-          />
+          <g style={{ pointerEvents: "none" }}>
+            <StencilView
+              id={root}
+              stencils={stencils}
+              stencilMeta={stencilMeta}
+              classNames={container.classNames}
+            />
+          </g>
         )}
         {DEBUG &&
           hovering.map(id => {

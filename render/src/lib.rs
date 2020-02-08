@@ -24,6 +24,7 @@ use wasm_bindgen::prelude::*;
 #[derive(Debug, Default)]
 pub struct Song {
     freeze_spacing: Option<isize>,
+    prev_freeze_spacing: Option<isize>,
 }
 
 #[wasm_bindgen]
@@ -130,7 +131,13 @@ impl Render {
     pub fn song_create(&mut self, freeze_spacing: Option<isize>) -> usize {
         let entity = self.entities.create();
 
-        self.songs.insert(entity, Song { freeze_spacing });
+        self.songs.insert(
+            entity,
+            Song {
+                freeze_spacing,
+                prev_freeze_spacing: None,
+            },
+        );
         self.ordered_children.insert(entity, vec![]);
         self.stencil_maps.insert(entity, StencilMap::default());
 
@@ -376,7 +383,11 @@ impl Render {
     fn keep_spacing(&self) -> bool {
         self.root
             .and_then(|root| self.songs.get(&root))
-            .map(|root| root.freeze_spacing.is_some())
+            .map(|root| {
+                root.freeze_spacing.is_some()
+                    && (root.freeze_spacing == root.prev_freeze_spacing
+                        || root.prev_freeze_spacing.is_none())
+            })
             .unwrap_or(false)
     }
 
@@ -450,6 +461,11 @@ impl Render {
             &self.stencil_maps,
             &mut self.world_bbox,
         );
+        if let Some(root) = self.root {
+            if let Some(root) = self.songs.get_mut(&root) {
+                root.prev_freeze_spacing = root.freeze_spacing;
+            }
+        }
     }
 
     pub fn stencils(&self) -> String {
@@ -531,7 +547,7 @@ impl Render {
                         let steps = ((*steps.numer() as f64) / (*steps.denom() as f64)).ceil();
 
                         let pct = (x - *child_left) / (next.0 - *child_left);
-                        let step = (pct * steps).round() as usize;
+                        let step = (pct * steps).floor() as usize;
                         let beat = child_start_beat + quant * (step as isize);
 
                         return Some(vec![

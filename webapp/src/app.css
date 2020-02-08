@@ -23,7 +23,13 @@ body {
     background: #004643;
     line-height: 1.28581;
     font-size: 14px;
+    overflow-y: scroll;
 }
+
+html body.bp3-overlay-open {
+    overflow-y: scroll;
+}
+
 
 *, ::before, ::after {
     box-sizing: inherit;
@@ -65,4 +71,42 @@ html body, html .ui-text {
 
 svg {
     z-index: -1;
+}
+
+.six-real-note {
+    fill: black;
+}
+
+.six-real-note-bg {
+    fill: transparent;
+    cursor: col-resize;
+}
+
+.six-bar-hover {
+    fill: #aeaeae;
+    cursor: none;
+}
+
+.six-bar-hover-bg {
+    fill: transparent;
+    cursor: none;
+}
+
+.six-note-to-add {
+    fill: deepskyblue;
+    cursor: none;
+}
+
+.six-note-to-add-bg {
+    fill: transparent;
+    cursor: none;
+}
+
+.six-between {
+    fill: transparent;
+    cursor: pointer;
+}
+
+.six-between:hover {
+    fill: #f9bc60;
 }

@@ -20,17 +20,28 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
     null
   );
 
+  const [numChanges, setNumChanges] = useState(0);
+
+  const hoverMatchesAny =
+    hoverTime &&
+    appState.song.part.bars.some(
+      (bar, barIdx) =>
+        barIdx === hoverTime[0] &&
+        bar.notes.some(
+          note =>
+            note.startNum === hoverTime[1] && note.startDen === hoverTime[2]
+        )
+    );
+
   return (
-    <div
-      style={{ cursor: hoverTime && tool === "notes" ? "pointer" : "default" }}
-    >
+    <div>
       <Sheet
         hoverElement={hoverElement ? hoverElement.id : null}
         onHoverElementChanged={setHoverElementChanged}
         hoverTime={hoverTime}
         onHoverTimeChanged={time => setHoverTime(time)}
         onClick={(time, mode) => {
-          if (!time) {
+          if (!time || tool !== "notes") {
             return;
           }
 
@@ -43,15 +54,17 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
               duration: -3,
               dots: 0
             });
+            setNumChanges(numChanges + 1);
           }
         }}
       >
         <song
-          freezeSpacing={hoverTime == null ? undefined : hoverTime[0]}
+          freezeSpacing={hoverTime == null ? undefined : numChanges}
           key={`${appState.song.global.tsNum}_${appState.song.global.tsDen}`}
         >
           <staff>
             <between
+              boundingClassName="six-between"
               clef={true}
               tsNum={appState.song.global.tsNum}
               tsDen={appState.song.global.tsDen}
@@ -61,32 +74,47 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                 <bar
                   numer={appState.song.global.tsNum}
                   denom={appState.song.global.tsDen}
+                  boundingClassName={
+                    tool === "notes" &&
+                    hoverTime &&
+                    hoverTime[0] === barIdx &&
+                    "six-bar-hover-bg"
+                  }
+                  className={
+                    tool === "notes" &&
+                    hoverTime &&
+                    hoverTime[0] === barIdx &&
+                    "six-bar-hover"
+                  }
                 >
                   {bar.notes.map(
-                    ({ dots, duration, startNum, startDen }, idx) =>
-                      (!hoverTime ||
-                        hoverTime[0] !== barIdx ||
-                        hoverTime[1] !== startNum ||
-                        hoverTime[2] !== startDen) && (
-                        <rnc
-                          key={idx}
-                          noteValue={duration}
-                          dots={dots}
-                          startNum={startNum}
-                          startDen={startDen}
-                          isNote={true}
-                        />
-                      )
+                    ({ dots, duration, startNum, startDen }, idx) => (
+                      <rnc
+                        className="six-real-note"
+                        boundingClassName="six-real-note-bg"
+                        key={idx}
+                        noteValue={duration}
+                        dots={dots}
+                        startNum={startNum}
+                        startDen={startDen}
+                        isNote={true}
+                      />
+                    )
                   )}
-                  {tool === "notes" && hoverTime && hoverTime[0] === barIdx && (
-                    <rnc
-                      noteValue={-3}
-                      dots={0}
-                      startNum={hoverTime[1]}
-                      startDen={hoverTime[2]}
-                      isNote={true}
-                    />
-                  )}
+                  {tool === "notes" &&
+                    !hoverMatchesAny &&
+                    hoverTime &&
+                    hoverTime[0] === barIdx && (
+                      <rnc
+                        boundingClassName="six-note-to-add-bg"
+                        className="six-note-to-add"
+                        noteValue={-3}
+                        dots={0}
+                        startNum={hoverTime[1]}
+                        startDen={hoverTime[2]}
+                        isNote={true}
+                      />
+                    )}
                 </bar>
                 <between
                   barline={
@@ -98,35 +126,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
           </staff>
         </song>
       </Sheet>
-      {tool === "notes" && hoverElement && hoverElement.kind === 0 && (
-        <div
-          className="six-note-editor-active-target-bg"
-          style={{
-            position: "absolute",
-            top: hoverElement.bbox[1],
-            left: hoverElement.bbox[0],
-            width: hoverElement.bbox[2] - hoverElement.bbox[0],
-            height: hoverElement.bbox[3] - hoverElement.bbox[1],
-            margin: 0,
-            padding: 0
-          }}
-        />
-      )}
 
-      {tool === "bars" && hoverElement && hoverElement.kind === 1 && (
-        <div
-          className="six-note-editor-active-target-bg"
-          style={{
-            position: "absolute",
-            top: hoverElement.bbox[1],
-            left: hoverElement.bbox[0],
-            width: hoverElement.bbox[2] - hoverElement.bbox[0] + 10,
-            height: hoverElement.bbox[3] - hoverElement.bbox[1],
-            margin: 0,
-            padding: 0
-          }}
-        />
-      )}
       {tool === "bars" && hoverElement && hoverElement.kind === 1 && (
         <React.Suspense fallback={null}>
           <div
@@ -134,8 +134,8 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
               position: "absolute",
               top: hoverElement.bbox[1],
               left: hoverElement.bbox[0],
-              width: hoverElement.bbox[2] - hoverElement.bbox[0] + 10,
-              height: hoverElement.bbox[3] - hoverElement.bbox[1],
+              width: hoverElement.bbox[2] - hoverElement.bbox[0] + 20,
+              height: hoverElement.bbox[3] - hoverElement.bbox[1] - 20,
               margin: 0,
               padding: 0
             }}
