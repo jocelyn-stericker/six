@@ -4,6 +4,7 @@ import "normalize.css";
 import "./app.css";
 import Toolbar, { Tool } from "./toolbar";
 import { reduce, getInitialState } from "./store";
+import About from "./about";
 
 const AppHotkeys = React.lazy(() => import("./app_hotkeys"));
 const SheetEdit = React.lazy(() => import("./sheet_edit"));
@@ -14,6 +15,7 @@ export default function App() {
 
   return (
     <React.Fragment>
+      <About />
       <div className="six-note-editor">
         <Toolbar
           tool={tool}
@@ -28,6 +30,7 @@ export default function App() {
           <AppHotkeys
             onUndo={() => dispatch({ type: "UNDO" })}
             onRedo={() => dispatch({ type: "REDO" })}
+            onSetTool={setTool}
           />
         </React.Suspense>
         <div className="six-note-editor-noteview">

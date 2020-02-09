@@ -34,7 +34,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
     );
 
   return (
-    <div>
+    <div style={{ position: "relative" }}>
       <Sheet
         hoverElement={hoverElement ? hoverElement.id : null}
         onHoverElementChanged={setHoverElementChanged}
@@ -64,10 +64,38 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
         >
           <staff>
             <between
-              boundingClassName="six-between"
               clef={true}
               tsNum={appState.song.global.tsNum}
               tsDen={appState.song.global.tsDen}
+              className={tool === "bars" && "between-bars"}
+              html={
+                tool === "bars" &&
+                (({ width, height }) => (
+                  <React.Suspense fallback={null}>
+                    <BetweenBarPopover
+                      tsNum={appState.song.global.tsNum}
+                      tsDen={appState.song.global.tsDen}
+                      setTs={([num, den]) =>
+                        dispatch({
+                          type: "SET_TS",
+                          num,
+                          den,
+                          prevNum: appState.song.global.tsNum,
+                          prevDen: appState.song.global.tsDen
+                        })
+                      }
+                    >
+                      <div
+                        style={{
+                          width,
+                          height,
+                          cursor: "pointer"
+                        }}
+                      />
+                    </BetweenBarPopover>
+                  </React.Suspense>
+                ))
+              }
             />
             {appState.song.part.bars.map((bar, barIdx) => (
               <React.Fragment key={barIdx}>
@@ -81,10 +109,9 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                     "six-bar-hover-bg"
                   }
                   className={
-                    tool === "notes" &&
-                    hoverTime &&
-                    hoverTime[0] === barIdx &&
-                    "six-bar-hover"
+                    tool === "notes" && hoverTime && hoverTime[0] === barIdx
+                      ? "six-bar-hover"
+                      : "six-bar"
                   }
                 >
                   {bar.notes.map(
@@ -119,6 +146,35 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                 <between
                   barline={
                     bar.barline === "normal" ? Barline.Normal : Barline.Final
+                  }
+                  className={tool === "bars" && "between-bars"}
+                  html={
+                    tool === "bars" &&
+                    (({ width, height }) => (
+                      <React.Suspense fallback={null}>
+                        <BetweenBarPopover
+                          tsNum={appState.song.global.tsNum}
+                          tsDen={appState.song.global.tsDen}
+                          setTs={([num, den]) =>
+                            dispatch({
+                              type: "SET_TS",
+                              num,
+                              den,
+                              prevNum: appState.song.global.tsNum,
+                              prevDen: appState.song.global.tsDen
+                            })
+                          }
+                        >
+                          <div
+                            style={{
+                              width,
+                              height,
+                              cursor: "pointer"
+                            }}
+                          />
+                        </BetweenBarPopover>
+                      </React.Suspense>
+                    ))
                   }
                 />
               </React.Fragment>

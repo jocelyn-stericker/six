@@ -4,6 +4,7 @@ import { Hotkeys, Hotkey, HotkeysTarget } from "@blueprintjs/core";
 export interface Props {
   onUndo: () => void;
   onRedo: () => void;
+  onSetTool: (tool: "notes" | "bars") => void;
 }
 
 class AppHotkeys extends React.Component<Props> {
@@ -14,6 +15,18 @@ class AppHotkeys extends React.Component<Props> {
   renderHotkeys() {
     return (
       <Hotkeys>
+        <Hotkey
+          global={true}
+          combo="n"
+          label="Mode: Add Notes"
+          onKeyDown={() => this.props.onSetTool("notes")}
+        />
+        <Hotkey
+          global={true}
+          combo="b"
+          label="Mode: Edit Bars and Signatures"
+          onKeyDown={() => this.props.onSetTool("bars")}
+        />
         <Hotkey
           global={true}
           combo="mod + z"

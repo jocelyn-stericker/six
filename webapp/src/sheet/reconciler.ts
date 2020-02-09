@@ -7,6 +7,7 @@ import ReactReconciler from "react-reconciler";
 interface RenderExtra {
   classNames: { [key: string]: string };
   boundingClassNames: { [key: string]: string };
+  html: { [key: string]: any };
 }
 
 type Render = _Render & RenderExtra;
@@ -34,49 +35,50 @@ interface Instance {
   entity: number;
 }
 
-export interface SongProps {
+interface Stylable {
+  className?: any;
+  boundingClassName?: any;
+  html?:
+    | ((props: { width: number; height: number }) => any)
+    | null
+    | undefined
+    | false;
+}
+
+export interface SongProps extends Stylable {
   key?: string | number | null | undefined;
   freezeSpacing?: number | undefined;
   children: React.ReactNode;
-  className?: any;
-  boundingClassName?: any;
 }
 
-export interface StaffProps {
+export interface StaffProps extends Stylable {
   key?: string | number | null | undefined;
   children: React.ReactNode;
   className?: any;
-  boundingClassName?: any;
 }
 
-export interface BarProps {
+export interface BarProps extends Stylable {
   key?: string | number | null | undefined;
   numer: number;
   denom: number;
   children?: any;
-  className?: any;
-  boundingClassName?: any;
 }
 
-export interface BetweenBarsProps {
+export interface BetweenBarsProps extends Stylable {
   key?: string | number | null | undefined;
   clef?: boolean;
   tsNum?: number;
   tsDen?: number;
   barline?: Barline | undefined;
-  className?: any;
-  boundingClassName?: any;
 }
 
-export interface RncProps {
+export interface RncProps extends Stylable {
   key?: string | number | null | undefined;
   noteValue: number;
   dots: number;
   startNum: number;
   startDen: number;
   isNote: boolean;
-  className?: any;
-  boundingClassName?: any;
 }
 
 // TODO: dedupe with JSX.IntrinsicElements
@@ -137,6 +139,10 @@ function createInstance(
     container.boundingClassNames[entity] = spec.props.boundingClassName;
   }
 
+  if ("html" in spec.props) {
+    container.html[entity] = spec.props.html;
+  }
+
   return { container, type, entity };
 }
 
@@ -190,6 +196,8 @@ const Reconciler = ReactReconciler({
     } else {
       child.container.child_remove(parent.entity, child.entity);
     }
+
+    // TODO: remove child entities from html/classNames/boundingClassNames
   },
   insertInContainerBefore(
     _container: Render,
@@ -273,6 +281,10 @@ const Reconciler = ReactReconciler({
     if (oldProps.boundingClassName !== newProps.boundingClassName) {
       instance.container.boundingClassNames[instance.entity] =
         newProps.boundingClassName;
+    }
+
+    if (oldProps.html !== newProps.html) {
+      instance.container.html[instance.entity] = newProps.html;
     }
   },
 

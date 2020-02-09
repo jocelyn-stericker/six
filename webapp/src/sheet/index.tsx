@@ -38,8 +38,6 @@ type StencilMeta = [
   number
 ];
 
-const DEBUG = false;
-
 function StencilView({
   id,
   stencils,
@@ -94,7 +92,8 @@ export default function SheetMusicView(props: Props) {
   const [container] = useState(() => {
     const render = Object.assign(Render.new(), {
       classNames: {} as { [key: string]: string },
-      boundingClassNames: {} as { [key: string]: string }
+      boundingClassNames: {} as { [key: string]: string },
+      html: {} as { [key: string]: any }
     });
     return render;
   });
@@ -148,153 +147,166 @@ export default function SheetMusicView(props: Props) {
   const svg = useRef<SVGSVGElement>(null);
   const { hoverTime } = props;
 
+  const bound = svg.current && svg.current.getBoundingClientRect();
+
   return (
-    <svg
-      viewBox="0 0 215.9 279.4"
-      width="100%"
-      ref={svg}
-      onClick={() => {
-        if (!stencilMeta) {
-          return;
-        }
-
-        for (const obj of hovering) {
-          const [_x, _y, _x2, _y2, bar, n, d, kind] = stencilMeta[obj];
-          if (kind === TYPE_BETWEEN_BARS) {
-            props.onClick([bar, n, d], "between-bars");
+    <>
+      <svg
+        viewBox="0 0 215.9 279.4"
+        width="100%"
+        ref={svg}
+        onClick={() => {
+          if (!stencilMeta) {
+            return;
           }
-        }
-        props.onClick(hoverTime, "rnc");
-      }}
-      onMouseMove={ev => {
-        if (!svg || !svg.current || !stencilMeta) {
-          return;
-        }
-        const ctm = svg.current.getScreenCTM();
-        if (!ctm) {
-          return;
-        }
-        let pt = svg.current.createSVGPoint();
-        pt.x = ev.clientX;
-        pt.y = ev.clientY;
-        pt = pt.matrixTransform(ctm.inverse());
-        pt.y = -pt.y;
 
-        // TODO: ask rust, or use r*tree, or both
-        const hovering = Object.entries(stencilMeta).filter(([_id, meta]) => {
-          return (
-            pt.x >= meta[0] &&
-            pt.x <= meta[2] &&
-            pt.y >= meta[1] &&
-            pt.y <= meta[3] &&
-            (meta[7] === TYPE_BETWEEN_BARS || meta[7] === TYPE_RNC)
-          );
-        });
-
-        if (hovering.length === 1) {
-          const item = hovering[0];
-          const id = parseInt(item[0]);
-          const meta = item[1];
-          if (id !== props.hoverElement) {
-            let pt2 = svg.current.createSVGPoint();
-            pt2.x = meta[0];
-            pt2.y = -meta[1];
-            pt2 = pt2.matrixTransform(ctm);
-
-            let pt3 = svg.current.createSVGPoint();
-            pt3.x = meta[2];
-            pt3.y = -meta[3];
-            pt3 = pt3.matrixTransform(ctm);
-
-            props.onHoverElementChanged({
-              id,
-              kind: meta[7],
-              bbox: [pt2.x, pt3.y, pt3.x, pt2.y]
-            });
+          for (const obj of hovering) {
+            const [, , , , bar, n, d, kind] = stencilMeta[obj];
+            if (kind === TYPE_BETWEEN_BARS) {
+              props.onClick([bar, n, d], "between-bars");
+            }
           }
-        } else if (props.hoverElement != null) {
-          props.onHoverElementChanged(null);
-        }
+          props.onClick(hoverTime, "rnc");
+        }}
+        onMouseMove={ev => {
+          if (!svg || !svg.current || !stencilMeta) {
+            return;
+          }
+          const ctm = svg.current.getScreenCTM();
+          if (!ctm) {
+            return;
+          }
+          let pt = svg.current.createSVGPoint();
+          pt.x = ev.clientX;
+          pt.y = ev.clientY;
+          pt = pt.matrixTransform(ctm.inverse());
+          pt.y = -pt.y;
 
-        const time = container.get_time_for_cursor(pt.x, pt.y);
-
-        if (
-          Boolean(props.hoverTime) !== Boolean(time) ||
-          (time &&
-            props.hoverTime &&
-            (time[0] !== props.hoverTime[0] ||
-              time[1] !== props.hoverTime[1] ||
-              time[2] !== props.hoverTime[2]))
-        ) {
-          props.onHoverTimeChanged(time ? [time[0], time[1], time[2]] : null);
-        }
-
-        setHovering(hovering.map(e => parseInt(e[0])));
-      }}
-    >
-      <g transform="scale(1, -1)">
-        {stencilMeta &&
-          Object.entries(container.boundingClassNames).map(
-            ([id, className]) => {
-              const meta = stencilMeta[id as any];
-              if (!meta || !className) {
-                return null;
-              }
-              return (
-                <rect
-                  key={id}
-                  x={meta[0]}
-                  y={meta[1]}
-                  width={meta[2] - meta[0]}
-                  height={meta[3] - meta[1]}
-                  className={className}
-                />
-              );
-            }
-          )}
-        {root && stencils && stencils[root] && stencilMeta && (
-          <g style={{ pointerEvents: "none" }}>
-            <StencilView
-              id={root}
-              stencils={stencils}
-              stencilMeta={stencilMeta}
-              classNames={container.classNames}
-            />
-          </g>
-        )}
-        {DEBUG &&
-          hovering.map(id => {
-            if (!stencilMeta || !stencilMeta[id]) {
-              return null;
-            }
-            const [x, y, x2, y2, bar, n, d] = stencilMeta[id];
+          // TODO: ask rust, or use r*tree, or both
+          const hovering = Object.entries(stencilMeta).filter(([_id, meta]) => {
             return (
-              <React.Fragment key={id}>
-                <path
-                  d={`M${x} ${y}L${x} ${y2}L${x2} ${y2}L${x2} ${y}Z`}
-                  style={{
-                    fill: "none",
-                    stroke: "deepskyblue",
-                    strokeWidth: 0.5
-                  }}
-                />
-                <text
-                  x={x}
-                  y={y}
-                  style={{
-                    fontSize: 2,
-                    transform: "scale(1,-1)",
-                    transformOrigin: "50% 50%",
-                    transformBox: "fill-box"
-                  }}
-                  className="serif"
-                >
-                  {bar}|{n / d}
-                </text>
-              </React.Fragment>
+              pt.x >= meta[0] &&
+              pt.x <= meta[2] &&
+              pt.y >= meta[1] &&
+              pt.y <= meta[3] &&
+              (meta[7] === TYPE_BETWEEN_BARS || meta[7] === TYPE_RNC)
             );
-          })}
-      </g>
-    </svg>
+          });
+
+          if (hovering.length === 1) {
+            const item = hovering[0];
+            const id = parseInt(item[0]);
+            const meta = item[1];
+            if (id !== props.hoverElement) {
+              let pt2 = svg.current.createSVGPoint();
+              pt2.x = meta[0];
+              pt2.y = -meta[1];
+              pt2 = pt2.matrixTransform(ctm);
+
+              let pt3 = svg.current.createSVGPoint();
+              pt3.x = meta[2];
+              pt3.y = -meta[3];
+              pt3 = pt3.matrixTransform(ctm);
+
+              props.onHoverElementChanged({
+                id,
+                kind: meta[7],
+                bbox: [pt2.x, pt3.y, pt3.x, pt2.y]
+              });
+            }
+          } else if (props.hoverElement != null) {
+            props.onHoverElementChanged(null);
+          }
+
+          const time = container.get_time_for_cursor(pt.x, pt.y);
+
+          if (
+            Boolean(props.hoverTime) !== Boolean(time) ||
+            (time &&
+              props.hoverTime &&
+              (time[0] !== props.hoverTime[0] ||
+                time[1] !== props.hoverTime[1] ||
+                time[2] !== props.hoverTime[2]))
+          ) {
+            props.onHoverTimeChanged(time ? [time[0], time[1], time[2]] : null);
+          }
+
+          setHovering(hovering.map(e => parseInt(e[0])));
+        }}
+      >
+        <g transform="scale(1, -1)">
+          {stencilMeta &&
+            Object.entries(container.boundingClassNames).map(
+              ([id, className]) => {
+                const meta = stencilMeta[id as any];
+                if (!meta || !className) {
+                  return null;
+                }
+                return (
+                  <rect
+                    key={id}
+                    x={meta[0]}
+                    y={meta[1]}
+                    width={meta[2] - meta[0]}
+                    height={meta[3] - meta[1]}
+                    className={className}
+                  />
+                );
+              }
+            )}
+          {root && stencils && stencils[root] && stencilMeta && (
+            <g style={{ pointerEvents: "none" }}>
+              <StencilView
+                id={root}
+                stencils={stencils}
+                stencilMeta={stencilMeta}
+                classNames={container.classNames}
+              />
+            </g>
+          )}
+        </g>
+      </svg>
+      {stencilMeta &&
+        Object.entries(container.html).map(([id, html]) => {
+          const meta = stencilMeta[id as any];
+          if (!meta || !html || !svg.current || !bound) {
+            return null;
+          }
+
+          const ctm = svg.current.getScreenCTM();
+          if (!ctm) {
+            return;
+          }
+
+          let pt2 = svg.current.createSVGPoint();
+          pt2.x = meta[0];
+          pt2.y = -meta[1];
+          pt2 = pt2.matrixTransform(ctm);
+
+          let pt3 = svg.current.createSVGPoint();
+          pt3.x = meta[2];
+          pt3.y = -meta[3];
+          pt3 = pt3.matrixTransform(ctm);
+
+          const width = pt3.x - pt2.x;
+          const height = pt2.y - pt3.y;
+          return (
+            <div
+              key={id}
+              style={{
+                position: "absolute",
+                left: pt2.x - bound.left,
+                top: pt3.y - bound.top,
+                width,
+                height
+              }}
+            >
+              <div style={{ position: "relative" }}>
+                {html({ width, height })}
+              </div>
+            </div>
+          );
+        })}
+    </>
   );
 }

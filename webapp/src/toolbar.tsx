@@ -23,7 +23,15 @@ export default function Toolbar(props: Props) {
     <div className="six-note-toolbar">
       <LazyTooltip
         position="right"
-        content="Add Notes"
+        content={
+          <>
+            Mode: Add Notes (
+            <strong>
+              <u>n</u>
+            </strong>
+            )
+          </>
+        }
         hoverOpenDelay={0}
         transitionDuration={0}
         lazy={false}
@@ -43,7 +51,15 @@ export default function Toolbar(props: Props) {
       </LazyTooltip>
       <LazyTooltip
         position="right"
-        content={<>Edit Bars and Signatures</>}
+        content={
+          <>
+            Mode: Edit Bars and Signatures (
+            <strong>
+              <u>b</u>
+            </strong>
+            )
+          </>
+        }
         hoverOpenDelay={0}
         transitionDuration={0}
       >

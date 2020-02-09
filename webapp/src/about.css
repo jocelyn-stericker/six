@@ -1,0 +1,20 @@
+.about {
+ color: #abd1c6;
+ padding: 0 16px 8px;
+ margin: 0;
+ border: none;
+ font-size: 16px;
+}
+
+.about h1, .about h2, .about h3, .about h4, .about h5 {
+ color: #fffffe;
+}
+
+.about p {
+    margin-bottom: 10px;
+}
+
+.about a {
+ color: #f9bc60;
+ text-decoration: underline;
+}

@@ -9,6 +9,7 @@
  *
  *  - ill. stroke: #001e1d
  *  - ill. main: #e8e4e6
+ *  #e16162
  *  - ill. highlight: #f9bc60
  *  - ill. secondary: #abd1c6
  *  - ill. tertiary: #e16162
@@ -82,8 +83,14 @@ svg {
     cursor: col-resize;
 }
 
+.six-bar {
+    fill: black;
+    transition: fill 100ms ease-in-out;
+}
+
 .six-bar-hover {
-    fill: #aeaeae;
+    fill: #abd1c6;
+    transition: fill 100ms ease-in-out;
     cursor: none;
 }
 
@@ -93,7 +100,9 @@ svg {
 }
 
 .six-note-to-add {
-    fill: deepskyblue;
+    fill: #e16162;
+    stroke: #e16162;
+    stroke-width: 25;
     cursor: none;
 }
 
@@ -102,11 +111,6 @@ svg {
     cursor: none;
 }
 
-.six-between {
-    fill: transparent;
-    cursor: pointer;
-}
-
-.six-between:hover {
-    fill: #f9bc60;
+.between-bars {
+    fill: #e16162;
 }
