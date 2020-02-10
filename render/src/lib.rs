@@ -569,6 +569,41 @@ impl Render {
         None
     }
 
+    pub fn split_note(
+        &self,
+        bar: usize,
+        start_num: isize,
+        start_den: isize,
+        duration_num: isize,
+        duration_den: isize,
+    ) -> Vec<isize> {
+        if let Some(bar) = self.bars.get(&Entity::new(bar)) {
+            let mut start = Rational::new(start_num, start_den);
+            bar.split_note(
+                start,
+                Duration::exact(Rational::new(duration_num, duration_den), None),
+            )
+            .into_iter()
+            .map(|part| {
+                let my_start = start;
+                start += part.duration();
+                vec![
+                    part.duration_display_base()
+                        .map(|d| d as isize)
+                        .unwrap_or(0),
+                    part.display_dots().map(|d| d as isize).unwrap_or(0),
+                    *my_start.numer(),
+                    *my_start.denom(),
+                ]
+                .into_iter()
+            })
+            .flatten()
+            .collect()
+        } else {
+            vec![]
+        }
+    }
+
     pub fn print_for_demo(&mut self) -> String {
         self.exec();
 

@@ -1,26 +1,27 @@
 import React, { useLayoutEffect, useState, useEffect, useRef } from "react";
-import { Render, render } from "./reconciler";
+import { render, newRender } from "./reconciler";
 
-export { Render, NoteValue, Barline } from "./reconciler";
+export type Render = import("./reconciler").Render;
+export { NoteValue, Barline } from "./reconciler";
 export const TYPE_RNC = 0;
 export const TYPE_BETWEEN_BARS = 1;
 
 interface Props {
   children: any;
-  onClick: (
+  onMouseDown?: (
     time: null | [number, number, number],
-    mode: "rnc" | "between-bars"
+    ev: React.MouseEvent
   ) => void;
-  onHoverElementChanged: (
-    props: {
-      id: number;
-      kind: number;
-      bbox: [number, number, number, number];
-    } | null
+  onMouseUp?: (
+    time: null | [number, number, number],
+    ev: React.MouseEvent
   ) => void;
-  hoverElement: number | null;
+  onClick?: (
+    time: null | [number, number, number],
+    ev: React.MouseEvent
+  ) => void;
+  onMouseMove?: (ev: React.MouseEvent) => void;
   onHoverTimeChanged: (time: [number, number, number] | null) => void;
-  hoverTime: [number, number, number] | null;
 }
 
 /** [entity, x, y, scale] */
@@ -89,14 +90,7 @@ function StencilView({
 
 export default function SheetMusicView(props: Props) {
   // create/destroy Rust container
-  const [container] = useState(() => {
-    const render = Object.assign(Render.new(), {
-      classNames: {} as { [key: string]: string },
-      boundingClassNames: {} as { [key: string]: string },
-      html: {} as { [key: string]: any }
-    });
-    return render;
-  });
+  const [container] = useState(newRender);
   useEffect(() => {
     return () => {
       container.free();
@@ -111,7 +105,9 @@ export default function SheetMusicView(props: Props) {
     [key: number]: StencilMeta;
   } | null>(null);
   const [root, setRoot] = useState<number | null>(null);
-  const [hovering, setHovering] = useState<Array<number>>([]);
+  const [hoverTime, setHoverTime] = useState<[number, number, number] | null>(
+    null
+  );
 
   useLayoutEffect(() => {
     console.time("render svg");
@@ -145,9 +141,20 @@ export default function SheetMusicView(props: Props) {
   }, [container, props.children]);
 
   const svg = useRef<SVGSVGElement>(null);
-  const { hoverTime } = props;
 
   const bound = svg.current && svg.current.getBoundingClientRect();
+
+  function makeMouseHandler(
+    fn?: (time: null | [number, number, number], ev: React.MouseEvent) => void
+  ) {
+    return (ev: React.MouseEvent) => {
+      if (!stencilMeta || !fn) {
+        return;
+      }
+
+      fn(hoverTime, ev);
+    };
+  }
 
   return (
     <>
@@ -155,20 +162,10 @@ export default function SheetMusicView(props: Props) {
         viewBox="0 0 215.9 279.4"
         width="100%"
         ref={svg}
-        onClick={() => {
-          if (!stencilMeta) {
-            return;
-          }
-
-          for (const obj of hovering) {
-            const [, , , , bar, n, d, kind] = stencilMeta[obj];
-            if (kind === TYPE_BETWEEN_BARS) {
-              props.onClick([bar, n, d], "between-bars");
-            }
-          }
-          props.onClick(hoverTime, "rnc");
-        }}
-        onMouseMove={ev => {
+        onMouseDownCapture={makeMouseHandler(props.onMouseDown)}
+        onMouseUpCapture={makeMouseHandler(props.onMouseUp)}
+        onClick={makeMouseHandler(props.onClick)}
+        onMouseMoveCapture={ev => {
           if (!svg || !svg.current || !stencilMeta) {
             return;
           }
@@ -182,56 +179,23 @@ export default function SheetMusicView(props: Props) {
           pt = pt.matrixTransform(ctm.inverse());
           pt.y = -pt.y;
 
-          // TODO: ask rust, or use r*tree, or both
-          const hovering = Object.entries(stencilMeta).filter(([_id, meta]) => {
-            return (
-              pt.x >= meta[0] &&
-              pt.x <= meta[2] &&
-              pt.y >= meta[1] &&
-              pt.y <= meta[3] &&
-              (meta[7] === TYPE_BETWEEN_BARS || meta[7] === TYPE_RNC)
-            );
-          });
-
-          if (hovering.length === 1) {
-            const item = hovering[0];
-            const id = parseInt(item[0]);
-            const meta = item[1];
-            if (id !== props.hoverElement) {
-              let pt2 = svg.current.createSVGPoint();
-              pt2.x = meta[0];
-              pt2.y = -meta[1];
-              pt2 = pt2.matrixTransform(ctm);
-
-              let pt3 = svg.current.createSVGPoint();
-              pt3.x = meta[2];
-              pt3.y = -meta[3];
-              pt3 = pt3.matrixTransform(ctm);
-
-              props.onHoverElementChanged({
-                id,
-                kind: meta[7],
-                bbox: [pt2.x, pt3.y, pt3.x, pt2.y]
-              });
-            }
-          } else if (props.hoverElement != null) {
-            props.onHoverElementChanged(null);
-          }
-
           const time = container.get_time_for_cursor(pt.x, pt.y);
 
           if (
-            Boolean(props.hoverTime) !== Boolean(time) ||
+            Boolean(hoverTime) !== Boolean(time) ||
             (time &&
-              props.hoverTime &&
-              (time[0] !== props.hoverTime[0] ||
-                time[1] !== props.hoverTime[1] ||
-                time[2] !== props.hoverTime[2]))
+              hoverTime &&
+              (time[0] !== hoverTime[0] ||
+                time[1] !== hoverTime[1] ||
+                time[2] !== hoverTime[2]))
           ) {
+            setHoverTime(time ? [time[0], time[1], time[2]] : null);
             props.onHoverTimeChanged(time ? [time[0], time[1], time[2]] : null);
           }
 
-          setHovering(hovering.map(e => parseInt(e[0])));
+          if (props.onMouseMove) {
+            props.onMouseMove(ev);
+          }
         }}
       >
         <g transform="scale(1, -1)">

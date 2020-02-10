@@ -91,7 +91,6 @@ svg {
 .six-bar-hover {
     fill: #abd1c6;
     transition: fill 100ms ease-in-out;
-    cursor: none;
 }
 
 .six-bar-hover-bg {
@@ -103,13 +102,21 @@ svg {
     fill: #e16162;
     stroke: #e16162;
     stroke-width: 25;
-    cursor: none;
 }
 
 .six-note-to-add-bg {
     fill: transparent;
     cursor: none;
 }
+
+.six-note-drag {
+    cursor: col-resize !important;
+}
+
+.six-note-drag {
+    fill: transparent;
+}
+
 
 .between-bars {
     fill: #e16162;

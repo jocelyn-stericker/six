@@ -3,6 +3,7 @@
 import { Render as _Render, Barline } from "../../rust_render_built/index";
 import { unstable_now as now } from "scheduler";
 import ReactReconciler from "react-reconciler";
+import { Ref } from "react";
 
 interface RenderExtra {
   classNames: { [key: string]: string };
@@ -10,9 +11,17 @@ interface RenderExtra {
   html: { [key: string]: any };
 }
 
-type Render = _Render & RenderExtra;
+export type Render = _Render & RenderExtra;
 
-export { Render, Barline } from "../../rust_render_built/index";
+export { Barline } from "../../rust_render_built/index";
+
+export function newRender(): Render {
+  return Object.assign(_Render.new(), {
+    classNames: {} as { [key: string]: string },
+    boundingClassNames: {} as { [key: string]: string },
+    html: {} as { [key: string]: any }
+  });
+}
 
 export enum NoteValue {
   Maxima = 3,
@@ -47,18 +56,21 @@ interface Stylable {
 
 export interface SongProps extends Stylable {
   key?: string | number | null | undefined;
+  ref?: Ref<Render>;
   freezeSpacing?: number | undefined;
   children: React.ReactNode;
 }
 
 export interface StaffProps extends Stylable {
   key?: string | number | null | undefined;
+  ref?: Ref<number>;
   children: React.ReactNode;
   className?: any;
 }
 
 export interface BarProps extends Stylable {
   key?: string | number | null | undefined;
+  ref?: Ref<number>;
   numer: number;
   denom: number;
   children?: any;
@@ -66,6 +78,7 @@ export interface BarProps extends Stylable {
 
 export interface BetweenBarsProps extends Stylable {
   key?: string | number | null | undefined;
+  ref?: Ref<number>;
   clef?: boolean;
   tsNum?: number;
   tsDen?: number;
@@ -74,6 +87,7 @@ export interface BetweenBarsProps extends Stylable {
 
 export interface RncProps extends Stylable {
   key?: string | number | null | undefined;
+  ref?: Ref<number>;
   noteValue: number;
   dots: number;
   startNum: number;
@@ -292,8 +306,12 @@ const Reconciler = ReactReconciler({
     return false;
   },
   getChildHostContext() {},
-  getPublicInstance(x) {
-    return x;
+  getPublicInstance(instance) {
+    if (instance.type === "song") {
+      return instance.container;
+    } else {
+      return instance.entity;
+    }
   },
   getRootHostContext() {},
   prepareForCommit() {},

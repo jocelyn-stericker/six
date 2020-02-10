@@ -3,11 +3,17 @@ export interface Global {
   tsDen: number;
 }
 
+export type TiedNote = Array<{
+  noteValue: number;
+  dots: number;
+  startNum: number;
+  startDen: number;
+}>;
+
 export interface Note {
   startNum: number;
   startDen: number;
-  duration: number;
-  dots: number;
+  divisions: TiedNote;
 }
 
 export interface Bar {
@@ -20,7 +26,7 @@ export interface Part {
 }
 
 export interface Song {
-  v: "0.10.0";
+  v: "0.1.0";
   global: Global;
   part: Part;
 }
@@ -28,19 +34,17 @@ export interface Song {
 type ApplyInvertAction =
   | {
       type: "REMOVE_NOTE";
-      bar: number;
-      num: number;
-      den: number;
-      duration: number;
-      dots: number;
+      barIdx: number;
+      startNum: number;
+      startDen: number;
+      divisions: TiedNote;
     }
   | {
       type: "ADD_NOTE";
-      bar: number;
-      num: number;
-      den: number;
-      duration: number;
-      dots: number;
+      barIdx: number;
+      startNum: number;
+      startDen: number;
+      divisions: TiedNote;
     }
   | {
       type: "SET_TS";
@@ -71,7 +75,7 @@ export interface State {
 export function getInitialState(): State {
   return {
     song: {
-      v: "0.10.0",
+      v: "0.1.0",
       global: {
         tsNum: 4,
         tsDen: 4
@@ -107,20 +111,18 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
     case "REMOVE_NOTE":
       return {
         type: "ADD_NOTE",
-        bar: action.bar,
-        num: action.num,
-        den: action.den,
-        duration: action.duration,
-        dots: action.dots
+        barIdx: action.barIdx,
+        startNum: action.startNum,
+        startDen: action.startDen,
+        divisions: action.divisions
       };
     case "ADD_NOTE":
       return {
         type: "REMOVE_NOTE",
-        bar: action.bar,
-        num: action.num,
-        den: action.den,
-        duration: action.duration,
-        dots: action.dots
+        barIdx: action.barIdx,
+        startNum: action.startNum,
+        startDen: action.startDen,
+        divisions: action.divisions
       };
     case "SET_TS":
       return {
@@ -135,29 +137,24 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
 
 function apply(state: State, action: ApplyInvertAction) {
   if (action.type === "REMOVE_NOTE") {
-    const { bar, num, den, duration, dots } = action;
-    const barObj = state.song.part.bars[bar];
+    const { barIdx, startNum, startDen } = action;
+    const barObj = state.song.part.bars[barIdx];
     if (!barObj) {
       return;
     }
     barObj.notes = barObj.notes.filter(
-      notes =>
-        notes.startNum !== num ||
-        notes.startDen !== den ||
-        notes.duration !== duration ||
-        notes.dots !== dots
+      notes => notes.startNum !== startNum || notes.startDen !== startDen
     );
   } else if (action.type === "ADD_NOTE") {
-    const { bar, num, den, duration, dots } = action;
-    const barObj = state.song.part.bars[bar];
+    const { barIdx, startNum, startDen, divisions } = action;
+    const barObj = state.song.part.bars[barIdx];
     if (!barObj) {
       return;
     }
     barObj.notes.push({
-      startNum: num,
-      startDen: den,
-      duration,
-      dots
+      startNum,
+      startDen,
+      divisions
     });
   } else if (action.type === "SET_TS") {
     const { num, den } = action;

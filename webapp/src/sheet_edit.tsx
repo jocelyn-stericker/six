@@ -1,6 +1,9 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useMemo, createRef } from "react";
+import cx from "classnames";
+
 import Sheet, { Barline } from "./sheet";
-import { Action, State } from "./store";
+import { Render } from "./sheet/reconciler";
+import { Action, State, TiedNote } from "./store";
 
 const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
 
@@ -10,57 +13,214 @@ interface Props {
   dispatch: (action: Action) => void;
 }
 
-function SheetEdit({ tool, appState, dispatch }: Props) {
-  const [hoverElement, setHoverElementChanged] = useState<{
-    id: number;
-    kind: number;
-    bbox: [number, number, number, number];
-  } | null>(null);
-  const [hoverTime, setHoverTime] = useState<[number, number, number] | null>(
-    null
+interface ProposedInsertion {
+  barIdx: number;
+  startNum: number;
+  startDen: number;
+  divisions: TiedNote;
+}
+
+function count(noteValue: number, dots: number) {
+  let base = Math.pow(2, noteValue);
+  let total = base;
+  for (let i = 0; i < dots; ++i) {
+    total += base / 2;
+    base / 2;
+  }
+
+  return total;
+}
+
+function getProposedInsertion(
+  render: Render | null,
+  appState: State,
+  barEntity: number | null,
+  time: [number, number, number] | null,
+  insertionDuration: Array<number>
+): ProposedInsertion | null {
+  if (!render) {
+    return null;
+  }
+  if (!time) {
+    return null;
+  }
+  if (!barEntity) {
+    return null;
+  }
+
+  const rawDivisions = render.split_note(
+    barEntity,
+    time[1],
+    time[2],
+    insertionDuration[0],
+    insertionDuration[1]
   );
+  const start = time[1] / time[2];
+  const end = start + insertionDuration[0] / insertionDuration[1];
+  if (
+    appState.song.part.bars[time[0]].notes.some(note => {
+      let noteStart = note.startNum / note.startDen;
+      let noteEnd =
+        noteStart +
+        note.divisions.reduce(
+          (sum, { noteValue, dots }) => sum + count(noteValue, dots),
+          0
+        );
+      // TODO: check if this note is in the middle of the proposed one.
+      return (
+        (start <= noteStart && end > noteStart) ||
+        (start < noteEnd && end >= noteEnd)
+      );
+    })
+  ) {
+    return null;
+  }
+
+  const divisions = [];
+  for (let i = 0; i < rawDivisions.length; i += 4) {
+    divisions.push({
+      noteValue: rawDivisions[i],
+      dots: rawDivisions[i + 1],
+      startNum: rawDivisions[i + 2],
+      startDen: rawDivisions[i + 3]
+    });
+  }
+  if (!divisions.length) {
+    return null;
+  }
+  return {
+    barIdx: time[0],
+    startNum: time[1],
+    startDen: time[2],
+    divisions
+  };
+}
+
+const STEPS = [
+  [1, 1],
+  [3, 4],
+  [1, 2],
+  [3, 8],
+  [1, 4],
+  [3, 16],
+  [1, 8],
+  [3, 32],
+  [1, 16]
+];
+
+function SheetEdit({ tool, appState, dispatch }: Props) {
+  const [insertionDuration, setInsertionDuration] = useState([1, 8]);
+  const [
+    proposedInsertion,
+    setProposedInsertion
+  ] = useState<ProposedInsertion | null>(null);
+
+  const songRef = useRef<Render>(null);
 
   const [numChanges, setNumChanges] = useState(0);
+  const [dragState, setDragState] = useState<{
+    startX: number;
+    startY: number;
+    origInsertionDuration: [number, number];
+  } | null>(null);
 
-  const hoverMatchesAny =
-    hoverTime &&
-    appState.song.part.bars.some(
-      (bar, barIdx) =>
-        barIdx === hoverTime[0] &&
-        bar.notes.some(
-          note =>
-            note.startNum === hoverTime[1] && note.startDen === hoverTime[2]
-        )
-    );
+  const barRefs = useMemo(
+    () =>
+      Array.from({ length: appState.song.part.bars.length }).map(() =>
+        createRef<number>()
+      ),
+    [appState.song.part.bars.length]
+  );
+
+  const hoverMatchesAny = false;
 
   return (
     <div style={{ position: "relative" }}>
       <Sheet
-        hoverElement={hoverElement ? hoverElement.id : null}
-        onHoverElementChanged={setHoverElementChanged}
-        hoverTime={hoverTime}
-        onHoverTimeChanged={time => setHoverTime(time)}
-        onClick={(time, mode) => {
-          if (!time || tool !== "notes") {
+        onHoverTimeChanged={time => {
+          if (dragState) {
+            return;
+          }
+          if (!time) {
+            setProposedInsertion(null);
+            return;
+          }
+          setProposedInsertion(
+            getProposedInsertion(
+              songRef.current,
+              appState,
+              barRefs[time[0]].current,
+              time,
+              insertionDuration
+            )
+          );
+        }}
+        onMouseMove={ev => {
+          if (dragState && proposedInsertion) {
+            let deltaX = ev.clientX - dragState.startX;
+            const steps = Math.trunc(deltaX / 30);
+            let step = STEPS.findIndex(
+              x =>
+                x[0] === dragState.origInsertionDuration[0] &&
+                x[1] === dragState.origInsertionDuration[1]
+            );
+            step = Math.min(Math.max(step - steps, 0), STEPS.length - 1);
+            const frac = STEPS[step];
+            if (
+              frac[1] !== insertionDuration[1] ||
+              frac[0] !== insertionDuration[0]
+            ) {
+              setInsertionDuration(frac);
+              setProposedInsertion(
+                getProposedInsertion(
+                  songRef.current,
+                  appState,
+                  barRefs[proposedInsertion.barIdx].current,
+                  [
+                    proposedInsertion.barIdx,
+                    proposedInsertion.startNum,
+                    proposedInsertion.startDen
+                  ],
+                  frac
+                )
+              );
+            }
+          }
+        }}
+        onMouseDown={(_, ev) => {
+          setDragState({
+            startX: ev.clientX,
+            startY: ev.clientY,
+            origInsertionDuration: [insertionDuration[0], insertionDuration[1]]
+          });
+        }}
+        onMouseUp={() => {
+          setDragState(null);
+          if (insertionDuration[0] / insertionDuration[1] > 1 / 4) {
+            setInsertionDuration([1, 4]);
+          }
+
+          if (tool !== "notes") {
             return;
           }
 
-          if (mode === "rnc") {
+          if (proposedInsertion) {
             dispatch({
               type: "ADD_NOTE",
-              bar: time[0],
-              num: time[1],
-              den: time[2],
-              duration: -3,
-              dots: 0
+              barIdx: proposedInsertion.barIdx,
+              startNum: proposedInsertion.startNum,
+              startDen: proposedInsertion.startDen,
+              divisions: proposedInsertion.divisions
             });
             setNumChanges(numChanges + 1);
           }
         }}
       >
         <song
-          freezeSpacing={hoverTime == null ? undefined : numChanges}
+          freezeSpacing={proposedInsertion == null ? undefined : numChanges}
           key={`${appState.song.global.tsNum}_${appState.song.global.tsDen}`}
+          ref={songRef}
+          boundingClassName={dragState && "six-note-drag"}
         >
           <staff>
             <between
@@ -100,48 +260,60 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
             {appState.song.part.bars.map((bar, barIdx) => (
               <React.Fragment key={barIdx}>
                 <bar
+                  ref={barRefs[barIdx]}
                   numer={appState.song.global.tsNum}
                   denom={appState.song.global.tsDen}
                   boundingClassName={
                     tool === "notes" &&
-                    hoverTime &&
-                    hoverTime[0] === barIdx &&
+                    proposedInsertion &&
+                    proposedInsertion.barIdx === barIdx &&
                     "six-bar-hover-bg"
                   }
                   className={
-                    tool === "notes" && hoverTime && hoverTime[0] === barIdx
+                    tool === "notes" &&
+                    proposedInsertion &&
+                    proposedInsertion.barIdx === barIdx
                       ? "six-bar-hover"
                       : "six-bar"
                   }
                 >
-                  {bar.notes.map(
-                    ({ dots, duration, startNum, startDen }, idx) => (
-                      <rnc
-                        className="six-real-note"
-                        boundingClassName="six-real-note-bg"
-                        key={idx}
-                        noteValue={duration}
-                        dots={dots}
-                        startNum={startNum}
-                        startDen={startDen}
-                        isNote={true}
-                      />
-                    )
-                  )}
+                  {bar.notes.map(({ divisions }, idx) => (
+                    <React.Fragment key={idx}>
+                      {divisions.map(
+                        ({ noteValue, dots, startNum, startDen }, jdx) => (
+                          <rnc
+                            className="six-real-note"
+                            boundingClassName="six-real-note-bg"
+                            key={jdx}
+                            noteValue={noteValue}
+                            dots={dots}
+                            startNum={startNum}
+                            startDen={startDen}
+                            isNote={true}
+                          />
+                        )
+                      )}
+                    </React.Fragment>
+                  ))}
                   {tool === "notes" &&
                     !hoverMatchesAny &&
-                    hoverTime &&
-                    hoverTime[0] === barIdx && (
+                    proposedInsertion &&
+                    proposedInsertion.barIdx === barIdx &&
+                    proposedInsertion.divisions.map((div, idx) => (
                       <rnc
-                        boundingClassName="six-note-to-add-bg"
+                        key={idx}
+                        boundingClassName={cx(
+                          "six-note-to-add-bg",
+                          dragState && "six-note-drag"
+                        )}
                         className="six-note-to-add"
-                        noteValue={-3}
-                        dots={0}
-                        startNum={hoverTime[1]}
-                        startDen={hoverTime[2]}
+                        noteValue={div.noteValue}
+                        dots={div.dots}
+                        startNum={div.startNum}
+                        startDen={div.startDen}
                         isNote={true}
                       />
-                    )}
+                    ))}
                 </bar>
                 <between
                   barline={
@@ -182,47 +354,6 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
           </staff>
         </song>
       </Sheet>
-
-      {tool === "bars" && hoverElement && hoverElement.kind === 1 && (
-        <React.Suspense fallback={null}>
-          <div
-            style={{
-              position: "absolute",
-              top: hoverElement.bbox[1],
-              left: hoverElement.bbox[0],
-              width: hoverElement.bbox[2] - hoverElement.bbox[0] + 20,
-              height: hoverElement.bbox[3] - hoverElement.bbox[1] - 20,
-              margin: 0,
-              padding: 0
-            }}
-          >
-            <BetweenBarPopover
-              tsNum={appState.song.global.tsNum}
-              tsDen={appState.song.global.tsDen}
-              setTs={([num, den]) =>
-                dispatch({
-                  type: "SET_TS",
-                  num,
-                  den,
-                  prevNum: appState.song.global.tsNum,
-                  prevDen: appState.song.global.tsDen
-                })
-              }
-            >
-              <div
-                style={{
-                  width: hoverElement.bbox[2] - hoverElement.bbox[0] + 10,
-
-                  height: hoverElement.bbox[3] - hoverElement.bbox[1],
-                  margin: 0,
-                  padding: 0,
-                  cursor: "pointer"
-                }}
-              />
-            </BetweenBarPopover>
-          </div>
-        </React.Suspense>
-      )}
     </div>
   );
 }
