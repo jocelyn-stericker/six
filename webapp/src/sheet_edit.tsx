@@ -56,7 +56,22 @@ function getProposedInsertion(
     insertionDuration[1]
   );
   const start = time[1] / time[2];
-  const end = start + insertionDuration[0] / insertionDuration[1];
+
+  const divisions = [];
+  let end = start;
+  for (let i = 0; i < rawDivisions.length; i += 4) {
+    end += count(rawDivisions[i], rawDivisions[i + 1]);
+    divisions.push({
+      noteValue: rawDivisions[i],
+      dots: rawDivisions[i + 1],
+      startNum: rawDivisions[i + 2],
+      startDen: rawDivisions[i + 3]
+    });
+  }
+  if (!divisions.length) {
+    return null;
+  }
+
   if (
     appState.song.part.bars[time[0]].notes.some(note => {
       let noteStart = note.startNum / note.startDen;
@@ -76,18 +91,6 @@ function getProposedInsertion(
     return null;
   }
 
-  const divisions = [];
-  for (let i = 0; i < rawDivisions.length; i += 4) {
-    divisions.push({
-      noteValue: rawDivisions[i],
-      dots: rawDivisions[i + 1],
-      startNum: rawDivisions[i + 2],
-      startDen: rawDivisions[i + 3]
-    });
-  }
-  if (!divisions.length) {
-    return null;
-  }
   return {
     barIdx: time[0],
     startNum: time[1],

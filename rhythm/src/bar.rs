@@ -505,9 +505,26 @@ impl Bar {
     }
 
     /// Determine how a note at a given position time be spelled, rhythmically.
-    pub fn split_note(&self, t: Rational, duration: Duration) -> Vec<Duration> {
+    pub fn split_note(&self, t: Rational, mut duration: Duration) -> Vec<Duration> {
         if !duration.duration().is_positive() {
             return vec![];
+        }
+
+        let t_end = t + duration.duration();
+
+        let mut existing_note_start = Rational::new(0, 1);
+        for (existing_note, entity) in &self.rhythm {
+            let existing_note_end = existing_note_start + existing_note.duration();
+            if existing_note_start != t
+                && entity.is_some()
+                && existing_note_start >= t
+                && existing_note_start < t_end
+            {
+                duration = Duration::exact(existing_note_start - t, None);
+                break;
+            }
+
+            existing_note_start = existing_note_end;
         }
 
         // TODO(joshuan): Split results up into printable bits.
@@ -2197,11 +2214,11 @@ mod bar_tests {
 
     #[test]
     fn split_note_triple() {
-        let three_four = Bar::new(Metre::new(2, 4));
+        let two_four = Bar::new(Metre::new(2, 4));
         let nine_eight = Bar::new(Metre::new(9, 8));
 
         assert_eq!(
-            three_four.split_note(Rational::new(1, 8), Duration::new(NoteValue::Half, 0, None)),
+            two_four.split_note(Rational::new(1, 8), Duration::new(NoteValue::Half, 0, None)),
             vec![
                 Duration::new(NoteValue::Eighth, 0, None),
                 Duration::new(NoteValue::Quarter, 1, None),
@@ -2219,6 +2236,23 @@ mod bar_tests {
                 Duration::new(NoteValue::Half, 1, None),
                 Duration::new(NoteValue::Quarter, 0, None),
             ]
+        );
+    }
+
+    #[test]
+    fn split_note_existing_space() {
+        let mut four_four = Bar::new(Metre::new(4, 4));
+        four_four.splice(
+            Rational::new(1, 8),
+            vec![(
+                Duration::new(NoteValue::Quarter, 1, None),
+                Some(Entity::new(1)),
+            )],
+        );
+
+        assert_eq!(
+            four_four.split_note(Rational::new(0, 1), Duration::new(NoteValue::Half, 0, None)),
+            vec![Duration::new(NoteValue::Eighth, 0, None),]
         );
     }
 
