@@ -12,7 +12,7 @@ use rest_note_chord::{
     sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_relative_spacing,
     sys_update_rnc_timing, RestNoteChord, SpaceTimeWarp,
 };
-use rhythm::{Bar, Duration, Metre, NoteValue, RelativeRhythmicSpacing, Start};
+use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing, Start};
 use staff::{
     sys_print_between_bars, sys_print_staff, sys_print_staff_lines, sys_update_bar_numbers,
     Barline, BetweenBars, Staff,
@@ -181,7 +181,7 @@ impl Render {
     /// Inserts a RestNoteChord into a bar.
     ///
     /// Note that children of bars are not ordered, instead children have a `start` property.
-    pub fn bar_insert(&mut self, bar: usize, child: usize) {
+    pub fn bar_insert(&mut self, bar: usize, child: usize, is_temporary: bool) {
         let child = Entity::new(child);
         let bar_id = Entity::new(bar);
 
@@ -191,7 +191,17 @@ impl Render {
 
         if let Some(bar) = self.bars.get_mut(&bar_id) {
             if let (Some(rnc), Some(start)) = (self.rncs.get(&child), self.starts.get(&child)) {
-                bar.splice(start.beat, vec![(rnc.duration(), Some(child))]);
+                bar.splice(
+                    start.beat,
+                    vec![(
+                        rnc.duration(),
+                        if is_temporary {
+                            Lifetime::Temporary(child)
+                        } else {
+                            Lifetime::Explicit(child)
+                        },
+                    )],
+                );
                 self.parents.insert(child, bar_id);
             }
         }
@@ -246,14 +256,15 @@ impl Render {
 
     pub fn rnc_update_time(
         &mut self,
-        rnc: usize,
+        rnc_id: usize,
         note_value: isize,
         dots: u8,
         start_numer: isize,
         start_denom: isize,
+        is_temporary: bool,
     ) {
         let note_value = NoteValue::new(note_value).unwrap();
-        let rnc_id = Entity::new(rnc);
+        let rnc_id = Entity::new(rnc_id);
         if let Some(parent_id) = self.parents.get(&rnc_id).copied() {
             if let (Some(rnc), Some(bar), Some(start)) = (
                 self.rncs.get_mut(&rnc_id),
@@ -265,7 +276,17 @@ impl Render {
                 start.natural_beat = start.beat;
                 rnc.duration = Duration::new(note_value, dots, None);
                 rnc.natural_duration = rnc.duration;
-                bar.splice(start.beat, vec![(rnc.duration(), Some(rnc_id))]);
+                bar.splice(
+                    start.beat,
+                    vec![(
+                        rnc.duration(),
+                        if is_temporary {
+                            Lifetime::Temporary(rnc_id)
+                        } else {
+                            Lifetime::Explicit(rnc_id)
+                        },
+                    )],
+                );
             }
             self.fixup_bar(parent_id);
         }
@@ -280,10 +301,11 @@ impl Render {
                 if (rnc.natural_duration != rnc.duration || start.natural_beat != start.beat)
                     && *parent == parent_id
                 {
-                    bar.remove(other_rnc_id);
                     rnc.duration = rnc.natural_duration;
                     start.beat = start.natural_beat;
-                    bar.splice(start.beat, vec![(rnc.duration(), Some(other_rnc_id))]);
+                    if let Some(lifetime) = bar.remove(other_rnc_id) {
+                        bar.splice(start.beat, vec![(rnc.duration(), lifetime)]);
+                    }
                 }
             }
         }
@@ -637,7 +659,7 @@ mod tests {
 
         let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8, true);
 
-        render.bar_insert(bar1, rnc1);
+        render.bar_insert(bar1, rnc1, false);
         let barline = render.between_bars_create(Some(Barline::Normal), false, None, None);
         render.child_append(staff, barline);
 
@@ -646,7 +668,7 @@ mod tests {
 
         let rnc2 = render.rnc_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4, true);
 
-        render.bar_insert(bar2, rnc2);
+        render.bar_insert(bar2, rnc2, false);
 
         let final_barline = render.between_bars_create(Some(Barline::Final), false, None, None);
         render.child_append(staff, final_barline);
@@ -656,7 +678,7 @@ mod tests {
 
         render.exec();
 
-        render.rnc_update_time(rnc1, NoteValue::Eighth.log2() as isize, 0, 4, 16);
+        render.rnc_update_time(rnc1, NoteValue::Eighth.log2() as isize, 0, 4, 16, false);
 
         snapshot("./snapshots/hello_world.svg", &render.print_for_demo());
 

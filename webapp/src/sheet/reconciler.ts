@@ -42,6 +42,7 @@ interface Instance {
   type: "song" | "staff" | "bar" | "between" | "rnc";
   container: Render;
   entity: number;
+  meta: any;
 }
 
 interface Stylable {
@@ -93,6 +94,7 @@ export interface RncProps extends Stylable {
   startNum: number;
   startDen: number;
   isNote: boolean;
+  isTemporary: boolean;
 }
 
 // TODO: dedupe with JSX.IntrinsicElements
@@ -110,6 +112,7 @@ function createInstance(
 ): Instance | null {
   let type: "song" | "staff" | "bar" | "between" | "rnc";
   let entity;
+  let meta: any = null;
 
   if (spec.type === "song") {
     type = "song";
@@ -141,6 +144,9 @@ function createInstance(
       spec.props.startDen,
       spec.props.isNote
     );
+    meta = {
+      isTemporary: spec.props.isTemporary || false
+    };
   } else {
     throw new Error(`Invalid type in sheet music reconciler: <${spec.type} />`);
   }
@@ -157,7 +163,7 @@ function createInstance(
     container.html[entity] = spec.props.html;
   }
 
-  return { container, type, entity };
+  return { container, type, entity, meta };
 }
 
 function appendChild(parent: Instance, child: Instance) {
@@ -166,7 +172,11 @@ function appendChild(parent: Instance, child: Instance) {
   }
 
   if (parent.type === "bar") {
-    parent.container.bar_insert(parent.entity, child.entity);
+    parent.container.bar_insert(
+      parent.entity,
+      child.entity,
+      child.meta.isTemporary
+    );
   } else {
     parent.container.child_append(parent.entity, child.entity);
   }
@@ -222,7 +232,11 @@ const Reconciler = ReactReconciler({
   },
   insertBefore(parent: Instance, child: Instance, before: Instance) {
     if (parent.type === "bar") {
-      parent.container.bar_insert(parent.entity, child.entity);
+      parent.container.bar_insert(
+        parent.entity,
+        child.entity,
+        child.meta.isTemporary || false
+      );
     } else {
       parent.container.child_insert_before(
         parent.entity,
@@ -269,7 +283,8 @@ const Reconciler = ReactReconciler({
         newProps.noteValue,
         newProps.dots,
         newProps.startNum,
-        newProps.startDen
+        newProps.startDen,
+        newProps.isTemporary
       );
     }
 

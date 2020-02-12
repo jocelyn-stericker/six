@@ -293,6 +293,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                             startNum={startNum}
                             startDen={startDen}
                             isNote={true}
+                            isTemporary={false}
                           />
                         )
                       )}
@@ -315,6 +316,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                         startNum={div.startNum}
                         startDen={div.startDen}
                         isNote={true}
+                        isTemporary={true}
                       />
                     ))}
                 </bar>

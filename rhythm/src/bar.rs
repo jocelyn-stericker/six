@@ -6,6 +6,49 @@ use num_rational::Rational;
 use num_traits::{sign::Signed, One, Zero};
 use std::collections::{BTreeSet, BinaryHeap};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum Lifetime {
+    AutomaticRest,
+    Temporary(Entity),
+    Explicit(Entity),
+}
+
+impl Lifetime {
+    pub fn is_explicit(&self) -> bool {
+        match self {
+            Lifetime::Explicit(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_temporary(&self) -> bool {
+        match self {
+            Lifetime::Temporary(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_automatic(&self) -> bool {
+        match self {
+            Lifetime::AutomaticRest => true,
+            _ => false,
+        }
+    }
+
+    fn to_option(self) -> Option<Entity> {
+        match self {
+            Lifetime::AutomaticRest => None,
+            Lifetime::Temporary(e) | Lifetime::Explicit(e) => Some(e),
+        }
+    }
+}
+
+impl Default for Lifetime {
+    fn default() -> Self {
+        Lifetime::AutomaticRest
+    }
+}
+
 #[derive(Clone, Debug)]
 /// The rhythm and metre of a voice in a single bar.
 pub struct Bar {
@@ -16,7 +59,7 @@ pub struct Bar {
     ///
     /// If the entity is None, that means it's an implicit rest that is managed
     /// by sys_update_rnc_timing.
-    rhythm: Vec<(Duration, Option<Entity>)>,
+    rhythm: Vec<(Duration, Lifetime)>,
 
     /// Automatically-generated ("managed") rests, managed by sys_update_rnc_timing.
     managed: Vec<Entity>,
@@ -40,7 +83,7 @@ impl Bar {
         &self.metre
     }
 
-    pub fn rhythm(&self) -> &Vec<(Duration, Option<Entity>)> {
+    pub fn rhythm(&self) -> &Vec<(Duration, Lifetime)> {
         &self.rhythm
     }
 
@@ -53,7 +96,8 @@ impl Bar {
                 .into_iter()
                 .zip(self.metre.division_starts().into_iter().skip(1))
             {
-                self.rhythm.push((Duration::exact(to - from, None), None));
+                self.rhythm
+                    .push((Duration::exact(to - from, None), Lifetime::AutomaticRest));
             }
         }
     }
@@ -61,13 +105,13 @@ impl Bar {
     fn try_amend(
         &self,
         division_start: Rational,
-        amend_to: Option<&mut (Duration, Option<Entity>)>,
+        amend_to: Option<&mut (Duration, Lifetime)>,
         t: Rational,
         duration: Rational,
     ) -> bool {
         if let Some(amend_to) = amend_to {
             let prior_note_t = t - amend_to.0.duration();
-            if amend_to.1.is_some() {
+            if !amend_to.1.is_automatic() {
                 return false;
             }
 
@@ -116,7 +160,7 @@ impl Bar {
         // The time, in whole notes, at which `existing_note` started, before this change.
         let mut t_read = Rational::zero();
         // The notes and rests, after the change.
-        let mut new: Vec<(Duration, Option<Entity>)> = Vec::new();
+        let mut new: Vec<(Duration, Lifetime)> = Vec::new();
 
         for existing_note in &self.rhythm {
             let mut next_division_start = *division_starts.peek().unwrap();
@@ -130,14 +174,14 @@ impl Bar {
                 next_division_start = *division_starts.peek().unwrap();
             }
 
-            if existing_note.1.is_none()
+            if existing_note.1.is_automatic()
                 && t_read < next_division_start
                 && next_division_start < existing_note_end
             {
                 let new_duration = next_division_start - t_read;
                 assert!(new_duration.is_positive());
                 if !self.try_amend(division_start, new.last_mut(), t_read, new_duration) {
-                    new.push((Duration::exact(new_duration, None), None));
+                    new.push((Duration::exact(new_duration, None), Lifetime::AutomaticRest));
                 }
                 // The time up to which we have written to `new`.
                 let mut t_write = t_read + new_duration;
@@ -149,7 +193,7 @@ impl Bar {
                     let p = t_read.min(next_division_start);
                     let new_duration = p - division_start;
                     if !self.try_amend(division_start, new.last_mut(), t_write, new_duration) {
-                        new.push((Duration::exact(new_duration, None), None));
+                        new.push((Duration::exact(new_duration, None), Lifetime::AutomaticRest));
                     }
 
                     t_write = p;
@@ -157,7 +201,7 @@ impl Bar {
 
                 assert_eq!(t_read, t_write);
             } else {
-                if existing_note.1.is_some()
+                if !existing_note.1.is_automatic()
                     || !self.try_amend(
                         division_start,
                         new.last_mut(),
@@ -172,7 +216,7 @@ impl Bar {
             }
         }
 
-        if self.rhythm.iter().any(|rhythm| rhythm.1.is_some()) {
+        if self.rhythm.iter().any(|rhythm| !rhythm.1.is_automatic()) {
             self.rhythm = new;
         } else {
             self.rhythm.clear();
@@ -246,8 +290,8 @@ impl Bar {
         struct PartialSolution {
             score: Rational,
             done_time: Rational,
-            todo: Vec<(Duration, Option<Entity>)>,
-            done: Vec<(Duration, Option<Entity>)>,
+            todo: Vec<(Duration, Lifetime)>,
+            done: Vec<(Duration, Lifetime)>,
         }
 
         let mut q: BinaryHeap<PartialSolution> = BinaryHeap::new();
@@ -267,7 +311,7 @@ impl Bar {
         }) = q.pop()
         {
             if let Some((first, remainder)) = input.split_first() {
-                if first.1.is_some() {
+                if !first.1.is_automatic() {
                     output.push(*first);
                     q.push(PartialSolution {
                         score,
@@ -296,17 +340,17 @@ impl Bar {
                             }
 
                             let remainder_t = first.0.duration() - dur;
-                            let new_input: Vec<(Duration, Option<Entity>)> = if remainder_t
+                            let new_input: Vec<(Duration, Lifetime)> = if remainder_t
                                 > Rational::zero()
                             {
-                                let mut x: Vec<(Duration, Option<Entity>)> = input.to_vec();
+                                let mut x: Vec<(Duration, Lifetime)> = input.to_vec();
                                 x[0].0 =
                                     Duration::exact(remainder_t * tuplet_kind, Some(*tuplet_kind));
                                 x
                             } else {
                                 input.iter().skip(1).cloned().collect()
                             };
-                            output.push((displayed, None));
+                            output.push((displayed, Lifetime::AutomaticRest));
                             let mut score = score;
                             if !displayed.printable() {
                                 score -= 10000;
@@ -332,7 +376,7 @@ impl Bar {
                                             if t < t_beat && t_beat < t_next {
                                                 beats_covered.insert(i);
                                             } else if t_beat == t_next
-                                                && note.1.is_none()
+                                                && note.1.is_automatic()
                                                 && t == div_start
                                             {
                                                 beats_exposed.insert(i);
@@ -410,7 +454,7 @@ impl Bar {
     /// Existing notes entirely after the splice are kept.
     ///
     /// TODO: Handle tuplets
-    pub fn splice(&mut self, splice_start: Rational, replacement: Vec<(Duration, Option<Entity>)>) {
+    pub fn splice(&mut self, splice_start: Rational, replacement: Vec<(Duration, Lifetime)>) {
         let bar_duration = self.metre.duration();
 
         if splice_start >= bar_duration {
@@ -460,7 +504,7 @@ impl Bar {
 
                 let pad_end = t_read - t_write;
                 if pad_end.is_positive() {
-                    new.push((Duration::exact(pad_end, None), None));
+                    new.push((Duration::exact(pad_end, None), Lifetime::AutomaticRest));
                     t_write += pad_end;
                 }
 
@@ -471,7 +515,7 @@ impl Bar {
                 if new_duration.is_positive() {
                     // We are splicing only the start of this note. We are creating a new rest with
                     // the remaining duration.
-                    new.push((Duration::exact(new_duration, None), None));
+                    new.push((Duration::exact(new_duration, None), Lifetime::AutomaticRest));
                     t_read = existing_note_end;
                     t_write += new_duration;
                     assert_eq!(t_read, t_write);
@@ -493,15 +537,20 @@ impl Bar {
         self.optimize();
     }
 
-    pub fn remove(&mut self, rnc: Entity) {
+    pub fn remove(&mut self, rnc: Entity) -> Option<Lifetime> {
+        let mut ret = None;
+
         for (_, entity) in &mut self.rhythm {
-            if *entity == Some(rnc) {
-                *entity = None;
+            if entity.to_option() == Some(rnc) {
+                ret = Some(*entity);
+                *entity = Lifetime::AutomaticRest;
             }
         }
 
         self.simplify();
         self.optimize();
+
+        ret
     }
 
     /// Determine how a note at a given position time be spelled, rhythmically.
@@ -516,7 +565,7 @@ impl Bar {
         for (existing_note, entity) in &self.rhythm {
             let existing_note_end = existing_note_start + existing_note.duration();
             if existing_note_start != t
-                && entity.is_some()
+                && entity.is_explicit()
                 && existing_note_start >= t
                 && existing_note_start < t_end
             {
@@ -603,7 +652,7 @@ impl Bar {
 
         let mut target_managed_count = 0;
         for rnc in &self.rhythm {
-            if rnc.1.is_none() {
+            if rnc.1.is_automatic() {
                 target_managed_count += 1;
             }
         }
@@ -624,7 +673,7 @@ impl Bar {
         }
 
         for note in &self.rhythm {
-            if note.1.is_none() {
+            if note.1.is_automatic() {
                 if managed_idx == 0 {
                     let entity = entities.create();
                     self.managed.push(entity);
@@ -672,8 +721,10 @@ impl Bar {
                 let data = (
                     *rhy,
                     start,
-                    entity.unwrap_or_else(|| *managed.next().unwrap()),
-                    entity.is_none(),
+                    entity
+                        .to_option()
+                        .unwrap_or_else(|| *managed.next().unwrap()),
+                    entity.is_automatic(),
                 );
 
                 start += rhy.duration();
@@ -698,7 +749,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -706,10 +757,16 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
             assert!(!bar.whole_rest());
@@ -720,18 +777,24 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
                     ),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -741,18 +804,24 @@ mod bar_tests {
                 Rational::new(1, 2),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -763,22 +832,28 @@ mod bar_tests {
                 vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1)),
+                        Lifetime::Explicit(Entity::new(1)),
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1)),
+                        Lifetime::Explicit(Entity::new(1)),
                     ),
                 ],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -790,7 +865,7 @@ mod bar_tests {
                 Rational::new(4, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(bar.rhythm(), &vec![]);
@@ -802,18 +877,24 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Half, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -827,12 +908,15 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(1, 4),
-                vec![(Duration::new(NoteValue::Half, 0, None), None)],
+                vec![(
+                    Duration::new(NoteValue::Half, 0, None),
+                    Lifetime::AutomaticRest,
+                )],
             );
             assert_eq!(bar.rhythm(), &vec![],);
         }
@@ -843,23 +927,35 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Lifetime::AutomaticRest,
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -870,24 +966,36 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(5, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Lifetime::AutomaticRest,
+                )],
             );
             // This is not a good rhythm, but we do not adjust explicit rhythms.
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -898,52 +1006,70 @@ mod bar_tests {
                 Rational::new(0, 1),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(1, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(2, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(1, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Lifetime::AutomaticRest,
+                )],
             );
             bar.splice(
                 Rational::new(2, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Lifetime::AutomaticRest,
+                )],
             );
             bar.splice(
                 Rational::new(3, 8),
-                vec![(Duration::new(NoteValue::Eighth, 0, None), None)],
+                vec![(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Lifetime::AutomaticRest,
+                )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -958,17 +1084,23 @@ mod bar_tests {
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -979,14 +1111,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -994,13 +1126,19 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1010,7 +1148,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1018,10 +1156,16 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1031,17 +1175,23 @@ mod bar_tests {
                 Rational::new(3, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1052,14 +1202,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(3, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1067,13 +1217,19 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1083,7 +1239,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1091,10 +1247,16 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1110,17 +1272,23 @@ mod bar_tests {
                 Rational::new(5, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 1, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1131,14 +1299,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(4, 16),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1146,13 +1314,19 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1163,7 +1337,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1171,11 +1345,20 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1186,17 +1369,23 @@ mod bar_tests {
                 Rational::new(5, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1207,14 +1396,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(4, 8),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1222,13 +1411,19 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1239,7 +1434,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1247,11 +1442,20 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1262,17 +1466,23 @@ mod bar_tests {
                 Rational::new(5, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 1, None), None),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1283,14 +1493,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(4, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1298,13 +1508,19 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Half, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Half, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1315,7 +1531,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1323,11 +1539,20 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Half, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1338,18 +1563,27 @@ mod bar_tests {
                 Rational::new(11, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 1, None), None),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1366,17 +1600,23 @@ mod bar_tests {
                 Rational::new(2, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1388,17 +1628,23 @@ mod bar_tests {
                 Rational::new(2, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1410,17 +1656,23 @@ mod bar_tests {
                 Rational::new(6, 8),
                 vec![(
                     Duration::new(NoteValue::Quarter, 1, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1437,28 +1689,34 @@ mod bar_tests {
                 Rational::new(3, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(7, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 1, None), None),
                     (
-                        Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Duration::new(NoteValue::Eighth, 1, None),
+                        Lifetime::AutomaticRest
                     ),
-                    (Duration::new(NoteValue::Eighth, 1, None), None),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1470,18 +1728,27 @@ mod bar_tests {
                 Rational::new(8, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1498,30 +1765,39 @@ mod bar_tests {
                 Rational::new(3, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(4, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 1, None), None),
                     (
-                        Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Duration::new(NoteValue::Eighth, 1, None),
+                        Lifetime::AutomaticRest
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1531,30 +1807,39 @@ mod bar_tests {
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(4, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
                     (
-                        Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1570,18 +1855,27 @@ mod bar_tests {
                 Rational::new(7, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1593,19 +1887,28 @@ mod bar_tests {
                 Rational::new(3, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1616,28 +1919,34 @@ mod bar_tests {
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(7, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
                     (
-                        Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
                     ),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1649,7 +1958,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1657,11 +1966,20 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1677,18 +1995,24 @@ mod bar_tests {
                 Rational::new(7, 32),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 2, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 2, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1699,31 +2023,43 @@ mod bar_tests {
                 Rational::new(7, 32),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(8, 32),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 2, None), None),
                     (
-                        Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Some(Entity::new(1))
+                        Duration::new(NoteValue::Eighth, 2, None),
+                        Lifetime::AutomaticRest
                     ),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), None),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::ThirtySecond, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::ThirtySecond, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1739,14 +2075,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(7, 32),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1754,16 +2090,28 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::ThirtySecond, 0, None), None),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
-                    (Duration::new(NoteValue::Sixteenth, 1, None), None),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::ThirtySecond, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1781,17 +2129,23 @@ mod bar_tests {
                 Rational::new(9, 8),
                 vec![(
                     Duration::new(NoteValue::Quarter, 1, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Half, 1, None), None),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1803,7 +2157,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 1, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1811,10 +2165,16 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
-                    (Duration::new(NoteValue::Half, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Half, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1830,28 +2190,34 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(5, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
                     (
-                        Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1863,19 +2229,28 @@ mod bar_tests {
                 Rational::new(5, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1890,14 +2265,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -1905,17 +2280,32 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -1928,17 +2318,23 @@ mod bar_tests {
             Rational::new(3, 4),
             vec![(
                 Duration::new(NoteValue::Half, 0, None),
-                Some(Entity::new(1)),
+                Lifetime::Explicit(Entity::new(1)),
             )],
         );
         assert_eq!(
             bar.rhythm(),
             &vec![
-                (Duration::new(NoteValue::Half, 0, None), None),
-                (Duration::new(NoteValue::Quarter, 0, None), None),
+                (
+                    Duration::new(NoteValue::Half, 0, None),
+                    Lifetime::AutomaticRest
+                ),
                 (
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Some(Entity::new(1))
+                    Lifetime::AutomaticRest
+                ),
+                (
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Lifetime::Explicit(Entity::new(1))
                 ),
             ],
         );
@@ -1953,29 +2349,38 @@ mod bar_tests {
                 Rational::new(2, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(11, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
                 bar.rhythm(),
                 &vec![
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 1, None), None),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -1988,21 +2393,21 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(5, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(8, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -2010,19 +2415,31 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
                     ),
-                    (Duration::new(NoteValue::Quarter, 0, None), None),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                 ],
             );
@@ -2034,14 +2451,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             bar.splice(
                 Rational::new(5, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -2049,17 +2466,29 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
-                    // TODO: join?
-                    (Duration::new(NoteValue::Eighth, 0, None), None),
-                    (Duration::new(NoteValue::Sixteenth, 0, None), None),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Some(Entity::new(1))
+                        Lifetime::AutomaticRest
                     ),
-                    (Duration::new(NoteValue::Quarter, 1, None), None),
+                    // TODO: join?
+                    (
+                        Duration::new(NoteValue::Eighth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
+                    (
+                        Duration::new(NoteValue::Sixteenth, 0, None),
+                        Lifetime::Explicit(Entity::new(1))
+                    ),
+                    (
+                        Duration::new(NoteValue::Quarter, 1, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -2074,7 +2503,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -2082,17 +2511,20 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        None
+                        Lifetime::AutomaticRest
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        None
+                        Lifetime::AutomaticRest
                     ),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -2102,7 +2534,7 @@ mod bar_tests {
                 Rational::new(2, 6),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                    Some(Entity::new(1)),
+                    Lifetime::Explicit(Entity::new(1)),
                 )],
             );
             assert_eq!(
@@ -2110,17 +2542,20 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        None
+                        Lifetime::AutomaticRest
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        None
+                        Lifetime::AutomaticRest
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        Some(Entity::new(1))
+                        Lifetime::Explicit(Entity::new(1))
                     ),
-                    (Duration::new(NoteValue::Half, 0, None), None),
+                    (
+                        Duration::new(NoteValue::Half, 0, None),
+                        Lifetime::AutomaticRest
+                    ),
                 ],
             );
         }
@@ -2133,14 +2568,14 @@ mod bar_tests {
             Rational::zero(),
             vec![(
                 Duration::new(NoteValue::Eighth, 0, None),
-                Some(Entity::new(1)),
+                Lifetime::Explicit(Entity::new(1)),
             )],
         );
         bar.splice(
             Rational::new(11, 8),
             vec![(
                 Duration::new(NoteValue::Eighth, 0, None),
-                Some(Entity::new(2)),
+                Lifetime::Explicit(Entity::new(2)),
             )],
         );
         assert_eq!(
@@ -2148,16 +2583,31 @@ mod bar_tests {
             &vec![
                 (
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(1))
+                    Lifetime::Explicit(Entity::new(1))
                 ),
-                (Duration::new(NoteValue::Eighth, 0, None), None),
-                (Duration::new(NoteValue::Eighth, 0, None), None),
-                (Duration::new(NoteValue::Quarter, 1, None), None),
-                (Duration::new(NoteValue::Quarter, 1, None), None),
-                (Duration::new(NoteValue::Quarter, 0, None), None),
                 (
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Some(Entity::new(2)),
+                    Lifetime::AutomaticRest
+                ),
+                (
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Lifetime::AutomaticRest
+                ),
+                (
+                    Duration::new(NoteValue::Quarter, 1, None),
+                    Lifetime::AutomaticRest
+                ),
+                (
+                    Duration::new(NoteValue::Quarter, 1, None),
+                    Lifetime::AutomaticRest
+                ),
+                (
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    Lifetime::AutomaticRest
+                ),
+                (
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Lifetime::Explicit(Entity::new(2)),
                 ),
             ],
         );
@@ -2246,7 +2696,7 @@ mod bar_tests {
             Rational::new(1, 8),
             vec![(
                 Duration::new(NoteValue::Quarter, 1, None),
-                Some(Entity::new(1)),
+                Lifetime::Explicit(Entity::new(1)),
             )],
         );
 
