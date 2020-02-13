@@ -6,6 +6,7 @@ import { Render } from "./sheet/reconciler";
 import { Action, State, TiedNote } from "./store";
 
 const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
+const NotePopover = React.lazy(() => import("./note_popover"));
 
 interface Props {
   tool: "notes" | "bars" | "select";
@@ -280,25 +281,63 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                       : "six-bar"
                   }
                 >
-                  {bar.notes.map(({ divisions }, idx) => (
-                    <React.Fragment key={idx}>
-                      {divisions.map(
-                        ({ noteValue, dots, startNum, startDen }, jdx) => (
-                          <rnc
-                            className="six-real-note"
-                            boundingClassName="six-real-note-bg"
-                            key={jdx}
-                            noteValue={noteValue}
-                            dots={dots}
-                            startNum={startNum}
-                            startDen={startDen}
-                            isNote={true}
-                            isTemporary={false}
-                          />
-                        )
-                      )}
-                    </React.Fragment>
-                  ))}
+                  {bar.notes.map(
+                    (
+                      {
+                        divisions,
+                        startNum: tiedStartNum,
+                        startDen: tiedStartDen
+                      },
+                      divisionIdx
+                    ) => (
+                      <React.Fragment key={divisionIdx}>
+                        {divisions.map(
+                          ({ noteValue, dots, startNum, startDen }, jdx) => (
+                            <rnc
+                              className="six-real-note"
+                              boundingClassName="six-real-note-bg"
+                              key={jdx}
+                              noteValue={noteValue}
+                              dots={dots}
+                              startNum={startNum}
+                              startDen={startDen}
+                              isNote={true}
+                              isTemporary={false}
+                              html={
+                                tool === "notes" &&
+                                (({ width, height }) => (
+                                  <React.Suspense fallback={null}>
+                                    <NotePopover
+                                      onDeleteNote={() => {
+                                        dispatch({
+                                          type: "REMOVE_NOTE",
+                                          barIdx,
+                                          startNum: tiedStartNum,
+                                          startDen: tiedStartDen,
+                                          divisions
+                                        });
+                                      }}
+                                    >
+                                      <div
+                                        onMouseOver={() =>
+                                          setProposedInsertion(null)
+                                        }
+                                        style={{
+                                          width,
+                                          height,
+                                          cursor: "pointer"
+                                        }}
+                                      />
+                                    </NotePopover>
+                                  </React.Suspense>
+                                ))
+                              }
+                            />
+                          )
+                        )}
+                      </React.Fragment>
+                    )
+                  )}
                   {tool === "notes" &&
                     !hoverMatchesAny &&
                     proposedInsertion &&
