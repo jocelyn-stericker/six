@@ -1,22 +1,24 @@
 use std::collections::HashMap;
 
-use crate::Staff;
+use crate::LineOfStaff;
 use entity::{Entity, Join};
 use kurbo::{Rect, TranslateScale, Vec2};
 use rhythm::{Bar, RelativeRhythmicSpacing};
 use stencil::{Stencil, StencilMap};
 
 pub fn sys_print_staff(
-    staffs: &mut HashMap<Entity, Staff>,
+    line_of_staffs: &mut HashMap<Entity, LineOfStaff>,
     bars: &HashMap<Entity, Bar>,
     spacing: &HashMap<Entity, RelativeRhythmicSpacing>,
     stencils: &HashMap<Entity, Stencil>,
     stencil_maps: &mut HashMap<Entity, StencilMap>,
     children: &HashMap<Entity, Vec<Entity>>,
 ) {
-    for (staff_entity, (staff, children)) in (staffs, children).join() {
+    for (staff_entity, (staff, children)) in (line_of_staffs, children).join() {
         let mut staff_advance = 0.0f64;
         let mut staff_stencil = StencilMap::default();
+
+        eprintln!("{:?} {:?}", staff_entity, children);
 
         for child in children {
             if let Some(bar) = bars.get(&child) {

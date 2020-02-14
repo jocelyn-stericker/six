@@ -58,8 +58,6 @@ pub(crate) fn sys_delete_orphans(
         }
     }
 
-    eprintln!("{:?} {:?}", live, garbage);
-
     // Take out the trash.
     for entity in garbage.iter() {
         for child_component in graph_components.iter_mut() {

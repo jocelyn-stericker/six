@@ -14,8 +14,8 @@ use rest_note_chord::{
 };
 use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing, Start};
 use staff::{
-    sys_print_between_bars, sys_print_staff, sys_print_staff_lines, sys_update_bar_numbers,
-    Barline, BetweenBars, Staff,
+    sys_break_into_lines, sys_print_between_bars, sys_print_staff, sys_print_staff_lines,
+    sys_update_bar_numbers, Barline, BetweenBars, LineOfStaff, Staff,
 };
 use std::collections::{HashMap, HashSet};
 use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
@@ -37,6 +37,7 @@ pub struct Render {
 
     songs: HashMap<Entity, Song>,
     staffs: HashMap<Entity, Staff>,
+    line_of_staffs: HashMap<Entity, LineOfStaff>,
     bars: HashMap<Entity, Bar>,
     between_bars: HashMap<Entity, BetweenBars>,
     rncs: HashMap<Entity, RestNoteChord>,
@@ -154,10 +155,8 @@ impl Render {
     /// Create a staff, without attaching it to a song.
     pub fn staff_create(&mut self) -> usize {
         let entity = self.entities.create();
-        let staff_lines_entity = self.entities.create();
 
-        self.parents.insert(staff_lines_entity, entity);
-        self.staffs.insert(entity, Staff::new(staff_lines_entity));
+        self.staffs.insert(entity, Staff::default());
 
         self.stencil_maps.insert(entity, StencilMap::default());
         self.ordered_children.insert(entity, vec![]);
@@ -421,6 +420,7 @@ impl Render {
             &entities,
             &mut [
                 &mut self.songs,
+                &mut self.line_of_staffs,
                 &mut self.staffs,
                 &mut self.bars,
                 &mut self.between_bars,
@@ -466,17 +466,30 @@ impl Render {
         }
         sys_print_between_bars(&self.between_bars, &mut self.stencils);
 
-        sys_print_staff(
+        sys_break_into_lines(
+            &self.entities,
             &mut self.staffs,
+            &mut self.parents,
+            &mut self.ordered_children,
+            &mut self.line_of_staffs,
+        );
+
+        sys_print_staff(
+            &mut self.line_of_staffs,
             &self.bars,
             &self.spacing,
             &self.stencils,
             &mut self.stencil_maps,
             &self.ordered_children,
         );
-        sys_print_staff_lines(&self.staffs, &mut self.stencils);
+        sys_print_staff_lines(&self.line_of_staffs, &mut self.stencils);
 
-        sys_print_song(&self.songs, &self.ordered_children, &mut self.stencil_maps);
+        sys_print_song(
+            &self.songs,
+            &self.staffs,
+            &self.ordered_children,
+            &mut self.stencil_maps,
+        );
         sys_update_world_bboxes(
             &self.songs,
             &self.stencils,
@@ -689,6 +702,7 @@ mod tests {
         assert_eq!(render.parents.len(), 0);
         assert_eq!(render.songs.len(), 0);
         assert_eq!(render.staffs.len(), 0);
+        assert_eq!(render.line_of_staffs.len(), 0);
         assert_eq!(render.bars.len(), 0);
         assert_eq!(render.between_bars.len(), 0);
         assert_eq!(render.rncs.len(), 0);

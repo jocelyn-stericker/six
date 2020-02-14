@@ -96,6 +96,26 @@ export function getInitialState(): State {
           },
           {
             notes: [],
+            barline: "normal"
+          },
+          {
+            notes: [],
+            barline: "normal"
+          },
+          {
+            notes: [],
+            barline: "normal"
+          },
+          {
+            notes: [],
+            barline: "normal"
+          },
+          {
+            notes: [],
+            barline: "normal"
+          },
+          {
+            notes: [],
             barline: "final"
           }
         ]
