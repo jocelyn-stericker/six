@@ -10,15 +10,15 @@ interface Props {
   children: any;
   onMouseDown?: (
     time: null | [number, number, number],
-    ev: React.MouseEvent
+    ev: React.MouseEvent,
   ) => void;
   onMouseUp?: (
     time: null | [number, number, number],
-    ev: React.MouseEvent
+    ev: React.MouseEvent,
   ) => void;
   onClick?: (
     time: null | [number, number, number],
-    ev: React.MouseEvent
+    ev: React.MouseEvent,
   ) => void;
   onMouseMove?: (ev: React.MouseEvent) => void;
   onHoverTimeChanged: (time: [number, number, number] | null) => void;
@@ -36,7 +36,7 @@ type StencilMeta = [
   number,
   number,
   number,
-  number
+  number,
 ];
 
 function StencilView({
@@ -44,7 +44,7 @@ function StencilView({
   stencils,
   stencilMeta,
   transform,
-  classNames
+  classNames,
 }: {
   id: number;
   stencils: { [key: string]: StencilOrStencilMap };
@@ -106,8 +106,9 @@ export default function SheetMusicView(props: Props) {
   } | null>(null);
   const [root, setRoot] = useState<number | null>(null);
   const [hoverTime, setHoverTime] = useState<[number, number, number] | null>(
-    null
+    null,
   );
+  const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
 
   useLayoutEffect(() => {
     console.time("render svg");
@@ -129,7 +130,7 @@ export default function SheetMusicView(props: Props) {
     let stencilMeta: { [key: number]: StencilMeta } = {};
     for (let i = 0; i < stencilMetaPairs.length; i += 2) {
       stencilMeta[stencilMetaPairs[i] as any] = JSON.parse(
-        stencilMetaPairs[i + 1]
+        stencilMetaPairs[i + 1],
       );
     }
 
@@ -137,7 +138,12 @@ export default function SheetMusicView(props: Props) {
 
     setStencils(stencils);
     setStencilMeta(stencilMeta);
-    setRoot(container.get_root_id() || null);
+    const root = container.get_root_id();
+    setRoot(root || null);
+    setPageSize({
+      width: (root && container.get_song_width(root)) || 0,
+      height: (root && container.get_song_height(root)) || 0,
+    });
   }, [container, props.children]);
 
   const svg = useRef<SVGSVGElement>(null);
@@ -145,7 +151,7 @@ export default function SheetMusicView(props: Props) {
   const bound = svg.current && svg.current.getBoundingClientRect();
 
   function makeMouseHandler(
-    fn?: (time: null | [number, number, number], ev: React.MouseEvent) => void
+    fn?: (time: null | [number, number, number], ev: React.MouseEvent) => void,
   ) {
     return (ev: React.MouseEvent) => {
       if (!stencilMeta || !fn) {
@@ -159,7 +165,7 @@ export default function SheetMusicView(props: Props) {
   return (
     <>
       <svg
-        viewBox="0 0 215.9 279.4"
+        viewBox={`0 0 ${pageSize.width} ${pageSize.height}`}
         width="100%"
         ref={svg}
         onMouseDownCapture={makeMouseHandler(props.onMouseDown)}
@@ -216,7 +222,7 @@ export default function SheetMusicView(props: Props) {
                     className={className}
                   />
                 );
-              }
+              },
             )}
           {root && stencils && stencils[root] && stencilMeta && (
             <g style={{ pointerEvents: "none" }}>
@@ -262,7 +268,7 @@ export default function SheetMusicView(props: Props) {
                 left: pt2.x - bound.left,
                 top: pt3.y - bound.top,
                 width,
-                height
+                height,
               }}
             >
               <div style={{ position: "relative" }}>

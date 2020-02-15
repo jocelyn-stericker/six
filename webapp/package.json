@@ -11,6 +11,9 @@
   },
   "author": "Joshua Netterfield <joshua@nettek.ca>",
   "license": "AGPL-3.0-or-later",
+  "prettier": {
+    "trailingComma": "all"
+  },
   "dependencies": {
     "@blueprintjs/core": "3.23.1",
     "@blueprintjs/select": "3.11.2",

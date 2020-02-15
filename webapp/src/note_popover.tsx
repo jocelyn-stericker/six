@@ -13,7 +13,7 @@ export default function NotePopover({ children, onDeleteNote }: Props) {
       popoverClassName="bp3-dark"
       modifiers={
         {
-          preventOverflow: true
+          preventOverflow: true,
         } as any
       }
       interactionKind="click"
@@ -25,7 +25,7 @@ export default function NotePopover({ children, onDeleteNote }: Props) {
             icon="delete"
             onClick={onDeleteNote}
             popoverProps={{
-              interactionKind: "hover"
+              interactionKind: "hover",
             }}
           />
         </Menu>

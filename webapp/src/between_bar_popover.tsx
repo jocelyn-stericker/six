@@ -4,7 +4,7 @@ import {
   Tooltip,
   Menu,
   MenuItem,
-  MenuDivider
+  MenuDivider,
 } from "@blueprintjs/core";
 
 export interface Props {
@@ -18,7 +18,7 @@ export default function BetweenBarPopover({
   children,
   setTs,
   tsNum,
-  tsDen
+  tsDen,
 }: Props) {
   return (
     <Popover
@@ -26,7 +26,7 @@ export default function BetweenBarPopover({
       popoverClassName="bp3-dark"
       modifiers={
         {
-          preventOverflow: true
+          preventOverflow: true,
         } as any
       }
       interactionKind="click"
@@ -39,7 +39,7 @@ export default function BetweenBarPopover({
             popoverProps={{
               interactionKind: "hover",
               hoverCloseDelay: 350,
-              hoverOpenDelay: 350
+              hoverOpenDelay: 350,
             }}
           >
             <li className="bp3-menu-header">
@@ -125,7 +125,7 @@ export default function BetweenBarPopover({
             popoverProps={{
               interactionKind: "hover",
               hoverCloseDelay: 350,
-              hoverOpenDelay: 350
+              hoverOpenDelay: 350,
             }}
           >
             <MenuItem text="Treble" icon={"treble" as any} />
@@ -140,7 +140,7 @@ export default function BetweenBarPopover({
             popoverProps={{
               interactionKind: "hover",
               hoverCloseDelay: 350,
-              hoverOpenDelay: 350
+              hoverOpenDelay: 350,
             }}
           >
             <MenuItem icon="blank" text="G♭ Major / e♭ minor (6♭)" />
@@ -166,7 +166,7 @@ export default function BetweenBarPopover({
             popoverProps={{
               interactionKind: "hover",
               hoverCloseDelay: 350,
-              hoverOpenDelay: 350
+              hoverOpenDelay: 350,
             }}
           >
             <MenuItem icon="blank" text="Single" />

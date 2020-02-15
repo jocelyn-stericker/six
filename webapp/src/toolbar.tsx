@@ -39,7 +39,7 @@ export default function Toolbar(props: Props) {
         <div
           className={cx(
             "six-note-toolbar-mode",
-            props.tool === "notes" && "six-note-toolbar-mode-selected"
+            props.tool === "notes" && "six-note-toolbar-mode-selected",
           )}
           onClick={() => props.onSetTool("notes")}
           onTouchStart={() => props.onSetTool("notes")}
@@ -66,7 +66,7 @@ export default function Toolbar(props: Props) {
         <div
           className={cx(
             "six-note-toolbar-mode",
-            props.tool === "bars" && "six-note-toolbar-mode-selected"
+            props.tool === "bars" && "six-note-toolbar-mode-selected",
           )}
           onClick={() => props.onSetTool("bars")}
           onTouchStart={() => props.onSetTool("bars")}
@@ -122,7 +122,7 @@ export default function Toolbar(props: Props) {
         <div
           className={cx(
             "six-note-toolbar-action",
-            !props.canUndo && "six-note-toolbar-action-disabled"
+            !props.canUndo && "six-note-toolbar-action-disabled",
           )}
           onClick={props.onUndo}
         >

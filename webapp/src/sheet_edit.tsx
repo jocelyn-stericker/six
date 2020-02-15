@@ -37,7 +37,7 @@ function getProposedInsertion(
   appState: State,
   barEntity: number | null,
   time: [number, number, number] | null,
-  insertionDuration: Array<number>
+  insertionDuration: Array<number>,
 ): ProposedInsertion | null {
   if (!render) {
     return null;
@@ -54,7 +54,7 @@ function getProposedInsertion(
     time[1],
     time[2],
     insertionDuration[0],
-    insertionDuration[1]
+    insertionDuration[1],
   );
   const start = time[1] / time[2];
 
@@ -66,7 +66,7 @@ function getProposedInsertion(
       noteValue: rawDivisions[i],
       dots: rawDivisions[i + 1],
       startNum: rawDivisions[i + 2],
-      startDen: rawDivisions[i + 3]
+      startDen: rawDivisions[i + 3],
     });
   }
   if (!divisions.length) {
@@ -80,7 +80,7 @@ function getProposedInsertion(
         noteStart +
         note.divisions.reduce(
           (sum, { noteValue, dots }) => sum + count(noteValue, dots),
-          0
+          0,
         );
       // TODO: check if this note is in the middle of the proposed one.
       return (
@@ -96,7 +96,7 @@ function getProposedInsertion(
     barIdx: time[0],
     startNum: time[1],
     startDen: time[2],
-    divisions
+    divisions,
   };
 }
 
@@ -109,14 +109,14 @@ const STEPS = [
   [3, 16],
   [1, 8],
   [3, 32],
-  [1, 16]
+  [1, 16],
 ];
 
 function SheetEdit({ tool, appState, dispatch }: Props) {
   const [insertionDuration, setInsertionDuration] = useState([1, 8]);
   const [
     proposedInsertion,
-    setProposedInsertion
+    setProposedInsertion,
   ] = useState<ProposedInsertion | null>(null);
 
   const songRef = useRef<Render>(null);
@@ -131,9 +131,9 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
   const barRefs = useMemo(
     () =>
       Array.from({ length: appState.song.part.bars.length }).map(() =>
-        createRef<number>()
+        createRef<number>(),
       ),
-    [appState.song.part.bars.length]
+    [appState.song.part.bars.length],
   );
 
   const hoverMatchesAny = false;
@@ -155,8 +155,8 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
               appState,
               barRefs[time[0]].current,
               time,
-              insertionDuration
-            )
+              insertionDuration,
+            ),
           );
         }}
         onMouseMove={ev => {
@@ -166,7 +166,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
             let step = STEPS.findIndex(
               x =>
                 x[0] === dragState.origInsertionDuration[0] &&
-                x[1] === dragState.origInsertionDuration[1]
+                x[1] === dragState.origInsertionDuration[1],
             );
             step = Math.min(Math.max(step - steps, 0), STEPS.length - 1);
             const frac = STEPS[step];
@@ -183,10 +183,10 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                   [
                     proposedInsertion.barIdx,
                     proposedInsertion.startNum,
-                    proposedInsertion.startDen
+                    proposedInsertion.startDen,
                   ],
-                  frac
-                )
+                  frac,
+                ),
               );
             }
           }
@@ -195,7 +195,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
           setDragState({
             startX: ev.clientX,
             startY: ev.clientY,
-            origInsertionDuration: [insertionDuration[0], insertionDuration[1]]
+            origInsertionDuration: [insertionDuration[0], insertionDuration[1]],
           });
         }}
         onMouseUp={() => {
@@ -214,7 +214,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
               barIdx: proposedInsertion.barIdx,
               startNum: proposedInsertion.startNum,
               startDen: proposedInsertion.startDen,
-              divisions: proposedInsertion.divisions
+              divisions: proposedInsertion.divisions,
             });
             setNumChanges(numChanges + 1);
           }
@@ -225,6 +225,8 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
           key={`${appState.song.global.tsNum}_${appState.song.global.tsDen}`}
           ref={songRef}
           boundingClassName={dragState && "six-note-drag"}
+          width={215.9}
+          height={279.4}
         >
           <staff>
             <between
@@ -245,7 +247,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                           num,
                           den,
                           prevNum: appState.song.global.tsNum,
-                          prevDen: appState.song.global.tsDen
+                          prevDen: appState.song.global.tsDen,
                         })
                       }
                     >
@@ -253,7 +255,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                         style={{
                           width,
                           height,
-                          cursor: "pointer"
+                          cursor: "pointer",
                         }}
                       />
                     </BetweenBarPopover>
@@ -286,9 +288,9 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                       {
                         divisions,
                         startNum: tiedStartNum,
-                        startDen: tiedStartDen
+                        startDen: tiedStartDen,
                       },
-                      divisionIdx
+                      divisionIdx,
                     ) => (
                       <React.Fragment key={divisionIdx}>
                         {divisions.map(
@@ -314,7 +316,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                                           barIdx,
                                           startNum: tiedStartNum,
                                           startDen: tiedStartDen,
-                                          divisions
+                                          divisions,
                                         });
                                       }}
                                     >
@@ -325,7 +327,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                                         style={{
                                           width,
                                           height,
-                                          cursor: "pointer"
+                                          cursor: "pointer",
                                         }}
                                       />
                                     </NotePopover>
@@ -333,10 +335,10 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                                 ))
                               }
                             />
-                          )
+                          ),
                         )}
                       </React.Fragment>
-                    )
+                    ),
                   )}
                   {tool === "notes" &&
                     !hoverMatchesAny &&
@@ -347,7 +349,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                         key={idx}
                         boundingClassName={cx(
                           "six-note-to-add-bg",
-                          dragState && "six-note-drag"
+                          dragState && "six-note-drag",
                         )}
                         className="six-note-to-add"
                         noteValue={div.noteValue}
@@ -377,7 +379,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                               num,
                               den,
                               prevNum: appState.song.global.tsNum,
-                              prevDen: appState.song.global.tsDen
+                              prevDen: appState.song.global.tsDen,
                             })
                           }
                         >
@@ -385,7 +387,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                             style={{
                               width,
                               height,
-                              cursor: "pointer"
+                              cursor: "pointer",
                             }}
                           />
                         </BetweenBarPopover>

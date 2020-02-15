@@ -78,51 +78,51 @@ export function getInitialState(): State {
       v: "0.1.0",
       global: {
         tsNum: 4,
-        tsDen: 4
+        tsDen: 4,
       },
       part: {
         bars: [
           {
             notes: [],
-            barline: "normal"
+            barline: "normal",
           },
           {
             notes: [],
-            barline: "normal"
+            barline: "normal",
           },
           {
             notes: [],
-            barline: "normal"
+            barline: "normal",
           },
           {
             notes: [],
-            barline: "normal"
+            barline: "normal",
           },
           {
             notes: [],
-            barline: "normal"
+            barline: "normal",
           },
           {
             notes: [],
-            barline: "normal"
+            barline: "normal",
           },
           {
             notes: [],
-            barline: "normal"
+            barline: "normal",
           },
           {
             notes: [],
-            barline: "normal"
+            barline: "normal",
           },
           {
             notes: [],
-            barline: "final"
-          }
-        ]
-      }
+            barline: "final",
+          },
+        ],
+      },
     },
     undoStack: [],
-    redoStack: []
+    redoStack: [],
   };
 }
 
@@ -134,7 +134,7 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         barIdx: action.barIdx,
         startNum: action.startNum,
         startDen: action.startDen,
-        divisions: action.divisions
+        divisions: action.divisions,
       };
     case "ADD_NOTE":
       return {
@@ -142,7 +142,7 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         barIdx: action.barIdx,
         startNum: action.startNum,
         startDen: action.startDen,
-        divisions: action.divisions
+        divisions: action.divisions,
       };
     case "SET_TS":
       return {
@@ -150,7 +150,7 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         num: action.prevNum,
         den: action.prevDen,
         prevNum: action.num,
-        prevDen: action.den
+        prevDen: action.den,
       };
   }
 }
@@ -163,7 +163,7 @@ function apply(state: State, action: ApplyInvertAction) {
       return;
     }
     barObj.notes = barObj.notes.filter(
-      notes => notes.startNum !== startNum || notes.startDen !== startDen
+      notes => notes.startNum !== startNum || notes.startDen !== startDen,
     );
   } else if (action.type === "ADD_NOTE") {
     const { barIdx, startNum, startDen, divisions } = action;
@@ -174,7 +174,7 @@ function apply(state: State, action: ApplyInvertAction) {
     barObj.notes.push({
       startNum,
       startDen,
-      divisions
+      divisions,
     });
   } else if (action.type === "SET_TS") {
     const { num, den } = action;

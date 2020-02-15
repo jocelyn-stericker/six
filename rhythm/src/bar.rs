@@ -7,9 +7,21 @@ use num_traits::{sign::Signed, One, Zero};
 use std::collections::{BTreeSet, BinaryHeap};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+/// Why this this element created?
 pub enum Lifetime {
+    /// This is a rest that was automatically inserted by the program.
+    ///
+    /// This should be considered empty space, and can be replaced without explicit user intent.
     AutomaticRest,
+
+    /// The user is hovering over a space and this is a preview.
+    ///
+    /// Moving the cursor will remove this note or rest.
     Temporary(Entity),
+
+    /// The user has added this note.
+    ///
+    /// Explicit user intent is required to remove it.
     Explicit(Entity),
 }
 
@@ -564,13 +576,14 @@ impl Bar {
         let mut existing_note_start = Rational::new(0, 1);
         for (existing_note, entity) in &self.rhythm {
             let existing_note_end = existing_note_start + existing_note.duration();
-            if existing_note_start != t
-                && entity.is_explicit()
-                && existing_note_start >= t
-                && existing_note_start < t_end
-            {
-                duration = Duration::exact(existing_note_start - t, None);
-                break;
+            if entity.is_explicit() {
+                if existing_note_start >= t && existing_note_start < t_end {
+                    duration = Duration::exact(existing_note_start - t, None);
+                    break;
+                }
+                if existing_note_start < t && existing_note_end > t {
+                    return vec![];
+                }
             }
 
             existing_note_start = existing_note_end;

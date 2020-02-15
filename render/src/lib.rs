@@ -9,8 +9,8 @@ use entity::{EntitiesRes, Entity, Join};
 use kurbo::Rect;
 use num_rational::Rational;
 use rest_note_chord::{
-    sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_relative_spacing,
-    sys_update_rnc_timing, RestNoteChord, SpaceTimeWarp,
+    sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_update_rnc_timing,
+    RestNoteChord, SpaceTimeWarp,
 };
 use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing, Start};
 use staff::{
@@ -25,6 +25,12 @@ use wasm_bindgen::prelude::*;
 pub struct Song {
     freeze_spacing: Option<isize>,
     prev_freeze_spacing: Option<isize>,
+
+    /// In mm
+    width: f64,
+
+    /// In mm
+    height: f64,
 }
 
 #[wasm_bindgen]
@@ -129,7 +135,7 @@ impl Render {
     }
 
     /// Create a song, without attaching it as the document root.
-    pub fn song_create(&mut self, freeze_spacing: Option<isize>) -> usize {
+    pub fn song_create(&mut self, freeze_spacing: Option<isize>, width: f64, height: f64) -> usize {
         let entity = self.entities.create();
 
         self.songs.insert(
@@ -137,6 +143,8 @@ impl Render {
             Song {
                 freeze_spacing,
                 prev_freeze_spacing: None,
+                width,
+                height,
             },
         );
         self.ordered_children.insert(entity, vec![]);
@@ -149,6 +157,14 @@ impl Render {
         let entity = Entity::new(entity);
         if let Some(song) = self.songs.get_mut(&entity) {
             song.freeze_spacing = freeze_spacing;
+        }
+    }
+
+    pub fn song_set_size(&mut self, entity: usize, width: f64, height: f64) {
+        let entity = Entity::new(entity);
+        if let Some(song) = self.songs.get_mut(&entity) {
+            song.width = width;
+            song.height = height;
         }
     }
 
@@ -452,27 +468,28 @@ impl Render {
         );
 
         sys_print_rnc(&self.rncs, &mut self.stencils);
+        sys_print_between_bars(&self.between_bars, &mut self.stencils);
+
         if self.keep_spacing() {
             sys_apply_warp(&self.bars, &mut self.spacing, &self.warps);
         } else {
-            sys_relative_spacing(
-                &self.rncs,
-                &self.parents,
+            // TODO(joshuan): scale is fixed as rastal size 3.
+            sys_break_into_lines(
+                &self.entities,
+                self.root
+                    .and_then(|root| self.songs.get(&root))
+                    .map(|root| (root.width / 7.0 * 1000.0, root.height / 7.0 * 1000.0)),
                 &self.bars,
+                &self.rncs,
                 &self.stencils,
                 &mut self.spacing,
+                &mut self.staffs,
+                &mut self.parents,
+                &mut self.ordered_children,
+                &mut self.line_of_staffs,
             );
             sys_record_space_time_warp(&self.bars, &self.spacing, &mut self.warps);
         }
-        sys_print_between_bars(&self.between_bars, &mut self.stencils);
-
-        sys_break_into_lines(
-            &self.entities,
-            &mut self.staffs,
-            &mut self.parents,
-            &mut self.ordered_children,
-            &mut self.line_of_staffs,
-        );
 
         sys_print_staff(
             &mut self.line_of_staffs,
@@ -523,6 +540,16 @@ impl Render {
 
     pub fn get_root_id(&self) -> Option<usize> {
         self.root.map(|root| root.id())
+    }
+
+    pub fn get_song_width(&self, song: usize) -> Option<f64> {
+        let song = Entity::new(song);
+        self.songs.get(&song).map(|song| song.width)
+    }
+
+    pub fn get_song_height(&self, song: usize) -> Option<f64> {
+        let song = Entity::new(song);
+        self.songs.get(&song).map(|song| song.height)
     }
 
     pub fn get_stencil_bboxes(&self) -> String {
@@ -614,26 +641,30 @@ impl Render {
     ) -> Vec<isize> {
         if let Some(bar) = self.bars.get(&Entity::new(bar)) {
             let mut start = Rational::new(start_num, start_den);
-            bar.split_note(
+            let solution = bar.split_note(
                 start,
                 Duration::exact(Rational::new(duration_num, duration_den), None),
-            )
-            .into_iter()
-            .map(|part| {
-                let my_start = start;
-                start += part.duration();
-                vec![
-                    part.duration_display_base()
-                        .map(|d| d as isize)
-                        .unwrap_or(0),
-                    part.display_dots().map(|d| d as isize).unwrap_or(0),
-                    *my_start.numer(),
-                    *my_start.denom(),
-                ]
+            );
+
+            let formatted_solution = solution
                 .into_iter()
-            })
-            .flatten()
-            .collect()
+                .map(|part| {
+                    let my_start = start;
+                    start += part.duration();
+                    vec![
+                        part.duration_display_base()
+                            .map(|d| d as isize)
+                            .unwrap_or(0),
+                        part.display_dots().map(|d| d as isize).unwrap_or(0),
+                        *my_start.numer(),
+                        *my_start.denom(),
+                    ]
+                    .into_iter()
+                })
+                .flatten()
+                .collect();
+
+            formatted_solution
         } else {
             vec![]
         }
@@ -661,7 +692,7 @@ mod tests {
         use stencil::snapshot;
 
         let mut render = Render::default();
-        let song = render.song_create(None);
+        let song = render.song_create(None, 215.9, 279.4);
 
         let staff = render.staff_create();
         let clef = render.between_bars_create(None, true, Some(4), Some(4));

@@ -10,17 +10,17 @@ const dist = path.resolve(__dirname, "dist");
 module.exports = {
   mode: "production",
   resolve: {
-    extensions: [".ts", ".tsx", ".js", ".jsx"]
+    extensions: [".ts", ".tsx", ".js", ".jsx"],
   },
   module: {
     rules: [
       {
         test: /\.(eot|ttf|woff|woff2|svg|png|gif|jpe?g)$/,
-        use: [{ loader: "file-loader" }]
+        use: [{ loader: "file-loader" }],
       },
       {
         test: /\.css$/i,
-        use: ["style-loader", "css-loader"]
+        use: ["style-loader", "css-loader"],
       },
       {
         test: /\.m?[jt]sx?$/,
@@ -31,41 +31,48 @@ module.exports = {
             presets: [
               "@babel/preset-env",
               "@babel/preset-react",
-              "@babel/preset-typescript"
-            ]
-          }
-        }
-      }
-    ]
+              "@babel/preset-typescript",
+            ],
+          },
+        },
+      },
+    ],
   },
   entry: {
-    index: "./src/index.tsx"
+    index: "./src/index.tsx",
   },
   output: {
     path: dist,
-    filename: "[name].js"
+    filename: "[name].js",
   },
   devServer: {
-    contentBase: dist
+    contentBase: dist,
   },
   plugins: [
     new CopyPlugin([path.resolve(__dirname, "static")]),
 
     new WasmPackPlugin({
       crateDirectory: path.resolve(__dirname, "..", "render"),
-      outDir: path.resolve(__dirname, "rust_render_built")
+      outDir: path.resolve(__dirname, "rust_render_built"),
+      watchDirectories: [
+        path.resolve(__dirname, "..", "entity"),
+        path.resolve(__dirname, "..", "rest_note_chord"),
+        path.resolve(__dirname, "..", "rhythm"),
+        path.resolve(__dirname, "..", "staff"),
+        path.resolve(__dirname, "..", "stencil"),
+      ],
     }),
 
     new NormalModuleReplacementPlugin(
       /.*\/generated\/iconSvgPaths.*/,
-      path.resolve(__dirname, "src/blueprint/icons.js")
+      path.resolve(__dirname, "src/blueprint/icons.js"),
     ),
 
     new NormalModuleReplacementPlugin(
       /.*dom4.*/,
-      path.resolve(__dirname, "src/blueprint/blank.js")
-    )
+      path.resolve(__dirname, "src/blueprint/blank.js"),
+    ),
 
     // new BundleAnalyzerPlugin()
-  ].filter(a => !!a)
+  ].filter(a => !!a),
 };

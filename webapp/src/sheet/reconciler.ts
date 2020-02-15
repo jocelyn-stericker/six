@@ -19,7 +19,7 @@ export function newRender(): Render {
   return Object.assign(_Render.new(), {
     classNames: {} as { [key: string]: string },
     boundingClassNames: {} as { [key: string]: string },
-    html: {} as { [key: string]: any }
+    html: {} as { [key: string]: any },
   });
 }
 
@@ -35,7 +35,7 @@ export enum NoteValue {
   ThirtySecond = -5,
   SixtyFourth = -6,
   HundredTwentyEighth = -7,
-  TwoHundredFiftySixth = -8
+  TwoHundredFiftySixth = -8,
 }
 
 interface Instance {
@@ -60,6 +60,10 @@ export interface SongProps extends Stylable {
   ref?: Ref<Render>;
   freezeSpacing?: number | undefined;
   children: React.ReactNode;
+  /** In mm */
+  width: number;
+  /** In mm */
+  height: number;
 }
 
 export interface StaffProps extends Stylable {
@@ -108,7 +112,7 @@ type CreateInstanceParam =
 
 function createInstance(
   spec: CreateInstanceParam,
-  container: Render
+  container: Render,
 ): Instance | null {
   let type: "song" | "staff" | "bar" | "between" | "rnc";
   let entity;
@@ -119,7 +123,9 @@ function createInstance(
     entity = container.song_create(
       typeof spec.props.freezeSpacing === "number"
         ? spec.props.freezeSpacing
-        : undefined
+        : undefined,
+      spec.props.width,
+      spec.props.height,
     );
   } else if (spec.type === "staff") {
     type = "staff";
@@ -133,7 +139,7 @@ function createInstance(
       spec.props.barline,
       spec.props.clef || false,
       spec.props.tsNum || undefined,
-      spec.props.tsDen || undefined
+      spec.props.tsDen || undefined,
     );
   } else if (spec.type === "rnc") {
     type = "rnc";
@@ -142,10 +148,10 @@ function createInstance(
       spec.props.dots,
       spec.props.startNum,
       spec.props.startDen,
-      spec.props.isNote
+      spec.props.isNote,
     );
     meta = {
-      isTemporary: spec.props.isTemporary || false
+      isTemporary: spec.props.isTemporary || false,
     };
   } else {
     throw new Error(`Invalid type in sheet music reconciler: <${spec.type} />`);
@@ -175,7 +181,7 @@ function appendChild(parent: Instance, child: Instance) {
     parent.container.bar_insert(
       parent.entity,
       child.entity,
-      child.meta.isTemporary
+      child.meta.isTemporary,
     );
   } else {
     parent.container.child_append(parent.entity, child.entity);
@@ -192,7 +198,7 @@ const Reconciler = ReactReconciler({
     _text,
     _rootContainerInstance: Render,
     _hostContext,
-    _internalInstanceHandle
+    _internalInstanceHandle,
   ) {
     throw new Error("Text not supported.");
   },
@@ -226,7 +232,7 @@ const Reconciler = ReactReconciler({
   insertInContainerBefore(
     _container: Render,
     _child: Instance,
-    _before: Instance
+    _before: Instance,
   ) {
     throw new Error("The root can only have one child");
   },
@@ -235,13 +241,13 @@ const Reconciler = ReactReconciler({
       parent.container.bar_insert(
         parent.entity,
         child.entity,
-        child.meta.isTemporary || false
+        child.meta.isTemporary || false,
       );
     } else {
       parent.container.child_insert_before(
         parent.entity,
         before.entity,
-        child.entity
+        child.entity,
       );
     }
   },
@@ -252,7 +258,7 @@ const Reconciler = ReactReconciler({
     _oldProps: any,
     _newProps: any,
     _rootContainerInstance: Render,
-    _currentHostContext
+    _currentHostContext,
   ) {
     return {};
   },
@@ -262,12 +268,23 @@ const Reconciler = ReactReconciler({
     type,
     oldProps: any,
     newProps: any,
-    _finishedWork
+    _finishedWork,
   ) {
     if (type === "song" && oldProps.freezeSpacing !== newProps.freezeSpacing) {
       instance.container.song_set_freeze_spacing(
         instance.entity,
-        newProps.freezeSpacing
+        newProps.freezeSpacing,
+      );
+    }
+
+    if (
+      type === "song" &&
+      (oldProps.width !== newProps.width || oldProps.height !== newProps.height)
+    ) {
+      instance.container.song_set_size(
+        instance.entity,
+        newProps.width,
+        newProps.height,
       );
     }
 
@@ -284,7 +301,7 @@ const Reconciler = ReactReconciler({
         newProps.dots,
         newProps.startNum,
         newProps.startDen,
-        newProps.isTemporary
+        newProps.isTemporary,
       );
     }
 
@@ -299,7 +316,7 @@ const Reconciler = ReactReconciler({
         newProps.barline,
         newProps.clef,
         newProps.tsNum,
-        newProps.tsDen
+        newProps.tsDen,
       );
     }
 
@@ -348,7 +365,7 @@ const Reconciler = ReactReconciler({
   cancelDeferredCallback() {},
   scheduleDeferredCallback() {
     return false;
-  }
+  },
 });
 
 const roots = new Map<Render, ReactReconciler.FiberRoot>();
@@ -370,5 +387,5 @@ Reconciler.injectIntoDevTools({
   // @ts-ignore
   findFiberByHostInstance() {
     return null;
-  }
+  },
 });

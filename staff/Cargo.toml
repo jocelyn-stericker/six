@@ -10,6 +10,7 @@ repository = "https://github.com/jnetterf/six"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+rest_note_chord = {path = "../rest_note_chord"}
 rhythm = {path = "../rhythm"}
 stencil = {path = "../stencil"}
 entity = {path = "../entity"}

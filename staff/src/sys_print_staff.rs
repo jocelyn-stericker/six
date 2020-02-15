@@ -15,10 +15,8 @@ pub fn sys_print_staff(
     children: &HashMap<Entity, Vec<Entity>>,
 ) {
     for (staff_entity, (staff, children)) in (line_of_staffs, children).join() {
-        let mut staff_advance = 0.0f64;
+        let mut staff_advance = 1000.0f64;
         let mut staff_stencil = StencilMap::default();
-
-        eprintln!("{:?} {:?}", staff_entity, children);
 
         for child in children {
             if let Some(bar) = bars.get(&child) {
