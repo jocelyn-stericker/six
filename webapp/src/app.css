@@ -57,6 +57,7 @@ html body, html .ui-text {
     flex: 1;
     display: block;
     z-index: 0;
+    max-width: 1000px;
 }
 
 .six-note-editor-noteview-placeholder {
@@ -71,7 +72,8 @@ html body, html .ui-text {
 }
 
 svg {
-    z-index: -1;
+    /* I don't know what's going on here, but without this, Firefox randomly blurs on hover on non-retina. */
+    filter: grayscale(0%);
 }
 
 .six-real-note {

@@ -2,10 +2,11 @@ use num_rational::Rational;
 
 use crate::{LineOfStaff, Staff};
 use entity::{EntitiesRes, Entity, Join};
-use rest_note_chord::RestNoteChord;
 use rhythm::{Bar, Duration, RelativeRhythmicSpacing};
 use std::collections::HashMap;
 use stencil::Stencil;
+
+pub(crate) const STAFF_MARGIN: f64 = 2500f64;
 
 #[derive(Debug, Clone)]
 struct PartialSolution {
@@ -19,7 +20,7 @@ struct PartialSolution {
 impl Default for PartialSolution {
     fn default() -> PartialSolution {
         PartialSolution {
-            shortest: Rational::new(1, 4),
+            shortest: Rational::new(1, 8),
             entities: vec![],
             children: vec![],
             width: 0f64,
@@ -29,18 +30,10 @@ impl Default for PartialSolution {
 }
 
 impl PartialSolution {
-    fn add_bar(
-        &mut self,
-        entity: Entity,
-        bar: &Bar,
-        rncs: &HashMap<Entity, RestNoteChord>,
-        stencils: &HashMap<Entity, Stencil>,
-    ) {
+    fn add_bar(&mut self, entity: Entity, bar: &Bar, stencils: &HashMap<Entity, Stencil>) {
         self.entities.push(entity);
-        for (_, _, entity, _) in bar.children() {
+        for (duration, _, entity, _) in bar.children() {
             let stencil = &stencils[&entity];
-            let rnc = &rncs[&entity];
-            let duration = rnc.duration;
             self.shortest = self.shortest.min(duration.duration());
             self.children
                 .push((entity, Some(duration), stencil.rect().x1));
@@ -54,7 +47,7 @@ impl PartialSolution {
             }
         }
 
-        let advance_step = advance_step + 100.0; // freeze
+        let advance_step = advance_step + 100.0;
 
         self.width = 0.0;
         for (_, time, min_width) in &self.children {
@@ -72,7 +65,7 @@ impl PartialSolution {
     fn add_between(&mut self, entity: Entity, between: &Stencil) {
         self.entities.push(entity);
 
-        let w = between.rect().x1;
+        let w = between.advance();
         self.children.push((entity, None, w));
         self.width += w;
         self.is_valid = true;
@@ -87,30 +80,37 @@ impl PartialSolution {
         spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
     ) {
         let mut advance_step = 400.0f64;
-        for (_, time, min_width) in &self.children {
-            if let Some(time) = time {
-                advance_step = advance_step
-                    .max(min_width / RelativeRhythmicSpacing::new(self.shortest, time).relative);
+        for (_, duration, min_width) in &self.children {
+            if let Some(duration) = duration {
+                advance_step = advance_step.max(
+                    min_width / RelativeRhythmicSpacing::new(self.shortest, duration).relative,
+                );
             }
         }
 
-        advance_step += 100.0;
+        advance_step = advance_step + 100.0;
 
         let mut spring_width = 0.0;
         let mut strut_width = 0.0;
+        let mut advances = 0.0;
 
-        for (_, time, min_width) in &self.children {
-            if let Some(time) = time {
+        for (i, (_, duration, min_width)) in self.children.iter().enumerate() {
+            if let Some(duration) = duration {
                 spring_width +=
-                    advance_step * RelativeRhythmicSpacing::new(self.shortest, time).relative;
+                    advance_step * RelativeRhythmicSpacing::new(self.shortest, duration).relative;
+                advances += RelativeRhythmicSpacing::new(self.shortest, duration).relative;
             } else {
+                if i != 0 {
+                    // HACK: padding after bar.
+                    strut_width += 200f64;
+                }
                 strut_width += min_width;
             }
         }
 
         let extra_width_to_allocate = width - spring_width - strut_width;
 
-        advance_step *= (spring_width + extra_width_to_allocate) / spring_width;
+        advance_step += extra_width_to_allocate / advances;
 
         for maybe_bar in &self.entities {
             if let Some(bar) = bars.get(maybe_bar) {
@@ -134,7 +134,6 @@ pub fn sys_break_into_lines(
     entities: &EntitiesRes,
     page_size: Option<(f64, f64)>,
     bars: &HashMap<Entity, Bar>,
-    rncs: &HashMap<Entity, RestNoteChord>,
     stencils: &HashMap<Entity, Stencil>,
     spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
     staffs: &mut HashMap<Entity, Staff>,
@@ -146,8 +145,7 @@ pub fn sys_break_into_lines(
         return;
     }
 
-    let width = page_size.unwrap().0;
-    let margin = 4000f64;
+    let width = page_size.unwrap().0 - STAFF_MARGIN * 2f64;
 
     let mut to_add = vec![];
     for (staff_id, (staff, children)) in (staffs, &mut *ordered_children).join() {
@@ -159,19 +157,22 @@ pub fn sys_break_into_lines(
         // This is greedy.
         for child in children {
             if let Some(bar) = bars.get(child) {
-                current_solution.add_bar(*child, bar, rncs, stencils);
-                next_solution.add_bar(*child, bar, rncs, stencils);
+                current_solution.add_bar(*child, bar, stencils);
+                next_solution.add_bar(*child, bar, stencils);
             } else if let Some(stencil) = stencils.get(child) {
                 current_solution.add_between(*child, stencil);
                 next_solution.add_between(*child, stencil);
+            } else {
+                panic!();
             }
 
             if current_solution.is_valid {
-                if current_solution.width < width - margin {
+                eprintln!("{:?} {:?}", current_solution.width, width);
+                if current_solution.width < width {
                     good_solution = current_solution.clone();
                     next_solution = PartialSolution::default();
                 } else {
-                    good_solution.apply_spacing(width - margin, bars, spacing);
+                    good_solution.apply_spacing(width, bars, spacing);
                     let PartialSolution { entities, .. } = good_solution;
                     current_solution = next_solution.clone();
                     good_solution = PartialSolution::default();
@@ -185,9 +186,13 @@ pub fn sys_break_into_lines(
 
         if !current_solution.entities.is_empty() {
             // Pad the spacing a bit.
-            let extra_space = (width - margin - current_solution.width) / 8f64;
+            let extra_space = (width - current_solution.width) / 8f64;
             current_solution.apply_spacing(current_solution.width + extra_space, bars, spacing);
             chunks.push(current_solution.entities);
+        }
+
+        while staff.lines.len() > chunks.len() {
+            staff.lines.pop();
         }
 
         for (line_number, line) in chunks.into_iter().enumerate() {

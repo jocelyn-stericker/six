@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::sys_break_into_lines::STAFF_MARGIN;
 use crate::LineOfStaff;
 use entity::{Entity, Join};
 use kurbo::{Rect, TranslateScale, Vec2};
@@ -15,13 +16,13 @@ pub fn sys_print_staff(
     children: &HashMap<Entity, Vec<Entity>>,
 ) {
     for (staff_entity, (staff, children)) in (line_of_staffs, children).join() {
-        let mut staff_advance = 1000.0f64;
+        let mut staff_advance = STAFF_MARGIN;
         let mut staff_stencil = StencilMap::default();
 
         for child in children {
             if let Some(bar) = bars.get(&child) {
                 let mut bar_stencil = StencilMap::default();
-                let start = 200f64;
+                let start = 0f64;
                 let mut advance = start;
                 for (_, _, entity, _) in bar.children() {
                     let relative_spacing = spacing[&entity];

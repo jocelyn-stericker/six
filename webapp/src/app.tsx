@@ -5,6 +5,7 @@ import "./app.css";
 import Toolbar, { Tool } from "./toolbar";
 import { reduce, getInitialState } from "./store";
 import About from "./about";
+import Meta from "./meta";
 
 const AppHotkeys = React.lazy(() => import("./app_hotkeys"));
 const SheetEdit = React.lazy(() => import("./sheet_edit"));
@@ -16,6 +17,7 @@ export default function App() {
   return (
     <React.Fragment>
       <About />
+      <Meta appState={appState} dispatch={dispatch} />
       <div className="six-note-editor">
         <Toolbar
           tool={tool}

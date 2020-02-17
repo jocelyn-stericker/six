@@ -64,6 +64,7 @@ export interface SongProps extends Stylable {
   width: number;
   /** In mm */
   height: number;
+  title: string;
 }
 
 export interface StaffProps extends Stylable {
@@ -110,6 +111,19 @@ type CreateInstanceParam =
   | { type: "rnc"; props: RncProps }
   | { type: never; props: never };
 
+let context = document.createElement("canvas").getContext("2d", {});
+
+function getTextWidth(text: string) {
+  if (!context) {
+    return 0;
+  }
+  // TODO: sync title font with sys_print_meta.rs.
+  context.font =
+    '7px Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif';
+
+  return context.measureText(text).width;
+}
+
 function createInstance(
   spec: CreateInstanceParam,
   container: Render,
@@ -120,12 +134,15 @@ function createInstance(
 
   if (spec.type === "song") {
     type = "song";
+    const title = spec.props.title || "Untitled";
     entity = container.song_create(
       typeof spec.props.freezeSpacing === "number"
         ? spec.props.freezeSpacing
         : undefined,
       spec.props.width,
       spec.props.height,
+      title,
+      getTextWidth(title),
     );
   } else if (spec.type === "staff") {
     type = "staff";
@@ -285,6 +302,15 @@ const Reconciler = ReactReconciler({
         instance.entity,
         newProps.width,
         newProps.height,
+      );
+    }
+
+    if (type === "song" && oldProps.title !== newProps.title) {
+      const title = newProps.title || "Untitled";
+      instance.container.song_set_title(
+        instance.entity,
+        title,
+        getTextWidth(title),
       );
     }
 

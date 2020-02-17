@@ -12,9 +12,9 @@ pub fn sys_print_song(
     children: &HashMap<Entity, Vec<Entity>>,
     stencil_maps: &mut HashMap<Entity, StencilMap>,
 ) {
-    for (_id, (_song, children, render)) in (songs, children, stencil_maps).join() {
+    for (_id, (song, children, render)) in (songs, children, stencil_maps).join() {
         let mut map = StencilMap::new();
-        let mut h = 0.0;
+        let mut h = 4500.0;
         for child in children {
             if let Some(staff) = staffs.get(child) {
                 for line in &staff.lines {
@@ -30,8 +30,9 @@ pub fn sys_print_song(
                 }
             }
         }
-        *render = map
-            .with_translation(Vec2::new(200.0, -1500.0))
-            .with_paper_size(3);
+        if let Some(title_stencil) = song.title_stencil {
+            map = map.and(title_stencil, None);
+        }
+        *render = map.with_paper_size(3);
     }
 }

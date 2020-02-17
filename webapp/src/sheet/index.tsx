@@ -171,7 +171,7 @@ export default function SheetMusicView(props: Props) {
         onMouseDownCapture={makeMouseHandler(props.onMouseDown)}
         onMouseUpCapture={makeMouseHandler(props.onMouseUp)}
         onClick={makeMouseHandler(props.onClick)}
-        onMouseMoveCapture={ev => {
+        onMouseMove={ev => {
           if (!svg || !svg.current || !stencilMeta) {
             return;
           }
@@ -204,7 +204,7 @@ export default function SheetMusicView(props: Props) {
           }
         }}
       >
-        <g transform="scale(1, -1)">
+        <g transform="scale(1, -1)" style={{ pointerEvents: "none" }}>
           {stencilMeta &&
             Object.entries(container.boundingClassNames).map(
               ([id, className]) => {
@@ -215,24 +215,22 @@ export default function SheetMusicView(props: Props) {
                 return (
                   <rect
                     key={id}
-                    x={meta[0]}
-                    y={meta[1]}
-                    width={meta[2] - meta[0]}
-                    height={meta[3] - meta[1]}
+                    x={Math.round(meta[0])}
+                    y={Math.round(meta[1])}
+                    width={Math.round(meta[2] - meta[0])}
+                    height={Math.round(meta[3] - meta[1])}
                     className={className}
                   />
                 );
               },
             )}
           {root && stencils && stencils[root] && stencilMeta && (
-            <g style={{ pointerEvents: "none" }}>
-              <StencilView
-                id={root}
-                stencils={stencils}
-                stencilMeta={stencilMeta}
-                classNames={container.classNames}
-              />
-            </g>
+            <StencilView
+              id={root}
+              stencils={stencils}
+              stencilMeta={stencilMeta}
+              classNames={container.classNames}
+            />
           )}
         </g>
       </svg>
@@ -265,8 +263,8 @@ export default function SheetMusicView(props: Props) {
               key={id}
               style={{
                 position: "absolute",
-                left: pt2.x - bound.left,
-                top: pt3.y - bound.top,
+                left: Math.round(pt2.x - bound.left),
+                top: Math.round(pt3.y - bound.top),
                 width,
                 height,
               }}

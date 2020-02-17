@@ -18,13 +18,21 @@ pub struct Path {
 }
 
 #[derive(Debug, Clone)]
+pub struct Text {
+    pub(crate) text: String,
+    pub(crate) font_size: f64,
+    pub(crate) width: f64,
+}
+
+#[derive(Debug, Clone)]
 pub struct CombineStencil(pub Vec<Stencil>);
 
 #[derive(Debug, Clone)]
 pub enum Stencil {
     Path(Path),
+    Text(Text),
     Combine(CombineStencil),
-    TranslateScale(TranslateScale, Box<Stencil>),
+    TranslateScale(TranslateScale, bool, Box<Stencil>),
 }
 
 /// Normalized normal vector of line.
@@ -40,12 +48,54 @@ fn tangent(line: Line) -> Vec2 {
 
 const BEZIER_CIRCLE_FACTOR: f64 = 0.552_284_8;
 
+fn escape(s: &str) -> String {
+    // From https://doc.rust-lang.org/1.1.0/src/rustdoc/html/escape.rs.html#20
+    let mut parts = vec![];
+
+    // Because the internet is always right, turns out there's not that many
+    // characters to escape: http://stackoverflow.com/questions/7381974
+    let pile_o_bits = s;
+    let mut last = 0;
+    for (i, ch) in s.bytes().enumerate() {
+        match ch as char {
+            '<' | '>' | '&' | '\'' | '"' => {
+                parts.push(&pile_o_bits[last..i]);
+                let replace = match ch as char {
+                    '>' => "&gt;",
+                    '<' => "&lt;",
+                    '&' => "&amp;",
+                    '\'' => "&#39;",
+                    '"' => "&quot;",
+                    _ => unreachable!(),
+                };
+                parts.push(replace);
+                last = i + 1;
+            }
+            _ => {}
+        }
+    }
+
+    if last < s.len() {
+        parts.push(&pile_o_bits[last..]);
+    }
+
+    parts.concat()
+}
+
 impl Stencil {
     pub fn padding(advance: f64) -> Stencil {
         Stencil::Path(Path {
             outline: BezPath::default(),
             bounds: Rect::new(0.0, 0.0, advance, 0.0),
             advance,
+        })
+    }
+
+    pub fn text(text: &str, font_size: f64, width: f64) -> Stencil {
+        Stencil::Text(Text {
+            text: text.to_owned(),
+            font_size,
+            width,
         })
     }
 
@@ -489,11 +539,19 @@ impl Stencil {
     }
 
     pub fn with_translation(self, offset: Vec2) -> Stencil {
-        Stencil::TranslateScale(TranslateScale::translate(offset), Box::new(self))
+        Stencil::TranslateScale(TranslateScale::translate(offset), false, Box::new(self))
+    }
+
+    pub fn with_translation_and_flip(self, offset: Vec2) -> Stencil {
+        Stencil::TranslateScale(TranslateScale::translate(offset), true, Box::new(self))
     }
 
     pub fn with_scale(self, scale: f64) -> Stencil {
-        Stencil::TranslateScale(TranslateScale::scale(scale), Box::new(self))
+        Stencil::TranslateScale(TranslateScale::scale(scale), false, Box::new(self))
+    }
+
+    pub fn with_scale_and_flip(self, scale: f64) -> Stencil {
+        Stencil::TranslateScale(TranslateScale::scale(scale), true, Box::new(self))
     }
 
     pub fn and(self, other: Stencil) -> Stencil {
@@ -525,7 +583,7 @@ impl Stencil {
     pub fn rect(&self) -> Rect {
         match self {
             Stencil::Path(path) => path.bounds,
-            Stencil::TranslateScale(ts, child) => *ts * child.rect(),
+            Stencil::TranslateScale(ts, _flip, child) => *ts * child.rect(),
             Stencil::Combine(combine) => {
                 let mut rect = combine.0.first().map(|f| f.rect()).unwrap_or_default();
 
@@ -546,13 +604,15 @@ impl Stencil {
 
                 rect
             }
+            // TODO(joshuan): The height is of course not accurate here.
+            Stencil::Text(text) => Rect::new(0.0, -text.font_size, text.width, text.font_size),
         }
     }
 
     pub fn advance(&self) -> f64 {
         match self {
             Stencil::Path(path) => path.advance,
-            Stencil::TranslateScale(ts, child) => {
+            Stencil::TranslateScale(ts, _flip, child) => {
                 let (translation, scale) = ts.as_tuple();
                 translation.x + scale * child.advance()
             }
@@ -569,6 +629,7 @@ impl Stencil {
                         }
                     })
             }
+            Stencil::Text(text) => text.width,
         }
     }
 
@@ -585,15 +646,15 @@ impl Stencil {
     ///  - 8 is used for full scores.
     pub fn with_paper_size(self, rastal: u8) -> Stencil {
         match rastal {
-            0 => self.with_scale(9.2 / 1000.0),
-            1 => self.with_scale(7.9 / 1000.0),
-            2 => self.with_scale(7.4 / 1000.0),
-            3 => self.with_scale(7.0 / 1000.0),
-            4 => self.with_scale(6.5 / 1000.0),
-            5 => self.with_scale(6.0 / 1000.0),
-            6 => self.with_scale(5.5 / 1000.0),
-            7 => self.with_scale(4.8 / 1000.0),
-            8 => self.with_scale(3.7 / 1000.0),
+            0 => self.with_scale(9.2 * 1000.0),
+            1 => self.with_scale(7.9 * 1000.0),
+            2 => self.with_scale(7.4 * 1000.0),
+            3 => self.with_scale(7.0 * 1000.0),
+            4 => self.with_scale(6.5 * 1000.0),
+            5 => self.with_scale(6.0 * 1000.0),
+            6 => self.with_scale(5.5 * 1000.0),
+            7 => self.with_scale(4.8 * 1000.0),
+            8 => self.with_scale(3.7 * 1000.0),
             _ => panic!("Expected rastal size <= 8"),
         }
     }
@@ -607,7 +668,7 @@ impl Stencil {
                 "\" />",
             ]
             .concat(),
-            Stencil::TranslateScale(ts, child) => {
+            Stencil::TranslateScale(ts, flip, child) => {
                 let (translation, scale) = ts.as_tuple();
 
                 [
@@ -619,7 +680,11 @@ impl Stencil {
                     "scale(",
                     &scale.to_string(),
                     ",",
-                    &scale.to_string(),
+                    &(if *flip {
+                       -scale
+                    } else {
+                        scale
+                    }.to_string()),
                     ")\">",
                     &child.to_svg(),
                     "</g>",
@@ -634,6 +699,15 @@ impl Stencil {
                 }
                 parts.push("</g>".to_owned());
                 parts.concat()
+            }
+            Stencil::Text(text) => {
+                [
+                    "<text style=\"font-size: ",
+                    &text.font_size.to_string(),
+                    "px; font-family: Palatino, 'Palatino Linotype', 'Palatino LT STD', 'Book Antiqua', Georgia, serif; \">",
+                    &escape(&text.text),
+                    "</text>",
+                ].concat()
             }
         }
     }

@@ -1,0 +1,59 @@
+.meta {
+ color: #abd1c6;
+ margin: 16px 16px 24px 64px;
+ padding: 0 16px 16px;
+ border: none;
+ font-size: 16px;
+ border: 1px solid #abd1c6;
+ max-width: 1002px;
+ border-radius: 3px;
+}
+
+.meta h1, .meta h2, .meta h3, .meta h4, .meta h5 {
+ color: #fffffe;
+}
+
+.meta-group {
+    max-width: 400px;
+}
+
+.meta input {
+    background: #004643;
+    color: #fffffe;
+    border: 1px solid #abd1c6;
+    outline-color: #e16162;
+}
+
+.meta input.bp3-input:focus {
+    outline-color: #e16162;
+    box-shadow: 0 0 0 1px #e16162, 0 0 0 3px #e16162, inset 0 1px 1px #e16162;
+}
+
+.meta input::placeholder {
+    color: #abd1c6;
+    opacity: 0.5;
+}
+
+.meta p {
+    margin-bottom: 10px;
+}
+
+.meta a {
+ color: #f9bc60;
+ text-decoration: underline;
+}
+
+.meta-ts-select {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.meta-ts-select label {
+    margin-right: 12px;
+}
+
+.meta-ts-select .bp3-divider {
+    margin-right: 16px;
+    border-color: #abd1c6;
+}
+

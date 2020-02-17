@@ -1,6 +1,8 @@
 export interface Global {
   tsNum: number;
   tsDen: number;
+  title: string;
+  author: string;
 }
 
 export type TiedNote = Array<{
@@ -52,6 +54,16 @@ type ApplyInvertAction =
       den: number;
       prevNum: number;
       prevDen: number;
+    }
+  | {
+      type: "SET_TITLE";
+      title: string;
+      prevTitle: string;
+    }
+  | {
+      type: "SET_AUTHOR";
+      author: string;
+      prevAuthor: string;
     };
 
 export type Action =
@@ -79,6 +91,8 @@ export function getInitialState(): State {
       global: {
         tsNum: 4,
         tsDen: 4,
+        title: "",
+        author: "",
       },
       part: {
         bars: [
@@ -152,6 +166,18 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         prevNum: action.num,
         prevDen: action.den,
       };
+    case "SET_AUTHOR":
+      return {
+        type: "SET_AUTHOR",
+        author: action.prevAuthor,
+        prevAuthor: action.author,
+      };
+    case "SET_TITLE":
+      return {
+        type: "SET_TITLE",
+        title: action.prevTitle,
+        prevTitle: action.title,
+      };
   }
 }
 
@@ -180,6 +206,10 @@ function apply(state: State, action: ApplyInvertAction) {
     const { num, den } = action;
     state.song.global.tsNum = num;
     state.song.global.tsDen = den;
+  } else if (action.type === "SET_TITLE") {
+    state.song.global.title = action.title;
+  } else if (action.type === "SET_AUTHOR") {
+    state.song.global.author = action.author;
   }
 }
 
@@ -194,6 +224,30 @@ export function reduce(state: State, action: Action): State {
     case "SET_TS":
       apply(state, action);
       state.undoStack.push(action);
+      state.redoStack = [];
+      return { ...state };
+    case "SET_TITLE":
+      apply(state, action);
+      {
+        const prevAction = state.undoStack[state.undoStack.length - 1];
+        if (prevAction && prevAction.type === "SET_TITLE") {
+          prevAction.title = action.title;
+        } else {
+          state.undoStack.push(action);
+        }
+      }
+      state.redoStack = [];
+      return { ...state };
+    case "SET_AUTHOR":
+      apply(state, action);
+      {
+        const prevAction = state.undoStack[state.undoStack.length - 1];
+        if (prevAction && prevAction.type === "SET_AUTHOR") {
+          prevAction.author = action.author;
+        } else {
+          state.undoStack.push(action);
+        }
+      }
       state.redoStack = [];
       return { ...state };
     case "UNDO":

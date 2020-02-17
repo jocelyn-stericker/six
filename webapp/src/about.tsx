@@ -4,7 +4,7 @@ import "./about.css";
 export default function About() {
   return (
     <div className="about">
-      <h1>Watch this space.</h1>
+      <h1>Your Lead Sheet</h1>
       <p>
         This is an early version of Six Eight, a lightweight lead sheet (chords
         + melody + lyrics) editor by{" "}

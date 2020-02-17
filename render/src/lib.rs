@@ -1,8 +1,10 @@
 #![allow(clippy::blacklisted_name)]
 
 mod sys_delete_orphans;
+mod sys_print_meta;
 mod sys_print_song;
 use sys_delete_orphans::sys_delete_orphans;
+use sys_print_meta::sys_print_meta;
 use sys_print_song::sys_print_song;
 
 use entity::{EntitiesRes, Entity, Join};
@@ -31,6 +33,10 @@ pub struct Song {
 
     /// In mm
     height: f64,
+
+    title: String,
+    title_width: f64,
+    title_stencil: Option<Entity>,
 }
 
 #[wasm_bindgen]
@@ -135,7 +141,14 @@ impl Render {
     }
 
     /// Create a song, without attaching it as the document root.
-    pub fn song_create(&mut self, freeze_spacing: Option<isize>, width: f64, height: f64) -> usize {
+    pub fn song_create(
+        &mut self,
+        freeze_spacing: Option<isize>,
+        width: f64,
+        height: f64,
+        title: &str,
+        title_width: f64,
+    ) -> usize {
         let entity = self.entities.create();
 
         self.songs.insert(
@@ -145,6 +158,9 @@ impl Render {
                 prev_freeze_spacing: None,
                 width,
                 height,
+                title: title.to_string(),
+                title_width,
+                title_stencil: None,
             },
         );
         self.ordered_children.insert(entity, vec![]);
@@ -165,6 +181,14 @@ impl Render {
         if let Some(song) = self.songs.get_mut(&entity) {
             song.width = width;
             song.height = height;
+        }
+    }
+
+    pub fn song_set_title(&mut self, entity: usize, title: &str, width: f64) {
+        let entity = Entity::new(entity);
+        if let Some(song) = self.songs.get_mut(&entity) {
+            song.title = title.to_owned();
+            song.title_width = width;
         }
     }
 
@@ -480,7 +504,6 @@ impl Render {
                     .and_then(|root| self.songs.get(&root))
                     .map(|root| (root.width / 7.0 * 1000.0, root.height / 7.0 * 1000.0)),
                 &self.bars,
-                &self.rncs,
                 &self.stencils,
                 &mut self.spacing,
                 &mut self.staffs,
@@ -500,6 +523,13 @@ impl Render {
             &self.ordered_children,
         );
         sys_print_staff_lines(&self.line_of_staffs, &mut self.stencils);
+
+        sys_print_meta(
+            &self.entities,
+            &mut self.parents,
+            &mut self.songs,
+            &mut self.stencils,
+        );
 
         sys_print_song(
             &self.songs,
@@ -692,7 +722,7 @@ mod tests {
         use stencil::snapshot;
 
         let mut render = Render::default();
-        let song = render.song_create(None, 215.9, 279.4);
+        let song = render.song_create(None, 215.9, 279.4, "Six Eight", 26.4f64);
 
         let staff = render.staff_create();
         let clef = render.between_bars_create(None, true, Some(4), Some(4));
