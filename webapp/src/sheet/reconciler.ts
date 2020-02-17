@@ -65,6 +65,7 @@ export interface SongProps extends Stylable {
   /** In mm */
   height: number;
   title: string;
+  author: string;
 }
 
 export interface StaffProps extends Stylable {
@@ -113,13 +114,12 @@ type CreateInstanceParam =
 
 let context = document.createElement("canvas").getContext("2d", {});
 
-function getTextWidth(text: string) {
+function getTextWidth(fontSize: number, text: string) {
   if (!context) {
     return 0;
   }
   // TODO: sync title font with sys_print_meta.rs.
-  context.font =
-    '7px Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif';
+  context.font = `${fontSize}px Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif`;
 
   return context.measureText(text).width;
 }
@@ -135,6 +135,7 @@ function createInstance(
   if (spec.type === "song") {
     type = "song";
     const title = spec.props.title || "Untitled";
+    const author = spec.props.author || "Anonymous";
     entity = container.song_create(
       typeof spec.props.freezeSpacing === "number"
         ? spec.props.freezeSpacing
@@ -142,7 +143,9 @@ function createInstance(
       spec.props.width,
       spec.props.height,
       title,
-      getTextWidth(title),
+      getTextWidth(7, title),
+      author,
+      getTextWidth(5, author),
     );
   } else if (spec.type === "staff") {
     type = "staff";
@@ -310,7 +313,16 @@ const Reconciler = ReactReconciler({
       instance.container.song_set_title(
         instance.entity,
         title,
-        getTextWidth(title),
+        getTextWidth(7, title),
+      );
+    }
+
+    if (type === "song" && oldProps.author !== newProps.author) {
+      const author = newProps.author || "Anonymous";
+      instance.container.song_set_author(
+        instance.entity,
+        author,
+        getTextWidth(5, author),
       );
     }
 

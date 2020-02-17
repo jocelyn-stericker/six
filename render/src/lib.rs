@@ -37,6 +37,10 @@ pub struct Song {
     title: String,
     title_width: f64,
     title_stencil: Option<Entity>,
+
+    author: String,
+    author_width: f64,
+    author_stencil: Option<Entity>,
 }
 
 #[wasm_bindgen]
@@ -148,6 +152,8 @@ impl Render {
         height: f64,
         title: &str,
         title_width: f64,
+        author: &str,
+        author_width: f64,
     ) -> usize {
         let entity = self.entities.create();
 
@@ -161,6 +167,9 @@ impl Render {
                 title: title.to_string(),
                 title_width,
                 title_stencil: None,
+                author: author.to_string(),
+                author_width,
+                author_stencil: None,
             },
         );
         self.ordered_children.insert(entity, vec![]);
@@ -189,6 +198,14 @@ impl Render {
         if let Some(song) = self.songs.get_mut(&entity) {
             song.title = title.to_owned();
             song.title_width = width;
+        }
+    }
+
+    pub fn song_set_author(&mut self, entity: usize, author: &str, width: f64) {
+        let entity = Entity::new(entity);
+        if let Some(song) = self.songs.get_mut(&entity) {
+            song.author = author.to_owned();
+            song.author_width = width;
         }
     }
 
@@ -722,7 +739,15 @@ mod tests {
         use stencil::snapshot;
 
         let mut render = Render::default();
-        let song = render.song_create(None, 215.9, 279.4, "Six Eight", 26.4f64);
+        let song = render.song_create(
+            None,
+            215.9,
+            279.4,
+            "Six Eight",
+            26.4f64,
+            "Six Eight",
+            26.4f64 * 5f64 / 7f64,
+        );
 
         let staff = render.staff_create();
         let clef = render.between_bars_create(None, true, Some(4), Some(4));

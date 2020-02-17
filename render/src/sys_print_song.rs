@@ -14,7 +14,7 @@ pub fn sys_print_song(
 ) {
     for (_id, (song, children, render)) in (songs, children, stencil_maps).join() {
         let mut map = StencilMap::new();
-        let mut h = 4500.0;
+        let mut h = 5500.0;
         for child in children {
             if let Some(staff) = staffs.get(child) {
                 for line in &staff.lines {
@@ -32,6 +32,9 @@ pub fn sys_print_song(
         }
         if let Some(title_stencil) = song.title_stencil {
             map = map.and(title_stencil, None);
+        }
+        if let Some(author_stencil) = song.author_stencil {
+            map = map.and(author_stencil, None);
         }
         *render = map.with_paper_size(3);
     }

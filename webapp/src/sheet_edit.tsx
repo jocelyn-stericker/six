@@ -228,6 +228,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
           width={215.9}
           height={279.4}
           title={appState.song.global.title}
+          author={appState.song.global.author}
         >
           <staff>
             <between

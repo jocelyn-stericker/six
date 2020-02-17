@@ -44,7 +44,6 @@ export default function Meta({ appState, dispatch }: Props) {
             id="meta-author"
             placeholder="Anonymous"
             large={true}
-            disabled={true}
             value={appState.song.global.author}
             onChange={(ev: React.FormEvent<HTMLInputElement>) => {
               dispatch({
