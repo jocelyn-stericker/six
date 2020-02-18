@@ -1,6 +1,10 @@
 /// <reference path="./intrinsic_elements.d.ts" /> #
 
-import { Render as _Render, Barline } from "../../rust_render_built/index";
+import {
+  Render as _Render,
+  Barline,
+  Clef,
+} from "../../rust_render_built/index";
 import { unstable_now as now } from "scheduler";
 import ReactReconciler from "react-reconciler";
 import { Ref } from "react";
@@ -13,7 +17,7 @@ interface RenderExtra {
 
 export type Render = _Render & RenderExtra;
 
-export { Barline } from "../../rust_render_built/index";
+export { Barline, Clef } from "../../rust_render_built/index";
 
 export function newRender(): Render {
   return Object.assign(_Render.new(), {
@@ -86,7 +90,7 @@ export interface BarProps extends Stylable {
 export interface BetweenBarsProps extends Stylable {
   key?: string | number | null | undefined;
   ref?: Ref<number>;
-  clef?: boolean;
+  clef?: Clef | undefined;
   tsNum?: number;
   tsDen?: number;
   barline?: Barline | undefined;
@@ -157,7 +161,7 @@ function createInstance(
     type = "between";
     entity = container.between_bars_create(
       spec.props.barline,
-      spec.props.clef || false,
+      spec.props.clef,
       spec.props.tsNum || undefined,
       spec.props.tsDen || undefined,
     );

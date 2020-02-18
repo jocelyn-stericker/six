@@ -2,8 +2,8 @@ import React, { useState, useRef, useMemo, createRef } from "react";
 import cx from "classnames";
 
 import Sheet, { Barline } from "./sheet";
-import { Render } from "./sheet/reconciler";
-import { Action, State, TiedNote } from "./store";
+import { Render, Clef } from "./sheet/reconciler";
+import { Action, State, TiedNote, Clef as ClefStr } from "./store";
 
 const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
 const NotePopover = React.lazy(() => import("./note_popover"));
@@ -111,6 +111,20 @@ const STEPS = [
   [3, 32],
   [1, 16],
 ];
+
+function clefStrToNum(clef: ClefStr): Clef {
+  if (clef === "g") {
+    return Clef.G;
+  }
+  if (clef === "f") {
+    return Clef.F;
+  }
+  if (clef === "percussion") {
+    return Clef.Percussion;
+  }
+
+  throw new Error("Unexpected clef");
+}
 
 function SheetEdit({ tool, appState, dispatch }: Props) {
   const [insertionDuration, setInsertionDuration] = useState([1, 8]);
@@ -232,7 +246,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
         >
           <staff>
             <between
-              clef={true}
+              clef={clefStrToNum(appState.song.global.clef)}
               tsNum={appState.song.global.tsNum}
               tsDen={appState.song.global.tsDen}
               className={tool === "bars" && "between-bars"}
@@ -243,6 +257,13 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                     <BetweenBarPopover
                       tsNum={appState.song.global.tsNum}
                       tsDen={appState.song.global.tsDen}
+                      setClef={clef =>
+                        dispatch({
+                          type: "SET_CLEF",
+                          clef,
+                          prevClef: appState.song.global.clef,
+                        })
+                      }
                       setTs={([num, den]) =>
                         dispatch({
                           type: "SET_TS",
@@ -375,6 +396,13 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                         <BetweenBarPopover
                           tsNum={appState.song.global.tsNum}
                           tsDen={appState.song.global.tsDen}
+                          setClef={clef =>
+                            dispatch({
+                              type: "SET_CLEF",
+                              clef,
+                              prevClef: appState.song.global.clef,
+                            })
+                          }
                           setTs={([num, den]) =>
                             dispatch({
                               type: "SET_TS",

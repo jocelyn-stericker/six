@@ -11,9 +11,16 @@ pub fn sys_print_staff_lines(
     stencils: &mut HashMap<Entity, Stencil>,
 ) {
     for staff in staffs.values() {
-        // TODO: coordinate advancew with sys_print_staff.
-        *stencils.entry(staff.staff_lines).or_default() =
-            Stencil::staff_line(staff.width - STAFF_MARGIN)
-                .with_translation(Vec2::new(STAFF_MARGIN, 0f64));
+        // TODO: coordinate advance with sys_print_staff.
+        let mut stencil = Stencil::default();
+
+        for i in -2..=2 {
+            stencil = stencil.and(
+                Stencil::staff_line(staff.width - STAFF_MARGIN)
+                    .with_translation(Vec2::new(STAFF_MARGIN, (i * 250) as f64)),
+            );
+        }
+
+        *stencils.entry(staff.staff_lines).or_default() = stencil;
     }
 }

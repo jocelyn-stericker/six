@@ -6,16 +6,19 @@ import {
   MenuItem,
   MenuDivider,
 } from "@blueprintjs/core";
+import { Clef } from "./store";
 
 export interface Props {
   children: any;
   tsNum: number;
   tsDen: number;
+  setClef: (clef: Clef) => void;
   setTs: (ts: [number, number]) => void;
 }
 
 export default function BetweenBarPopover({
   children,
+  setClef,
   setTs,
   tsNum,
   tsDen,
@@ -128,9 +131,21 @@ export default function BetweenBarPopover({
               hoverOpenDelay: 350,
             }}
           >
-            <MenuItem text="Treble" icon={"treble" as any} />
-            <MenuItem text="Bass" icon={"bass" as any} />
-            <MenuItem text="Percussion" icon={"percussion" as any} />
+            <MenuItem
+              onClick={() => setClef("g")}
+              text="Treble"
+              icon={"treble" as any}
+            />
+            <MenuItem
+              onClick={() => setClef("f")}
+              text="Bass"
+              icon={"bass" as any}
+            />
+            <MenuItem
+              onClick={() => setClef("percussion")}
+              text="Percussion"
+              icon={"percussion" as any}
+            />
             <MenuDivider />
             <MenuItem text="No change" icon="delete" />
           </MenuItem>

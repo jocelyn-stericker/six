@@ -60,12 +60,17 @@ export default function Meta({ appState, dispatch }: Props) {
         <FormGroup label="Clef">
           <RadioGroup
             inline={true}
-            onChange={() => {}}
-            selectedValue="percussion"
-            disabled={true}
+            onChange={ev => {
+              dispatch({
+                type: "SET_CLEF",
+                prevClef: appState.song.global.clef as any,
+                clef: ev.currentTarget.value as any,
+              });
+            }}
+            selectedValue={appState.song.global.clef}
           >
-            <Radio large={true} label="Treble" value="treble" />
-            <Radio large={true} label="Bass" value="bass" />
+            <Radio large={true} label="Treble" value="g" />
+            <Radio large={true} label="Bass" value="f" />
             <Radio large={true} label="Percussion" value="percussion" />
           </RadioGroup>
         </FormGroup>

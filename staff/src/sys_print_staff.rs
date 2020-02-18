@@ -19,6 +19,9 @@ pub fn sys_print_staff(
         let mut staff_advance = STAFF_MARGIN;
         let mut staff_stencil = StencilMap::default();
 
+        // Lines are behind contents.
+        staff_stencil = staff_stencil.and(staff.staff_lines, None);
+
         for child in children {
             if let Some(bar) = bars.get(&child) {
                 let mut bar_stencil = StencilMap::default();
@@ -56,8 +59,6 @@ pub fn sys_print_staff(
         }
 
         staff.width = staff_advance;
-
-        staff_stencil = staff_stencil.and(staff.staff_lines, None);
 
         stencil_maps.insert(staff_entity, staff_stencil);
     }

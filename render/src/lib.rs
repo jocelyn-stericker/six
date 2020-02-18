@@ -17,7 +17,7 @@ use rest_note_chord::{
 use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing, Start};
 use staff::{
     sys_break_into_lines, sys_print_between_bars, sys_print_staff, sys_print_staff_lines,
-    sys_update_bar_numbers, Barline, BetweenBars, LineOfStaff, Staff,
+    sys_update_bar_numbers, Barline, BetweenBars, Clef, LineOfStaff, Staff,
 };
 use std::collections::{HashMap, HashSet};
 use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
@@ -373,7 +373,7 @@ impl Render {
     pub fn between_bars_create(
         &mut self,
         barline: Option<Barline>,
-        clef: bool,
+        clef: Option<Clef>,
         time_numer: Option<u8>,
         time_denom: Option<u8>,
     ) -> usize {
@@ -406,7 +406,7 @@ impl Render {
         &mut self,
         entity: usize,
         barline: Option<Barline>,
-        clef: bool,
+        clef: Option<Clef>,
         time_numer: Option<u8>,
         time_denom: Option<u8>,
     ) {
@@ -750,7 +750,7 @@ mod tests {
         );
 
         let staff = render.staff_create();
-        let clef = render.between_bars_create(None, true, Some(4), Some(4));
+        let clef = render.between_bars_create(None, Some(Clef::Percussion), Some(4), Some(4));
         render.child_append(staff, clef);
 
         let bar1 = render.bar_create(4, 4);
@@ -759,7 +759,7 @@ mod tests {
         let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8, true);
 
         render.bar_insert(bar1, rnc1, false);
-        let barline = render.between_bars_create(Some(Barline::Normal), false, None, None);
+        let barline = render.between_bars_create(Some(Barline::Normal), None, None, None);
         render.child_append(staff, barline);
 
         let bar2 = render.bar_create(4, 4);
@@ -769,7 +769,7 @@ mod tests {
 
         render.bar_insert(bar2, rnc2, false);
 
-        let final_barline = render.between_bars_create(Some(Barline::Final), false, None, None);
+        let final_barline = render.between_bars_create(Some(Barline::Final), None, None, None);
         render.child_append(staff, final_barline);
 
         render.child_append(song, staff);

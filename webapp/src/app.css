@@ -71,8 +71,8 @@ html body, html .ui-text {
     background: #f9bc60;
 }
 
-svg {
-    /* I don't know what's going on here, but without this, Firefox randomly blurs on hover on non-retina. */
+g {
+    /* I don't know what's going on here, but without this, Firefox randomly blurs or moves content. */
     filter: grayscale(0%);
 }
 

@@ -7,7 +7,7 @@ mod sys_print_staff;
 mod sys_print_staff_lines;
 mod sys_update_bar_numbers;
 
-pub use between_bars::{Barline, BetweenBars};
+pub use between_bars::{Barline, BetweenBars, Clef};
 use entity::Entity;
 pub use sys_break_into_lines::sys_break_into_lines;
 pub use sys_print_between_bars::sys_print_between_bars;

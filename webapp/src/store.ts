@@ -1,8 +1,11 @@
+export type Clef = "g" | "f" | "percussion";
+
 export interface Global {
   tsNum: number;
   tsDen: number;
   title: string;
   author: string;
+  clef: Clef;
 }
 
 export type TiedNote = Array<{
@@ -56,6 +59,11 @@ type ApplyInvertAction =
       prevDen: number;
     }
   | {
+      type: "SET_CLEF";
+      clef: Clef;
+      prevClef: Clef;
+    }
+  | {
       type: "SET_TITLE";
       title: string;
       prevTitle: string;
@@ -91,6 +99,7 @@ export function getInitialState(): State {
       global: {
         tsNum: 4,
         tsDen: 4,
+        clef: "g",
         title: "",
         author: "",
       },
@@ -178,6 +187,12 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         title: action.prevTitle,
         prevTitle: action.title,
       };
+    case "SET_CLEF":
+      return {
+        type: "SET_CLEF",
+        clef: action.prevClef,
+        prevClef: action.clef,
+      };
   }
 }
 
@@ -202,6 +217,8 @@ function apply(state: State, action: ApplyInvertAction) {
       startDen,
       divisions,
     });
+  } else if (action.type === "SET_CLEF") {
+    state.song.global.clef = action.clef;
   } else if (action.type === "SET_TS") {
     const { num, den } = action;
     state.song.global.tsNum = num;
@@ -222,6 +239,7 @@ export function reduce(state: State, action: Action): State {
     case "REMOVE_NOTE":
     case "ADD_NOTE":
     case "SET_TS":
+    case "SET_CLEF":
       apply(state, action);
       state.undoStack.push(action);
       state.redoStack = [];
