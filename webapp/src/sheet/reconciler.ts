@@ -11,7 +11,6 @@ import { Ref } from "react";
 
 interface RenderExtra {
   classNames: { [key: string]: string };
-  boundingClassNames: { [key: string]: string };
   html: { [key: string]: any };
 }
 
@@ -22,7 +21,6 @@ export { Barline, Clef } from "../../rust_render_built/index";
 export function newRender(): Render {
   return Object.assign(_Render.new(), {
     classNames: {} as { [key: string]: string },
-    boundingClassNames: {} as { [key: string]: string },
     html: {} as { [key: string]: any },
   });
 }
@@ -51,7 +49,6 @@ interface Instance {
 
 interface Stylable {
   className?: any;
-  boundingClassName?: any;
   html?:
     | ((props: { width: number; height: number }) => any)
     | null
@@ -185,10 +182,6 @@ function createInstance(
     container.classNames[entity] = spec.props.className;
   }
 
-  if ("boundingClassName" in spec.props) {
-    container.boundingClassNames[entity] = spec.props.boundingClassName;
-  }
-
   if ("html" in spec.props) {
     container.html[entity] = spec.props.html;
   }
@@ -251,7 +244,7 @@ const Reconciler = ReactReconciler({
       child.container.child_remove(parent.entity, child.entity);
     }
 
-    // TODO: remove child entities from html/classNames/boundingClassNames
+    // TODO: remove child entities from html/classNames
   },
   insertInContainerBefore(
     _container: Render,
@@ -364,11 +357,6 @@ const Reconciler = ReactReconciler({
 
     if (oldProps.className !== newProps.className) {
       instance.container.classNames[instance.entity] = newProps.className;
-    }
-
-    if (oldProps.boundingClassName !== newProps.boundingClassName) {
-      instance.container.boundingClassNames[instance.entity] =
-        newProps.boundingClassName;
     }
 
     if (oldProps.html !== newProps.html) {

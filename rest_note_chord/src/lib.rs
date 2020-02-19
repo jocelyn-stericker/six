@@ -76,7 +76,7 @@ impl RestNoteChord {
                     _ => None,
                 };
 
-                let top = attachment.y + 875.0;
+                let top = attachment.y - 875.0;
                 let stem = Stencil::stem_line(
                     attachment.x,
                     attachment.y,
@@ -120,7 +120,7 @@ impl RestNoteChord {
                 }
                 dot_stencil = dot_stencil.and_right(Stencil::augmentation_dot());
             }
-            stencil = stencil.and(dot_stencil.with_translation(Vec2::new(head_right, 125.0)));
+            stencil = stencil.and(dot_stencil.with_translation(Vec2::new(head_right, -125.0)));
         }
 
         stencil
@@ -311,8 +311,7 @@ mod tests {
             "./snapshots/rnc.svg",
             &notes
                 .and(Stencil::staff_line(right + 200.0))
-                .with_translation(Vec2::new(0.0, -2000.0))
-                .with_paper_size(3)
+                .with_translation(Vec2::new(0.0, 2000.0))
                 .to_svg_doc_for_testing(),
         );
     }

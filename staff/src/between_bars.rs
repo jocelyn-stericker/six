@@ -48,8 +48,8 @@ impl BetweenBars {
             stencil = stencil
                 .and_right(Stencil::padding(100.0))
                 .and_right(match clef {
-                    Clef::G => Stencil::clef_g().with_translation(Vec2::new(0f64, -250f64)),
-                    Clef::F => Stencil::clef_f().with_translation(Vec2::new(0f64, 250f64)),
+                    Clef::G => Stencil::clef_g().with_translation(Vec2::new(0f64, 250f64)),
+                    Clef::F => Stencil::clef_f().with_translation(Vec2::new(0f64, -250f64)),
                     Clef::Percussion => Stencil::clef_unpitched(),
                 })
                 .and_right(Stencil::padding(100.0));

@@ -71,18 +71,12 @@ html body, html .ui-text {
     background: #f9bc60;
 }
 
-g {
-    /* I don't know what's going on here, but without this, Firefox randomly blurs or moves content. */
-    filter: grayscale(0%);
+.six-sheet > g {
+    pointer-events: none;
 }
 
 .six-real-note {
     fill: black;
-}
-
-.six-real-note-bg {
-    fill: transparent;
-    cursor: col-resize;
 }
 
 .six-bar {
@@ -95,30 +89,11 @@ g {
     transition: fill 100ms ease-in-out;
 }
 
-.six-bar-hover-bg {
-    fill: transparent;
-    cursor: none;
-}
-
 .six-note-to-add {
     fill: #e16162;
     stroke: #e16162;
     stroke-width: 25;
 }
-
-.six-note-to-add-bg {
-    fill: transparent;
-    cursor: none;
-}
-
-.six-note-drag {
-    cursor: col-resize !important;
-}
-
-.six-note-drag {
-    fill: transparent;
-}
-
 
 .between-bars {
     fill: #e16162;

@@ -7,7 +7,7 @@ mod sys_update_world_bboxes;
 pub use stencil_map::StencilMap;
 pub use sys_update_world_bboxes::sys_update_world_bboxes;
 
-use kurbo::{BezPath, Line, Point, Rect, TranslateScale, Vec2};
+use kurbo::{Affine, BezPath, Line, Point, Rect, TranslateScale, Vec2};
 
 /// A path with precomputed bounds.
 #[derive(Debug, Clone)]
@@ -32,7 +32,7 @@ pub enum Stencil {
     Path(Path),
     Text(Text),
     Combine(CombineStencil),
-    TranslateScale(TranslateScale, bool, Box<Stencil>),
+    Translate(Vec2, Box<Stencil>),
 }
 
 /// Normalized normal vector of line.
@@ -313,14 +313,14 @@ impl Stencil {
     fn from_corefont(corefont: &(f64, [f64; 4], &str)) -> Stencil {
         assert_eq!(corefont::UNITS_PER_EM, 1000);
         Stencil::Path(Path {
-            outline: BezPath::from_svg(corefont.2).expect("Invalid corefont"),
-            bounds: Rect::new(corefont.1[0], corefont.1[1], corefont.1[2], corefont.1[3]),
+            outline: Affine::FLIP_Y * BezPath::from_svg(corefont.2).expect("Invalid corefont"),
+            bounds: Rect::new(corefont.1[0], -corefont.1[1], corefont.1[2], -corefont.1[3]),
             advance: corefont.0,
         })
     }
 
     fn attachment(corefont: [f64; 2]) -> Point {
-        Point::new(corefont[0], corefont[1])
+        Point::new(corefont[0], -corefont[1])
     }
 
     pub fn time_sig_number(mut number: u8) -> Stencil {
@@ -363,11 +363,11 @@ impl Stencil {
         let den_adv = den.advance();
 
         if num_adv > den_adv {
-            num = num.with_translation(Vec2::new(0.0, 247.0));
-            den = den.with_translation(Vec2::new((num_adv - den_adv) / 2.0, -247.0));
+            num = num.with_translation(Vec2::new(0.0, -247.0));
+            den = den.with_translation(Vec2::new((num_adv - den_adv) / 2.0, 247.0));
         } else {
-            num = num.with_translation(Vec2::new((den_adv - num_adv) / 2.0, 247.0));
-            den = den.with_translation(Vec2::new(0.0, -247.0));
+            num = num.with_translation(Vec2::new((den_adv - num_adv) / 2.0, -247.0));
+            den = den.with_translation(Vec2::new(0.0, 247.0));
         }
 
         Stencil::combine(vec![num, den])
@@ -539,19 +539,7 @@ impl Stencil {
     }
 
     pub fn with_translation(self, offset: Vec2) -> Stencil {
-        Stencil::TranslateScale(TranslateScale::translate(offset), false, Box::new(self))
-    }
-
-    pub fn with_translation_and_flip(self, offset: Vec2) -> Stencil {
-        Stencil::TranslateScale(TranslateScale::translate(offset), true, Box::new(self))
-    }
-
-    pub fn with_scale(self, scale: f64) -> Stencil {
-        Stencil::TranslateScale(TranslateScale::scale(scale), false, Box::new(self))
-    }
-
-    pub fn with_scale_and_flip(self, scale: f64) -> Stencil {
-        Stencil::TranslateScale(TranslateScale::scale(scale), true, Box::new(self))
+        Stencil::Translate(offset, Box::new(self))
     }
 
     pub fn and(self, other: Stencil) -> Stencil {
@@ -583,7 +571,7 @@ impl Stencil {
     pub fn rect(&self) -> Rect {
         match self {
             Stencil::Path(path) => path.bounds,
-            Stencil::TranslateScale(ts, _flip, child) => *ts * child.rect(),
+            Stencil::Translate(ts, child) => TranslateScale::translate(*ts) * child.rect(),
             Stencil::Combine(combine) => {
                 let mut rect = combine.0.first().map(|f| f.rect()).unwrap_or_default();
 
@@ -612,10 +600,7 @@ impl Stencil {
     pub fn advance(&self) -> f64 {
         match self {
             Stencil::Path(path) => path.advance,
-            Stencil::TranslateScale(ts, _flip, child) => {
-                let (translation, scale) = ts.as_tuple();
-                translation.x + scale * child.advance()
-            }
+            Stencil::Translate(ts, child) => ts.x + child.advance(),
             Stencil::Combine(combine) => {
                 combine
                     .0
@@ -633,32 +618,6 @@ impl Stencil {
         }
     }
 
-    /// Convert from staff-size (1 unit is 1 staff) to paper-size (1 unit is 1 mm)
-    ///
-    /// Behind Bars, p483.
-    ///
-    /// Rastal sizes vary from 0 to 8, where 0 is large and 8 is small.
-    ///  - 0 and 1 are used for educational music.
-    ///  - 2 is not generally used, but is sometimes used for piano music/songs.
-    ///  - 3-4 are commonly used for single-staff-parts, piano music, and songs.
-    ///  - 5 is less commonly used for single-staff-parts, piano music, and songs.
-    ///  - 6-7 are used for choral music, cue saves, or ossia.
-    ///  - 8 is used for full scores.
-    pub fn with_paper_size(self, rastal: u8) -> Stencil {
-        match rastal {
-            0 => self.with_scale(9.2 * 1000.0),
-            1 => self.with_scale(7.9 * 1000.0),
-            2 => self.with_scale(7.4 * 1000.0),
-            3 => self.with_scale(7.0 * 1000.0),
-            4 => self.with_scale(6.5 * 1000.0),
-            5 => self.with_scale(6.0 * 1000.0),
-            6 => self.with_scale(5.5 * 1000.0),
-            7 => self.with_scale(4.8 * 1000.0),
-            8 => self.with_scale(3.7 * 1000.0),
-            _ => panic!("Expected rastal size <= 8"),
-        }
-    }
-
     /// Generate an SVG representation of the string, without newlines.
     pub fn to_svg(&self) -> String {
         match self {
@@ -668,23 +627,12 @@ impl Stencil {
                 "\" />",
             ]
             .concat(),
-            Stencil::TranslateScale(ts, flip, child) => {
-                let (translation, scale) = ts.as_tuple();
-
+            Stencil::Translate(translation, child) => {
                 [
                     "<g transform=\"translate(",
-                    &translation.x.to_string(),
+                    &translation.x.round().to_string(),
                     ",",
-                    &translation.y.to_string(),
-                    ") ",
-                    "scale(",
-                    &scale.to_string(),
-                    ",",
-                    &(if *flip {
-                       -scale
-                    } else {
-                        scale
-                    }.to_string()),
+                    &translation.y.round().to_string(),
                     ")\">",
                     &child.to_svg(),
                     "</g>",
@@ -703,7 +651,7 @@ impl Stencil {
             Stencil::Text(text) => {
                 [
                     "<text style=\"font-size: ",
-                    &text.font_size.to_string(),
+                    &text.font_size.round().to_string(),
                     "px; font-family: Palatino, 'Palatino Linotype', 'Palatino LT STD', 'Book Antiqua', Georgia, serif; \">",
                     &escape(&text.text),
                     "</text>",
@@ -714,9 +662,9 @@ impl Stencil {
 
     pub fn to_svg_doc_for_testing(&self) -> String {
         [
-            "<svg viewBox=\"0 0 215.9 279.4\" width=\"215.9mm\" height=\"279.4mm\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><g transform=\"scale(1, -1)\">",
+            "<svg viewBox=\"0 0 30842.9 39914.3\" width=\"215.9mm\" height=\"279.4mm\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">\">",
             &self.to_svg(),
-            "</g></svg>\n"
+            "</svg>\n"
         ].concat()
     }
 }
@@ -761,8 +709,7 @@ mod tests {
             "./snapshots/time_signature_stencils.svg",
             &Stencil::staff_line(right)
                 .and(times)
-                .with_translation(Vec2::new(0.0, -1000.0))
-                .with_paper_size(3)
+                .with_translation(Vec2::new(0.0, 1000.0))
                 .to_svg_doc_for_testing(),
         );
     }
@@ -772,9 +719,9 @@ mod tests {
         let clefs = Stencil::padding(200.0)
             .and_right(Stencil::clef_c())
             .and_right(Stencil::padding(200.0))
-            .and_right(Stencil::clef_f().with_translation(Vec2::new(0.0, 250.0)))
+            .and_right(Stencil::clef_f().with_translation(Vec2::new(0.0, -250.0)))
             .and_right(Stencil::padding(200.0))
-            .and_right(Stencil::clef_g().with_translation(Vec2::new(0.0, -250.0)))
+            .and_right(Stencil::clef_g().with_translation(Vec2::new(0.0, 250.0)))
             .and_right(Stencil::padding(200.0))
             .and_right(Stencil::clef_unpitched())
             .and_right(Stencil::padding(200.0));
@@ -790,8 +737,7 @@ mod tests {
             "./snapshots/clef_stencils.svg",
             &Stencil::combine(staff_lines)
                 .and(clefs)
-                .with_translation(Vec2::new(0.0, -1000.0))
-                .with_paper_size(3)
+                .with_translation(Vec2::new(0.0, 1000.0))
                 .to_svg_doc_for_testing(),
         );
     }
@@ -836,8 +782,7 @@ mod tests {
             "./snapshots/rest_stencils.svg",
             &Stencil::combine(staff_lines)
                 .and(rests)
-                .with_translation(Vec2::new(0.0, -1000.0))
-                .with_paper_size(3)
+                .with_translation(Vec2::new(0.0, 1000.0))
                 .to_svg_doc_for_testing(),
         );
     }

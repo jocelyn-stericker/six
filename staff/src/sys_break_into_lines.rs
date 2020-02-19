@@ -88,7 +88,7 @@ impl PartialSolution {
             }
         }
 
-        advance_step = advance_step + 100.0;
+        advance_step += 100.0;
 
         let mut spring_width = 0.0;
         let mut strut_width = 0.0;

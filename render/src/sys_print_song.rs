@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::Song;
 use entity::{Entity, Join};
-use kurbo::{TranslateScale, Vec2};
+use kurbo::Vec2;
 use staff::Staff;
 use stencil::StencilMap;
 
@@ -21,7 +21,7 @@ pub fn sys_print_song(
                     map = map.and(
                         *line,
                         if h > 0.0 {
-                            Some(TranslateScale::translate(Vec2::new(0.0, -h)))
+                            Some(Vec2::new(0.0, h))
                         } else {
                             None
                         },
@@ -36,6 +36,6 @@ pub fn sys_print_song(
         if let Some(author_stencil) = song.author_stencil {
             map = map.and(author_stencil, None);
         }
-        *render = map.with_paper_size(3);
+        *render = map;
     }
 }

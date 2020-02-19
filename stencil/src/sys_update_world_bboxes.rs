@@ -22,8 +22,8 @@ fn update_world_bbox(
                 stencil_maps,
                 world_bbox,
                 transform
-                    * stencil_map.transform.unwrap_or_default()
-                    * subtransform.unwrap_or_default(),
+                    * TranslateScale::translate(stencil_map.translate.unwrap_or_default())
+                    * TranslateScale::translate(subtransform.unwrap_or_default()),
             );
             rect = Some(match rect {
                 None => child_bbox,

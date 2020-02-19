@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::sys_break_into_lines::STAFF_MARGIN;
 use crate::LineOfStaff;
 use entity::{Entity, Join};
-use kurbo::{Rect, TranslateScale, Vec2};
+use kurbo::{Rect, Vec2};
 use rhythm::{Bar, RelativeRhythmicSpacing};
 use stencil::{Stencil, StencilMap};
 
@@ -30,13 +30,8 @@ pub fn sys_print_staff(
                 for (_, _, entity, _) in bar.children() {
                     let relative_spacing = spacing[&entity];
 
-                    bar_stencil = bar_stencil.and(
-                        entity,
-                        Some(TranslateScale::translate(Vec2::new(
-                            relative_spacing.start_x,
-                            0.0,
-                        ))),
-                    );
+                    bar_stencil =
+                        bar_stencil.and(entity, Some(Vec2::new(relative_spacing.start_x, 0.0)));
                     advance = advance.max(relative_spacing.end_x);
                 }
 
@@ -44,16 +39,10 @@ pub fn sys_print_staff(
 
                 stencil_maps.insert(*child, bar_stencil);
 
-                staff_stencil = staff_stencil.and(
-                    *child,
-                    Some(TranslateScale::translate(Vec2::new(staff_advance, 0.0))),
-                );
+                staff_stencil = staff_stencil.and(*child, Some(Vec2::new(staff_advance, 0.0)));
                 staff_advance += advance;
             } else if let Some(stencil) = stencils.get(&child) {
-                staff_stencil = staff_stencil.and(
-                    *child,
-                    Some(TranslateScale::translate(Vec2::new(staff_advance, 0.0))),
-                );
+                staff_stencil = staff_stencil.and(*child, Some(Vec2::new(staff_advance, 0.0)));
                 staff_advance += stencil.advance();
             }
         }

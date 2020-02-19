@@ -28,7 +28,7 @@ pub fn sys_print_meta(
                 7f64 * 1000f64 / 7f64,
                 song.title_width * 1000f64 / 7f64,
             )
-            .with_translation_and_flip(Vec2::new(title_x, -2500f64)),
+            .with_translation(Vec2::new(title_x, 2500f64)),
         );
 
         if song.author_stencil.is_none() {
@@ -48,7 +48,7 @@ pub fn sys_print_meta(
                 5f64 * 1000f64 / 7f64,
                 song.author_width * 1000f64 / 7f64,
             )
-            .with_translation_and_flip(Vec2::new(author_x, -3500f64)),
+            .with_translation(Vec2::new(author_x, 3500f64)),
         );
     }
 }

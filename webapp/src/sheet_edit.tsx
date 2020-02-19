@@ -1,5 +1,4 @@
 import React, { useState, useRef, useMemo, createRef } from "react";
-import cx from "classnames";
 
 import Sheet, { Barline } from "./sheet";
 import { Render, Clef } from "./sheet/reconciler";
@@ -238,7 +237,6 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
           freezeSpacing={proposedInsertion == null ? undefined : numChanges}
           key={`${appState.song.global.tsNum}_${appState.song.global.tsDen}`}
           ref={songRef}
-          boundingClassName={dragState && "six-note-drag"}
           width={215.9}
           height={279.4}
           title={appState.song.global.title}
@@ -292,12 +290,6 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                   ref={barRefs[barIdx]}
                   numer={appState.song.global.tsNum}
                   denom={appState.song.global.tsDen}
-                  boundingClassName={
-                    tool === "notes" &&
-                    proposedInsertion &&
-                    proposedInsertion.barIdx === barIdx &&
-                    "six-bar-hover-bg"
-                  }
                   className={
                     tool === "notes" &&
                     proposedInsertion &&
@@ -320,7 +312,6 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                           ({ noteValue, dots, startNum, startDen }, jdx) => (
                             <rnc
                               className="six-real-note"
-                              boundingClassName="six-real-note-bg"
                               key={jdx}
                               noteValue={noteValue}
                               dots={dots}
@@ -370,10 +361,6 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                     proposedInsertion.divisions.map((div, idx) => (
                       <rnc
                         key={idx}
-                        boundingClassName={cx(
-                          "six-note-to-add-bg",
-                          dragState && "six-note-drag",
-                        )}
                         className="six-note-to-add"
                         noteValue={div.noteValue}
                         dots={div.dots}

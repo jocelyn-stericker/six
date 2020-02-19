@@ -25,7 +25,7 @@ interface Props {
 }
 
 /** [entity, x, y, scale] */
-type StencilMapItem = [number, number, number, number];
+type StencilMapItem = [number, number, number];
 type StencilOrStencilMap = string | Array<StencilMapItem>;
 /** [x, y, x2, y2, barIdx, timeFracNum, timeFracDen, kind] */
 type StencilMeta = [
@@ -69,7 +69,7 @@ function StencilView({
         data-entity-id={id}
         className={classNames[id] || undefined}
       >
-        {stencil.map(([childId, x, y, scale]) => (
+        {stencil.map(([childId, x, y]) => (
           <StencilView
             key={childId}
             id={childId}
@@ -77,9 +77,7 @@ function StencilView({
             stencilMeta={stencilMeta}
             classNames={classNames}
             transform={
-              typeof x === "number"
-                ? `translate(${x}, ${y}) scale(${scale})`
-                : undefined
+              typeof x === "number" ? `translate(${x}, ${y})` : undefined
             }
           />
         ))}
@@ -165,6 +163,7 @@ export default function SheetMusicView(props: Props) {
   return (
     <>
       <svg
+        className="six-sheet"
         viewBox={`0 0 ${pageSize.width} ${pageSize.height}`}
         width="100%"
         ref={svg}
@@ -183,7 +182,6 @@ export default function SheetMusicView(props: Props) {
           pt.x = ev.clientX;
           pt.y = ev.clientY;
           pt = pt.matrixTransform(ctm.inverse());
-          pt.y = -pt.y;
 
           const time = container.get_time_for_cursor(pt.x, pt.y);
 
@@ -204,35 +202,14 @@ export default function SheetMusicView(props: Props) {
           }
         }}
       >
-        <g transform="scale(1, -1)" style={{ pointerEvents: "none" }}>
-          {stencilMeta &&
-            Object.entries(container.boundingClassNames).map(
-              ([id, className]) => {
-                const meta = stencilMeta[id as any];
-                if (!meta || !className) {
-                  return null;
-                }
-                return (
-                  <rect
-                    key={id}
-                    x={Math.round(meta[0])}
-                    y={Math.round(meta[1])}
-                    width={Math.round(meta[2] - meta[0])}
-                    height={Math.round(meta[3] - meta[1])}
-                    className={className}
-                  />
-                );
-              },
-            )}
-          {root && stencils && stencils[root] && stencilMeta && (
-            <StencilView
-              id={root}
-              stencils={stencils}
-              stencilMeta={stencilMeta}
-              classNames={container.classNames}
-            />
-          )}
-        </g>
+        {root && stencils && stencils[root] && stencilMeta && (
+          <StencilView
+            id={root}
+            stencils={stencils}
+            stencilMeta={stencilMeta}
+            classNames={container.classNames}
+          />
+        )}
       </svg>
       {stencilMeta &&
         Object.entries(container.html).map(([id, html]) => {
@@ -248,23 +225,23 @@ export default function SheetMusicView(props: Props) {
 
           let pt2 = svg.current.createSVGPoint();
           pt2.x = meta[0];
-          pt2.y = -meta[1];
+          pt2.y = meta[1];
           pt2 = pt2.matrixTransform(ctm);
 
           let pt3 = svg.current.createSVGPoint();
           pt3.x = meta[2];
-          pt3.y = -meta[3];
+          pt3.y = meta[3];
           pt3 = pt3.matrixTransform(ctm);
 
           const width = pt3.x - pt2.x;
-          const height = pt2.y - pt3.y;
+          const height = pt3.y - pt2.y;
           return (
             <div
               key={id}
               style={{
                 position: "absolute",
                 left: Math.round(pt2.x - bound.left),
-                top: Math.round(pt3.y - bound.top),
+                top: Math.round(pt2.y - bound.top),
                 width,
                 height,
               }}

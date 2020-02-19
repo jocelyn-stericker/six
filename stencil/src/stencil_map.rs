@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use crate::Stencil;
 use entity::Entity;
-use kurbo::{Rect, TranslateScale, Vec2};
+use kurbo::{Rect, Vec2};
 
 #[derive(Debug, Clone, Default)]
 pub struct StencilMap {
-    pub(crate) transform: Option<TranslateScale>,
+    pub(crate) translate: Option<Vec2>,
     explicit_rect: Option<Rect>,
-    children: HashMap<Entity, (isize, Option<TranslateScale>)>,
+    children: HashMap<Entity, (isize, Option<Vec2>)>,
     top_zindex: isize,
 }
 
@@ -17,7 +17,7 @@ impl StencilMap {
         StencilMap::default()
     }
 
-    pub fn and(mut self, child: Entity, transform: Option<TranslateScale>) -> StencilMap {
+    pub fn and(mut self, child: Entity, transform: Option<Vec2>) -> StencilMap {
         self.top_zindex += 1;
         let z = self.top_zindex;
         self.children.insert(child, (z, transform));
@@ -31,20 +31,8 @@ impl StencilMap {
         self
     }
 
-    pub fn with_transform(mut self, transform: Option<TranslateScale>) -> StencilMap {
-        self.transform = transform;
-
-        self
-    }
-
     pub fn with_translation(mut self, offset: Vec2) -> StencilMap {
-        self.transform =
-            Some(TranslateScale::translate(offset) * self.transform.unwrap_or_default());
-        self
-    }
-
-    pub fn with_scale(mut self, scale: f64) -> StencilMap {
-        self.transform = Some(TranslateScale::scale(scale) * self.transform.unwrap_or_default());
+        self.translate = Some(offset);
         self
     }
 
@@ -56,33 +44,7 @@ impl StencilMap {
         self.explicit_rect = Some(rect);
     }
 
-    /// Convert from staff-size (1 unit is 1 staff) to paper-size (1 unit is 1 mm)
-    ///
-    /// Behind Bars, p483.
-    ///
-    /// Rastal sizes vary from 0 to 8, where 0 is large and 8 is small.
-    ///  - 0 and 1 are used for educational music.
-    ///  - 2 is not generally used, but is sometimes used for piano music/songs.
-    ///  - 3-4 are commonly used for single-staff-parts, piano music, and songs.
-    ///  - 5 is less commonly used for single-staff-parts, piano music, and songs.
-    ///  - 6-7 are used for choral music, cue saves, or ossia.
-    ///  - 8 is used for full scores.
-    pub fn with_paper_size(self, rastal: u8) -> StencilMap {
-        match rastal {
-            0 => self.with_scale(9.2 / 1000.0),
-            1 => self.with_scale(7.9 / 1000.0),
-            2 => self.with_scale(7.4 / 1000.0),
-            3 => self.with_scale(7.0 / 1000.0),
-            4 => self.with_scale(6.5 / 1000.0),
-            5 => self.with_scale(6.0 / 1000.0),
-            6 => self.with_scale(5.5 / 1000.0),
-            7 => self.with_scale(4.8 / 1000.0),
-            8 => self.with_scale(3.7 / 1000.0),
-            _ => panic!("Expected rastal size <= 8"),
-        }
-    }
-
-    pub fn get_sorted_children(&self) -> Vec<(Entity, Option<TranslateScale>)> {
+    pub fn get_sorted_children(&self) -> Vec<(Entity, Option<Vec2>)> {
         let mut sorted = self.children.iter().collect::<Vec<_>>();
         sorted.sort_by_key(|k| (k.1).0);
 
@@ -101,24 +63,21 @@ impl StencilMap {
             &sorted
                 .into_iter()
                 .enumerate()
-                .map(|(i, (entity, transform))| {
-                    let transform = match (self.transform, transform) {
-                        (Some(a), Some(b)) => Some(a * b),
+                .map(|(i, (entity, translate))| {
+                    let translate = match (self.translate, translate) {
+                        (Some(a), Some(b)) => Some(a + b),
                         (Some(a), None) | (None, Some(a)) => Some(a),
                         (None, None) => None,
                     };
 
-                    if let Some(transform) = transform {
-                        let (translate, scale) = transform.as_tuple();
+                    if let Some(translate) = translate {
                         [
                             "[",
                             &entity.id().to_string(),
                             ",",
-                            &translate.x.to_string(),
+                            &translate.x.round().to_string(),
                             ",",
-                            &translate.y.to_string(),
-                            ",",
-                            &scale.to_string(),
+                            &translate.y.round().to_string(),
                             if i == len - 1 { "]" } else { "]," },
                         ]
                         .concat()
@@ -145,7 +104,7 @@ impl StencilMap {
         let children: String = self
             .get_sorted_children()
             .into_iter()
-            .map(|(entity, transform)| {
+            .map(|(entity, translate)| {
                 let child_svg;
                 if let Some(map) = stencil_maps.get(&entity) {
                     child_svg = map.to_svg(stencil_maps, stencils);
@@ -155,18 +114,12 @@ impl StencilMap {
                     child_svg = String::new();
                 }
 
-                if let Some(transform) = transform {
-                    let (translation, scale) = transform.as_tuple();
+                if let Some(translate) = translate {
                     [
                         "<g transform=\"translate(",
-                        &translation.x.to_string(),
+                        &translate.x.to_string(),
                         ",",
-                        &translation.y.to_string(),
-                        ") ",
-                        "scale(",
-                        &scale.to_string(),
-                        ",",
-                        &scale.to_string(),
+                        &translate.y.to_string(),
                         ")\">",
                         &child_svg,
                         "</g>",
@@ -178,19 +131,12 @@ impl StencilMap {
             })
             .collect();
 
-        if let Some(transform) = self.transform {
-            let (translation, scale) = transform.as_tuple();
-
+        if let Some(translate) = self.translate {
             [
                 "<g transform=\"translate(",
-                &translation.x.to_string(),
+                &translate.x.to_string(),
                 ",",
-                &translation.y.to_string(),
-                ") ",
-                "scale(",
-                &scale.to_string(),
-                ",",
-                &scale.to_string(),
+                &translate.y.to_string(),
                 ")\">",
                 &children,
                 "</g>",
@@ -203,13 +149,18 @@ impl StencilMap {
 
     pub fn to_svg_doc_for_testing(
         &self,
+        scale: f64,
         stencil_maps: &HashMap<Entity, StencilMap>,
         stencils: &HashMap<Entity, Stencil>,
     ) -> String {
         [
-            "<svg viewBox=\"0 0 215.9 279.4\" width=\"215.9mm\" height=\"279.4mm\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><g transform=\"scale(1, -1)\">",
+            "<svg viewBox=\"0 0 ",
+            &(215.9 / scale).round().to_string(),
+            " ",
+            &(279.4 / scale).round().to_string(),
+            "\" width=\"215.9mm\" height=\"279.4mm\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\">",
             &self.to_svg(stencil_maps, stencils),
-            "</g></svg>\n"
+            "</svg>\n"
         ].concat()
     }
 }

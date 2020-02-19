@@ -23,7 +23,7 @@ use std::collections::{HashMap, HashSet};
 use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
 use wasm_bindgen::prelude::*;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Song {
     freeze_spacing: Option<isize>,
     prev_freeze_spacing: Option<isize>,
@@ -34,6 +34,19 @@ pub struct Song {
     /// In mm
     height: f64,
 
+    /// Convert from staff-size (1 unit is 1 staff) to paper-size (1 unit is 1 mm)
+    ///
+    /// Behind Bars, p483.
+    ///
+    /// Rastal sizes vary from 0 to 8, where 0 is large and 8 is small.
+    ///  - 0 and 1 are used for educational music.
+    ///  - 2 is not generally used, but is sometimes used for piano music/songs.
+    ///  - 3-4 are commonly used for single-staff-parts, piano music, and songs.
+    ///  - 5 is less commonly used for single-staff-parts, piano music, and songs.
+    ///  - 6-7 are used for choral music, cue saves, or ossia.
+    ///  - 8 is used for full scores.
+    rastal_size: u8,
+
     title: String,
     title_width: f64,
     title_stencil: Option<Entity>,
@@ -41,6 +54,42 @@ pub struct Song {
     author: String,
     author_width: f64,
     author_stencil: Option<Entity>,
+}
+
+impl Default for Song {
+    fn default() -> Song {
+        Song {
+            freeze_spacing: None,
+            prev_freeze_spacing: None,
+
+            width: 0f64,
+            height: 0f64,
+            rastal_size: 3,
+            title: String::default(),
+            title_width: 0f64,
+            title_stencil: None,
+            author: String::default(),
+            author_width: 0f64,
+            author_stencil: None,
+        }
+    }
+}
+
+impl Song {
+    pub fn scale(&self) -> f64 {
+        match self.rastal_size {
+            0 => 9.2 / 1000.0,
+            1 => 7.9 / 1000.0,
+            2 => 7.4 / 1000.0,
+            3 => 7.0 / 1000.0,
+            4 => 6.5 / 1000.0,
+            5 => 6.0 / 1000.0,
+            6 => 5.5 / 1000.0,
+            7 => 4.8 / 1000.0,
+            8 => 3.7 / 1000.0,
+            _ => panic!("Expected rastal size <= 8"),
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -164,6 +213,7 @@ impl Render {
                 prev_freeze_spacing: None,
                 width,
                 height,
+                rastal_size: 3,
                 title: title.to_string(),
                 title_width,
                 title_stencil: None,
@@ -591,12 +641,16 @@ impl Render {
 
     pub fn get_song_width(&self, song: usize) -> Option<f64> {
         let song = Entity::new(song);
-        self.songs.get(&song).map(|song| song.width)
+        self.songs
+            .get(&song)
+            .map(|song| (song.width / song.scale()).round())
     }
 
     pub fn get_song_height(&self, song: usize) -> Option<f64> {
         let song = Entity::new(song);
-        self.songs.get(&song).map(|song| song.height)
+        self.songs
+            .get(&song)
+            .map(|song| (song.height / song.scale()).round())
     }
 
     pub fn get_stencil_bboxes(&self) -> String {
@@ -693,7 +747,8 @@ impl Render {
                 Duration::exact(Rational::new(duration_num, duration_den), None),
             );
 
-            let formatted_solution = solution
+            // Format it.
+            solution
                 .into_iter()
                 .map(|part| {
                     let my_start = start;
@@ -709,9 +764,7 @@ impl Render {
                     .into_iter()
                 })
                 .flatten()
-                .collect();
-
-            formatted_solution
+                .collect()
         } else {
             vec![]
         }
@@ -720,9 +773,11 @@ impl Render {
     pub fn print_for_demo(&mut self) -> String {
         self.exec();
 
+        let song = &self.songs[&self.root.unwrap()];
+
         if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
             root.clone()
-                .to_svg_doc_for_testing(&self.stencil_maps, &self.stencils)
+                .to_svg_doc_for_testing(song.scale(), &self.stencil_maps, &self.stencils)
         } else {
             String::default()
         }
