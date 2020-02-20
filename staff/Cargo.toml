@@ -7,16 +7,14 @@ license = "AGPL-3.0-or-later"
 description = "Renders a staff"
 repository = "https://github.com/jnetterf/six"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 rest_note_chord = {path = "../rest_note_chord"}
 rhythm = {path = "../rhythm"}
 stencil = {path = "../stencil"}
 entity = {path = "../entity"}
-kurbo = {git = "https://github.com/linebender/kurbo", rev = "680b4a94d11db6d59e2be323dee721d9bd25ae56"}
+kurbo = "0.5.8"
 wasm-bindgen = "0.2.58"
 
 [dependencies.num-rational]
-version = "0.2.2"
+version = "0.2.3"
 default-features = false

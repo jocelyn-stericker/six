@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "entity",
+    "pitch",
     "render",
     "rest_note_chord",
     "rhythm",

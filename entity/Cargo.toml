@@ -7,6 +7,4 @@ license = "AGPL-3.0-or-later"
 description = "A lightweight ECS"
 repository = "https://github.com/jnetterf/six"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]

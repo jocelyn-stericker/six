@@ -1,12 +1,10 @@
 [package]
-name = "stencil"
+name = "pitch"
 version = "0.1.0"
 authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
 license = "AGPL-3.0-or-later"
-description = "A type which represents a rendered object, composed of a bezier path and a bounding box."
+description = "Note names and accidentals"
 repository = "https://github.com/jnetterf/six"
 
 [dependencies]
-entity = {path = "../entity"}
-kurbo = "0.5.8"
