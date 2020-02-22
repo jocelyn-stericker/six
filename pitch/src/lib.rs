@@ -1,3 +1,23 @@
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Clef {
+    G,
+    F,
+    Percussion,
+}
+
+impl Clef {
+    /// Y-position of C0, in steps.
+    pub fn offset(&self) -> i32 {
+        match self {
+            Clef::G | Clef::Percussion => 34,
+            Clef::F => 22,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
 pub enum NoteName {
@@ -8,6 +28,20 @@ pub enum NoteName {
     G = 7,
     A = 9,
     B = 11,
+}
+
+impl NoteName {
+    pub fn index(&self) -> i32 {
+        match self {
+            NoteName::C => 0,
+            NoteName::D => 1,
+            NoteName::E => 2,
+            NoteName::F => 3,
+            NoteName::G => 4,
+            NoteName::A => 5,
+            NoteName::B => 6,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -62,6 +96,10 @@ impl Pitch {
     /// A440 is A4.
     pub fn octave(&self) -> i8 {
         self.octave
+    }
+
+    pub fn y(&self, clef: Clef) -> f64 {
+        (clef.offset() - self.name().index() - 7 * (self.octave() as i32)) as f64 * 125f64
     }
 }
 

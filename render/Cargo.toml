@@ -12,6 +12,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 entity = { path = "../entity" }
+pitch = { path = "../pitch" }
 rest_note_chord = { path = "../rest_note_chord" }
 rhythm = { path = "../rhythm" }
 staff = { path = "../staff" }

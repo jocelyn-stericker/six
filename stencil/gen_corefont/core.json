@@ -38,5 +38,8 @@
     "rest32nd",
     "rest64th",
     "rest128th",
-    "rest256th"
+    "rest256th",
+    "accidentalFlat",
+    "accidentalNatural",
+    "accidentalSharp"
 ]

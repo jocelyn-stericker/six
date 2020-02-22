@@ -80,8 +80,19 @@ export default function Meta({ appState, dispatch }: Props) {
           className="meta-group"
         >
           <HTMLSelect
-            disabled={true}
-            value={0}
+            disabled={appState.song.global.clef === "percussion"}
+            value={
+              appState.song.global.clef === "percussion"
+                ? 0
+                : appState.song.global.ks
+            }
+            onChange={ev => {
+              dispatch({
+                type: "SET_KS",
+                prevKs: appState.song.global.ks as any,
+                ks: parseInt(ev.currentTarget.value),
+              });
+            }}
             options={[
               { label: "G♭ Major / e♭ minor (6♭)", value: -6 },
               { label: "D♭ Major / b♭ minor (5♭)", value: -5 },

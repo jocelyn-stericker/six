@@ -90,6 +90,7 @@ export interface BetweenBarsProps extends Stylable {
   clef?: Clef | undefined;
   tsNum?: number;
   tsDen?: number;
+  ks?: number | undefined;
   barline?: Barline | undefined;
 }
 
@@ -156,11 +157,13 @@ function createInstance(
       (entity = container.bar_create(spec.props.numer, spec.props.denom));
   } else if (spec.type === "between") {
     type = "between";
+    console.log("bbks", spec.props.ks);
     entity = container.between_bars_create(
       spec.props.barline,
       spec.props.clef,
       spec.props.tsNum || undefined,
       spec.props.tsDen || undefined,
+      spec.props.ks,
     );
   } else if (spec.type === "rnc") {
     type = "rnc";
@@ -344,7 +347,8 @@ const Reconciler = ReactReconciler({
       type === "between" &&
       (oldProps.clef !== newProps.clef ||
         oldProps.tsNum !== newProps.tsNum ||
-        oldProps.tsDen !== newProps.tsDen)
+        oldProps.tsDen !== newProps.tsDen ||
+        oldProps.ks !== newProps.ks)
     ) {
       instance.container.between_bars_update(
         instance.entity,
@@ -352,6 +356,7 @@ const Reconciler = ReactReconciler({
         newProps.clef,
         newProps.tsNum,
         newProps.tsDen,
+        newProps.ks,
       );
     }
 

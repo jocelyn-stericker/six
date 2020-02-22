@@ -8,3 +8,4 @@ description = "Note names and accidentals"
 repository = "https://github.com/jnetterf/six"
 
 [dependencies]
+wasm-bindgen = "0.2.58"

@@ -3,6 +3,7 @@ export type Clef = "g" | "f" | "percussion";
 export interface Global {
   tsNum: number;
   tsDen: number;
+  ks: number;
   title: string;
   author: string;
   clef: Clef;
@@ -59,6 +60,11 @@ type ApplyInvertAction =
       prevDen: number;
     }
   | {
+      type: "SET_KS";
+      ks: number;
+      prevKs: number;
+    }
+  | {
       type: "SET_CLEF";
       clef: Clef;
       prevClef: Clef;
@@ -99,6 +105,7 @@ export function getInitialState(): State {
       global: {
         tsNum: 4,
         tsDen: 4,
+        ks: 0,
         clef: "g",
         title: "",
         author: "",
@@ -175,6 +182,12 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         prevNum: action.num,
         prevDen: action.den,
       };
+    case "SET_KS":
+      return {
+        type: "SET_KS",
+        ks: action.prevKs,
+        prevKs: action.ks,
+      };
     case "SET_AUTHOR":
       return {
         type: "SET_AUTHOR",
@@ -223,6 +236,8 @@ function apply(state: State, action: ApplyInvertAction) {
     const { num, den } = action;
     state.song.global.tsNum = num;
     state.song.global.tsDen = den;
+  } else if (action.type === "SET_KS") {
+    state.song.global.ks = action.ks;
   } else if (action.type === "SET_TITLE") {
     state.song.global.title = action.title;
   } else if (action.type === "SET_AUTHOR") {
@@ -239,6 +254,7 @@ export function reduce(state: State, action: Action): State {
     case "REMOVE_NOTE":
     case "ADD_NOTE":
     case "SET_TS":
+    case "SET_KS":
     case "SET_CLEF":
       apply(state, action);
       state.undoStack.push(action);

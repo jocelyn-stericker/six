@@ -373,6 +373,18 @@ impl Stencil {
         Stencil::combine(vec![num, den])
     }
 
+    pub fn flat() -> Stencil {
+        Self::from_corefont(&corefont::ACCIDENTAL_FLAT)
+    }
+
+    pub fn natural() -> Stencil {
+        Self::from_corefont(&corefont::ACCIDENTAL_NATURAL)
+    }
+
+    pub fn sharp() -> Stencil {
+        Self::from_corefont(&corefont::ACCIDENTAL_SHARP)
+    }
+
     pub fn time_sig_common() -> Stencil {
         Self::from_corefont(&corefont::TIME_SIG_COMMON)
     }

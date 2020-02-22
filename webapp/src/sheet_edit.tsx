@@ -247,6 +247,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
               clef={clefStrToNum(appState.song.global.clef)}
               tsNum={appState.song.global.tsNum}
               tsDen={appState.song.global.tsDen}
+              ks={appState.song.global.ks}
               className={tool === "bars" && "between-bars"}
               html={
                 tool === "bars" &&
