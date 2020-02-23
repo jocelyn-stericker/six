@@ -1,5 +1,6 @@
 use kurbo::Vec2;
 use pitch::{Clef, NoteName, Pitch};
+use rest_note_chord::Context;
 use stencil::Stencil;
 use wasm_bindgen::prelude::*;
 
@@ -59,7 +60,7 @@ pub struct BetweenBars {
 }
 
 impl BetweenBars {
-    pub fn render(&self) -> Stencil {
+    pub fn render(&self, _context: &Context) -> Stencil {
         let mut stencil = Stencil::default();
 
         match self.barline {
@@ -118,10 +119,22 @@ impl BetweenBars {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use num_rational::Rational;
+    use rest_note_chord::Place;
 
     #[test]
     fn signatures() {
         use stencil::snapshot;
+
+        let context = Context {
+            bar: 0,
+            beat: Rational::new(0, 1),
+            natural_beat: Rational::new(0, 1),
+            clef: Clef::G,
+            key: 0,
+            time: (4, 4),
+            place: Place::Start,
+        };
 
         snapshot(
             "./snapshots/signatures.svg",
@@ -131,7 +144,7 @@ mod tests {
                 key: Some(0),
                 barline: Some(Barline::Normal),
             }
-            .render()
+            .render(&context)
             .and_right(
                 BetweenBars {
                     clef: Some(Clef::G),
@@ -139,7 +152,7 @@ mod tests {
                     key: Some(6),
                     barline: Some(Barline::Normal),
                 }
-                .render(),
+                .render(&context),
             )
             .and_right(
                 BetweenBars {
@@ -148,7 +161,7 @@ mod tests {
                     key: Some(-6),
                     barline: Some(Barline::Normal),
                 }
-                .render(),
+                .render(&context),
             )
             .and_right(
                 BetweenBars {
@@ -157,7 +170,7 @@ mod tests {
                     key: Some(6),
                     barline: Some(Barline::Normal),
                 }
-                .render(),
+                .render(&context),
             )
             .and_right(
                 BetweenBars {
@@ -166,7 +179,7 @@ mod tests {
                     key: Some(-6),
                     barline: Some(Barline::Normal),
                 }
-                .render(),
+                .render(&context),
             )
             .with_translation(Vec2::new(0f64, 1000f64))
             .to_svg_doc_for_testing(),

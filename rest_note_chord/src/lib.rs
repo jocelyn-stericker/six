@@ -1,5 +1,6 @@
 #![allow(clippy::implicit_hasher, clippy::blacklisted_name)]
 
+mod context;
 mod sys_print_rnc;
 mod sys_space_time_warp;
 mod sys_update_rnc_timing;
@@ -8,6 +9,7 @@ use kurbo::Vec2;
 use rhythm::{Duration, NoteValue};
 use stencil::Stencil;
 
+pub use context::{Context, Place};
 pub use sys_print_rnc::sys_print_rnc;
 pub use sys_space_time_warp::{sys_apply_warp, sys_record_space_time_warp, SpaceTimeWarp};
 pub use sys_update_rnc_timing::sys_update_rnc_timing;

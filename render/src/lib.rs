@@ -12,13 +12,13 @@ use kurbo::Rect;
 use num_rational::Rational;
 use pitch::Clef;
 use rest_note_chord::{
-    sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_update_rnc_timing,
+    sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_update_rnc_timing, Context,
     RestNoteChord, SpaceTimeWarp,
 };
-use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing, Start};
+use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing};
 use staff::{
     sys_break_into_lines, sys_print_between_bars, sys_print_staff, sys_print_staff_lines,
-    sys_update_bar_numbers, Barline, BetweenBars, LineOfStaff, Staff,
+    sys_update_context, Barline, BetweenBars, LineOfStaff, Staff,
 };
 use std::collections::{HashMap, HashSet};
 use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
@@ -110,7 +110,7 @@ pub struct Render {
     stencils: HashMap<Entity, Stencil>,
     stencil_maps: HashMap<Entity, StencilMap>,
     world_bbox: HashMap<Entity, Rect>,
-    starts: HashMap<Entity, Start>,
+    contexts: HashMap<Entity, Context>,
     spacing: HashMap<Entity, RelativeRhythmicSpacing>,
     ordered_children: HashMap<Entity, Vec<Entity>>,
     warps: HashMap<Entity, SpaceTimeWarp>,
@@ -280,7 +280,7 @@ impl Render {
 
         self.bars.insert(entity, Bar::new(Metre::new(numer, denom)));
         self.stencil_maps.insert(entity, StencilMap::default());
-        self.starts.insert(entity, Start::default());
+        self.contexts.insert(entity, Context::default());
 
         entity.id()
     }
@@ -297,7 +297,7 @@ impl Render {
         }
 
         if let Some(bar) = self.bars.get_mut(&bar_id) {
-            if let (Some(rnc), Some(start)) = (self.rncs.get(&child), self.starts.get(&child)) {
+            if let (Some(rnc), Some(start)) = (self.rncs.get(&child), self.contexts.get(&child)) {
                 bar.splice(
                     start.beat,
                     vec![(
@@ -348,12 +348,12 @@ impl Render {
             entity,
             RestNoteChord::new(Duration::new(note_value, dots, None), is_note),
         );
-        self.starts.insert(
+        self.contexts.insert(
             entity,
-            Start {
-                bar: 0,
+            Context {
                 beat: start,
                 natural_beat: start,
+                ..Default::default()
             },
         );
         self.stencils.insert(entity, Stencil::default());
@@ -376,7 +376,7 @@ impl Render {
             if let (Some(rnc), Some(bar), Some(start)) = (
                 self.rncs.get_mut(&rnc_id),
                 self.bars.get_mut(&parent_id),
-                self.starts.get_mut(&rnc_id),
+                self.contexts.get_mut(&rnc_id),
             ) {
                 bar.remove(rnc_id);
                 start.beat = Rational::new(start_numer, start_denom);
@@ -403,7 +403,7 @@ impl Render {
         // Fix previously overlapping notes.
         if let Some(bar) = self.bars.get_mut(&parent_id) {
             for (other_rnc_id, (rnc, parent, start)) in
-                (&mut self.rncs, &self.parents, &mut self.starts).join()
+                (&mut self.rncs, &self.parents, &mut self.contexts).join()
             {
                 if (rnc.natural_duration != rnc.duration || start.natural_beat != start.beat)
                     && *parent == parent_id
@@ -446,7 +446,7 @@ impl Render {
                 key,
             },
         );
-        self.starts.insert(entity, Start::default());
+        self.contexts.insert(entity, Context::default());
         self.stencils.insert(entity, Stencil::default());
 
         entity.id()
@@ -499,7 +499,7 @@ impl Render {
                 .copied()
                 .collect::<HashSet<Entity>>(),
             self.world_bbox.keys().copied().collect::<HashSet<Entity>>(),
-            self.starts.keys().copied().collect::<HashSet<Entity>>(),
+            self.contexts.keys().copied().collect::<HashSet<Entity>>(),
             self.spacing.keys().copied().collect::<HashSet<Entity>>(),
             self.ordered_children
                 .keys()
@@ -537,7 +537,7 @@ impl Render {
                 &mut self.bars,
                 &mut self.between_bars,
                 &mut self.rncs,
-                &mut self.starts,
+                &mut self.contexts,
                 &mut self.stencils,
                 &mut self.stencil_maps,
                 &mut self.spacing,
@@ -546,17 +546,18 @@ impl Render {
             ],
         );
 
-        sys_update_bar_numbers(
+        sys_update_context(
             &self.staffs,
             &self.ordered_children,
             &self.bars,
-            &mut self.starts,
+            &self.between_bars,
+            &mut self.contexts,
         );
 
         sys_update_rnc_timing(
             &self.entities,
             &mut self.rncs,
-            &mut self.starts,
+            &mut self.contexts,
             &mut self.bars,
             &mut self.spacing,
             &mut self.parents,
@@ -564,7 +565,7 @@ impl Render {
         );
 
         sys_print_rnc(&self.rncs, &mut self.stencils);
-        sys_print_between_bars(&self.between_bars, &mut self.stencils);
+        sys_print_between_bars(&self.between_bars, &self.contexts, &mut self.stencils);
 
         if self.keep_spacing() {
             sys_apply_warp(&self.bars, &mut self.spacing, &self.warps);
@@ -661,7 +662,7 @@ impl Render {
     pub fn get_stencil_bboxes(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
         for (entity, bbox) in &self.world_bbox {
-            let start = self.starts.get(entity);
+            let start = self.contexts.get(entity);
             lines.push(entity.id().to_string());
             let kind = if self.rncs.contains_key(entity) {
                 0
@@ -688,9 +689,9 @@ impl Render {
     /// Returns [bar, num, den]
     pub fn get_time_for_cursor(&self, x: f64, y: f64) -> Option<Vec<usize>> {
         let quant = Rational::new(1, 8);
-        for (_id, (bbox, bar, start)) in (&self.world_bbox, &self.bars, &self.starts).join() {
+        for (_id, (bbox, bar, start)) in (&self.world_bbox, &self.bars, &self.contexts).join() {
             if x >= bbox.x0 && x <= bbox.x1 && y >= bbox.y0 && y <= bbox.y1 {
-                let child_starts: Vec<_> = bar
+                let child_contexts: Vec<_> = bar
                     .children()
                     .into_iter()
                     .map(|c| {
@@ -703,9 +704,9 @@ impl Render {
                         )
                     })
                     .collect();
-                for (i, (child_left, child_start_beat)) in child_starts.iter().enumerate().rev() {
+                for (i, (child_left, child_start_beat)) in child_contexts.iter().enumerate().rev() {
                     if *child_left <= x {
-                        let next = child_starts
+                        let next = child_contexts
                             .get(i + 1)
                             .copied()
                             .unwrap_or((bbox.x1, bar.metre().duration()));
@@ -857,7 +858,7 @@ mod tests {
         assert_eq!(render.stencils.len(), 0);
         assert_eq!(render.stencil_maps.len(), 0);
         assert_eq!(render.world_bbox.len(), 0);
-        assert_eq!(render.starts.len(), 0);
+        assert_eq!(render.contexts.len(), 0);
         assert_eq!(render.spacing.len(), 0);
         assert_eq!(render.ordered_children.len(), 0);
     }
