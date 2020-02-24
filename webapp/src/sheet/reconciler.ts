@@ -157,7 +157,6 @@ function createInstance(
       (entity = container.bar_create(spec.props.numer, spec.props.denom));
   } else if (spec.type === "between") {
     type = "between";
-    console.log("bbks", spec.props.ks);
     entity = container.between_bars_create(
       spec.props.barline,
       spec.props.clef,
@@ -178,6 +177,7 @@ function createInstance(
       isTemporary: spec.props.isTemporary || false,
     };
   } else {
+    // @ts-ignore
     throw new Error(`Invalid type in sheet music reconciler: <${spec.type} />`);
   }
 

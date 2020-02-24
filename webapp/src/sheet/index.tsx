@@ -102,6 +102,9 @@ export default function SheetMusicView(props: Props) {
   const [stencilMeta, setStencilMeta] = useState<{
     [key: number]: StencilMeta;
   } | null>(null);
+  const [children, setChildren] = useState<{
+    [key: number]: Array<number>;
+  }>({});
   const [root, setRoot] = useState<number | null>(null);
   const [hoverTime, setHoverTime] = useState<[number, number, number] | null>(
     null,
@@ -115,6 +118,7 @@ export default function SheetMusicView(props: Props) {
     let stencilPairs = container.stencils().split("\n");
     let stencilMapPairs = container.stencil_maps().split("\n");
     let stencilMetaPairs = container.get_stencil_bboxes().split("\n");
+    let parents = container.parents().split("\n");
 
     let stencils: { [key: number]: StencilOrStencilMap } = {};
     for (let i = 0; i < stencilPairs.length; i += 2) {
@@ -132,10 +136,18 @@ export default function SheetMusicView(props: Props) {
       );
     }
 
+    let children: { [key: number]: Array<number> } = {};
+    for (let i = 0; i < parents.length; i += 2) {
+      let cl = children[parents[i + 1] as any] || [];
+      cl.push(parseInt(parents[i]));
+      children[parents[i + 1] as any] = cl;
+    }
+
     console.timeEnd("render svg");
 
     setStencils(stencils);
     setStencilMeta(stencilMeta);
+    setChildren(children);
     const root = container.get_root_id();
     setRoot(root || null);
     setPageSize({
@@ -214,42 +226,57 @@ export default function SheetMusicView(props: Props) {
       {stencilMeta &&
         Object.entries(container.html).map(([id, html]) => {
           const meta = stencilMeta[id as any];
-          if (!meta || !html || !svg.current || !bound) {
-            return null;
+          let applyTo;
+          if (meta) {
+            applyTo = [meta];
+          } else {
+            applyTo = (children[id as any] || [])
+              .map(m => stencilMeta[m])
+              .filter(m => m);
           }
 
-          const ctm = svg.current.getScreenCTM();
-          if (!ctm) {
-            return;
-          }
-
-          let pt2 = svg.current.createSVGPoint();
-          pt2.x = meta[0];
-          pt2.y = meta[1];
-          pt2 = pt2.matrixTransform(ctm);
-
-          let pt3 = svg.current.createSVGPoint();
-          pt3.x = meta[2];
-          pt3.y = meta[3];
-          pt3 = pt3.matrixTransform(ctm);
-
-          const width = pt3.x - pt2.x;
-          const height = pt3.y - pt2.y;
           return (
-            <div
-              key={id}
-              style={{
-                position: "absolute",
-                left: Math.round(pt2.x - bound.left),
-                top: Math.round(pt2.y - bound.top),
-                width,
-                height,
-              }}
-            >
-              <div style={{ position: "relative" }}>
-                {html({ width, height })}
-              </div>
-            </div>
+            <React.Fragment key={id}>
+              {applyTo.map((meta, i) => {
+                if (!meta || !html || !svg.current || !bound) {
+                  return null;
+                }
+
+                const ctm = svg.current.getScreenCTM();
+                if (!ctm) {
+                  return;
+                }
+
+                let pt2 = svg.current.createSVGPoint();
+                pt2.x = meta[0];
+                pt2.y = meta[1];
+                pt2 = pt2.matrixTransform(ctm);
+
+                let pt3 = svg.current.createSVGPoint();
+                pt3.x = meta[2];
+                pt3.y = meta[3];
+                pt3 = pt3.matrixTransform(ctm);
+
+                const width = pt3.x - pt2.x;
+                const height = pt3.y - pt2.y;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      position: "absolute",
+                      left: Math.round(pt2.x - bound.left),
+                      top: Math.round(pt2.y - bound.top),
+                      width,
+                      height,
+                    }}
+                  >
+                    <div style={{ position: "relative" }}>
+                      {html({ width, height })}
+                    </div>
+                  </div>
+                );
+              })}
+            </React.Fragment>
           );
         })}
     </>

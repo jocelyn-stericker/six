@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  Popover,
-  Tooltip,
-  Menu,
-  MenuItem,
-  MenuDivider,
-} from "@blueprintjs/core";
+import { Popover, Menu, MenuItem, MenuDivider } from "@blueprintjs/core";
 import { Clef } from "./store";
 
 export interface Props {
@@ -196,15 +190,7 @@ export default function BetweenBarPopover({
         </Menu>
       }
     >
-      <Tooltip
-        content={<>Edit Bars and Signatures</>}
-        hoverOpenDelay={0}
-        transitionDuration={0}
-        position="bottom"
-        interactionKind="hover-target"
-      >
-        {children}
-      </Tooltip>
+      {children}
     </Popover>
   );
 }

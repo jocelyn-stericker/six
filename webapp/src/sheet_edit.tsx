@@ -8,7 +8,6 @@ const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
 const NotePopover = React.lazy(() => import("./note_popover"));
 
 interface Props {
-  tool: "notes" | "bars" | "select";
   appState: State;
   dispatch: (action: Action) => void;
 }
@@ -125,7 +124,7 @@ function clefStrToNum(clef: ClefStr): Clef {
   throw new Error("Unexpected clef");
 }
 
-function SheetEdit({ tool, appState, dispatch }: Props) {
+function SheetEdit({ appState, dispatch }: Props) {
   const [insertionDuration, setInsertionDuration] = useState([1, 8]);
   const [
     proposedInsertion,
@@ -217,10 +216,6 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
             setInsertionDuration([1, 4]);
           }
 
-          if (tool !== "notes") {
-            return;
-          }
-
           if (proposedInsertion) {
             dispatch({
               type: "ADD_NOTE",
@@ -248,42 +243,39 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
               tsNum={appState.song.global.tsNum}
               tsDen={appState.song.global.tsDen}
               ks={appState.song.global.ks}
-              className={tool === "bars" && "between-bars"}
-              html={
-                tool === "bars" &&
-                (({ width, height }) => (
-                  <React.Suspense fallback={null}>
-                    <BetweenBarPopover
-                      tsNum={appState.song.global.tsNum}
-                      tsDen={appState.song.global.tsDen}
-                      setClef={clef =>
-                        dispatch({
-                          type: "SET_CLEF",
-                          clef,
-                          prevClef: appState.song.global.clef,
-                        })
-                      }
-                      setTs={([num, den]) =>
-                        dispatch({
-                          type: "SET_TS",
-                          num,
-                          den,
-                          prevNum: appState.song.global.tsNum,
-                          prevDen: appState.song.global.tsDen,
-                        })
-                      }
-                    >
-                      <div
-                        style={{
-                          width,
-                          height,
-                          cursor: "pointer",
-                        }}
-                      />
-                    </BetweenBarPopover>
-                  </React.Suspense>
-                ))
-              }
+              className="between-bars"
+              html={({ width, height }) => (
+                <React.Suspense fallback={null}>
+                  <BetweenBarPopover
+                    tsNum={appState.song.global.tsNum}
+                    tsDen={appState.song.global.tsDen}
+                    setClef={clef =>
+                      dispatch({
+                        type: "SET_CLEF",
+                        clef,
+                        prevClef: appState.song.global.clef,
+                      })
+                    }
+                    setTs={([num, den]) =>
+                      dispatch({
+                        type: "SET_TS",
+                        num,
+                        den,
+                        prevNum: appState.song.global.tsNum,
+                        prevDen: appState.song.global.tsDen,
+                      })
+                    }
+                  >
+                    <div
+                      style={{
+                        width,
+                        height,
+                        cursor: "pointer",
+                      }}
+                    />
+                  </BetweenBarPopover>
+                </React.Suspense>
+              )}
             />
             {appState.song.part.bars.map((bar, barIdx) => (
               <React.Fragment key={barIdx}>
@@ -292,9 +284,7 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                   numer={appState.song.global.tsNum}
                   denom={appState.song.global.tsDen}
                   className={
-                    tool === "notes" &&
-                    proposedInsertion &&
-                    proposedInsertion.barIdx === barIdx
+                    proposedInsertion && proposedInsertion.barIdx === barIdx
                       ? "six-bar-hover"
                       : "six-bar"
                   }
@@ -320,43 +310,39 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                               startDen={startDen}
                               isNote={true}
                               isTemporary={false}
-                              html={
-                                tool === "notes" &&
-                                (({ width, height }) => (
-                                  <React.Suspense fallback={null}>
-                                    <NotePopover
-                                      onDeleteNote={() => {
-                                        dispatch({
-                                          type: "REMOVE_NOTE",
-                                          barIdx,
-                                          startNum: tiedStartNum,
-                                          startDen: tiedStartDen,
-                                          divisions,
-                                        });
+                              html={({ width, height }) => (
+                                <React.Suspense fallback={null}>
+                                  <NotePopover
+                                    onDeleteNote={() => {
+                                      dispatch({
+                                        type: "REMOVE_NOTE",
+                                        barIdx,
+                                        startNum: tiedStartNum,
+                                        startDen: tiedStartDen,
+                                        divisions,
+                                      });
+                                    }}
+                                  >
+                                    <div
+                                      onMouseOver={() =>
+                                        setProposedInsertion(null)
+                                      }
+                                      style={{
+                                        width,
+                                        height,
+                                        cursor: "pointer",
                                       }}
-                                    >
-                                      <div
-                                        onMouseOver={() =>
-                                          setProposedInsertion(null)
-                                        }
-                                        style={{
-                                          width,
-                                          height,
-                                          cursor: "pointer",
-                                        }}
-                                      />
-                                    </NotePopover>
-                                  </React.Suspense>
-                                ))
-                              }
+                                    />
+                                  </NotePopover>
+                                </React.Suspense>
+                              )}
                             />
                           ),
                         )}
                       </React.Fragment>
                     ),
                   )}
-                  {tool === "notes" &&
-                    !hoverMatchesAny &&
+                  {!hoverMatchesAny &&
                     proposedInsertion &&
                     proposedInsertion.barIdx === barIdx &&
                     proposedInsertion.divisions.map((div, idx) => (
@@ -376,42 +362,39 @@ function SheetEdit({ tool, appState, dispatch }: Props) {
                   barline={
                     bar.barline === "normal" ? Barline.Normal : Barline.Final
                   }
-                  className={tool === "bars" && "between-bars"}
-                  html={
-                    tool === "bars" &&
-                    (({ width, height }) => (
-                      <React.Suspense fallback={null}>
-                        <BetweenBarPopover
-                          tsNum={appState.song.global.tsNum}
-                          tsDen={appState.song.global.tsDen}
-                          setClef={clef =>
-                            dispatch({
-                              type: "SET_CLEF",
-                              clef,
-                              prevClef: appState.song.global.clef,
-                            })
-                          }
-                          setTs={([num, den]) =>
-                            dispatch({
-                              type: "SET_TS",
-                              num,
-                              den,
-                              prevNum: appState.song.global.tsNum,
-                              prevDen: appState.song.global.tsDen,
-                            })
-                          }
-                        >
-                          <div
-                            style={{
-                              width,
-                              height,
-                              cursor: "pointer",
-                            }}
-                          />
-                        </BetweenBarPopover>
-                      </React.Suspense>
-                    ))
-                  }
+                  className="between-bars"
+                  html={({ width, height }) => (
+                    <React.Suspense fallback={null}>
+                      <BetweenBarPopover
+                        tsNum={appState.song.global.tsNum}
+                        tsDen={appState.song.global.tsDen}
+                        setClef={clef =>
+                          dispatch({
+                            type: "SET_CLEF",
+                            clef,
+                            prevClef: appState.song.global.clef,
+                          })
+                        }
+                        setTs={([num, den]) =>
+                          dispatch({
+                            type: "SET_TS",
+                            num,
+                            den,
+                            prevNum: appState.song.global.tsNum,
+                            prevDen: appState.song.global.tsDen,
+                          })
+                        }
+                      >
+                        <div
+                          style={{
+                            width,
+                            height,
+                            cursor: "pointer",
+                          }}
+                        />
+                      </BetweenBarPopover>
+                    </React.Suspense>
+                  )}
                 />
               </React.Fragment>
             ))}

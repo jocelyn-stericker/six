@@ -647,6 +647,15 @@ impl Render {
         lines.join("\n")
     }
 
+    pub fn parents(&self) -> String {
+        let mut lines: Vec<String> = Vec::new();
+        for (parent, child) in &self.parents {
+            lines.push(parent.id().to_string());
+            lines.push(child.id().to_string());
+        }
+        lines.join("\n")
+    }
+
     pub fn stencil_maps(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
         for (entity, stencil) in &self.stencil_maps {
