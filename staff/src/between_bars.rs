@@ -1,3 +1,4 @@
+use entity::{EntitiesRes, Entity};
 use kurbo::Vec2;
 use pitch::{Clef, NoteName, Pitch};
 use rest_note_chord::Context;
@@ -51,16 +52,75 @@ pub enum Barline {
     Final,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct BetweenBars {
     pub clef: Option<Clef>,
     pub time: Option<(u8, u8)>,
     pub key: Option<i8>,
     pub barline: Option<Barline>,
+
+    /// Stencil if this is at the start of a line.
+    pub stencil_start: Entity,
+
+    /// Stencil if this is in the middle of a line.
+    pub stencil_middle: Entity,
+
+    /// Stencil if this is at the end of a line.
+    pub stencil_end: Entity,
 }
 
 impl BetweenBars {
-    pub fn render(&self, _context: &Context) -> Stencil {
+    pub fn new(&self, entities: &EntitiesRes) -> BetweenBars {
+        BetweenBars {
+            clef: None,
+            time: None,
+            key: None,
+            barline: None,
+            stencil_start: entities.create(),
+            stencil_middle: entities.create(),
+            stencil_end: entities.create(),
+        }
+    }
+
+    pub fn render_start(&self, context: &Context) -> Stencil {
+        let mut stencil = Stencil::default();
+
+        let clef = self.clef.unwrap_or(context.clef);
+        let key = self.key.unwrap_or(context.key);
+
+        stencil = stencil
+            .and_right(Stencil::padding(100.0))
+            .and_right(match clef {
+                Clef::G => Stencil::clef_g().with_translation(Vec2::new(0f64, 250f64)),
+                Clef::F => Stencil::clef_f().with_translation(Vec2::new(0f64, -250f64)),
+                Clef::Percussion => Stencil::clef_unpitched(),
+            })
+            .and_right(Stencil::padding(100.0));
+
+        if key != 0 && clef != Clef::Percussion {
+            stencil = stencil.and_right(Stencil::padding(100.0));
+            for pitch in get_pitches(key, clef) {
+                stencil = stencil.and_right(
+                    if key < 0 {
+                        Stencil::flat()
+                    } else {
+                        Stencil::sharp()
+                    }
+                    .with_translation(Vec2::new(0.0, pitch.y(clef))),
+                );
+            }
+
+            stencil = stencil.and_right(Stencil::padding(100.0));
+        }
+
+        if let Some((num, den)) = self.time {
+            stencil = stencil.and_right(Stencil::time_sig_fraction(num, den));
+        }
+
+        stencil
+    }
+
+    pub fn render_mid(&self, _context: &Context) -> Stencil {
         let mut stencil = Stencil::default();
 
         match self.barline {
@@ -114,13 +174,36 @@ impl BetweenBars {
 
         stencil
     }
+
+    pub fn render_end(&self, _context: &Context) -> Stencil {
+        let mut stencil = Stencil::default();
+
+        match self.barline {
+            Some(Barline::Normal) => {
+                stencil = stencil
+                    .and_right(Stencil::padding(100.0))
+                    .and_right(Stencil::barline_thin(0.0, -500.0, 500.0))
+            }
+            Some(Barline::Final) => {
+                stencil = stencil
+                    .and_right(Stencil::padding(100.0))
+                    .and_right(Stencil::barline_thin(0.0, -500.0, 500.0))
+                    .and_right(Stencil::padding(125.0))
+                    .and_right(Stencil::barline_thick(0.0, -500.0, 500.0));
+            }
+            None => {}
+        }
+
+        // TODO: warnings!
+
+        stencil
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use num_rational::Rational;
-    use rest_note_chord::Place;
 
     #[test]
     fn signatures() {
@@ -133,7 +216,6 @@ mod tests {
             clef: Clef::G,
             key: 0,
             time: (4, 4),
-            place: Place::Start,
         };
 
         snapshot(
@@ -143,16 +225,22 @@ mod tests {
                 time: Some((4, 4)),
                 key: Some(0),
                 barline: Some(Barline::Normal),
+                stencil_start: Entity::new(0),
+                stencil_middle: Entity::new(1),
+                stencil_end: Entity::new(2),
             }
-            .render(&context)
+            .render_start(&context)
             .and_right(
                 BetweenBars {
                     clef: Some(Clef::G),
                     time: Some((4, 4)),
                     key: Some(6),
                     barline: Some(Barline::Normal),
+                    stencil_start: Entity::new(0),
+                    stencil_middle: Entity::new(1),
+                    stencil_end: Entity::new(2),
                 }
-                .render(&context),
+                .render_start(&context),
             )
             .and_right(
                 BetweenBars {
@@ -160,8 +248,11 @@ mod tests {
                     time: Some((4, 4)),
                     key: Some(-6),
                     barline: Some(Barline::Normal),
+                    stencil_start: Entity::new(0),
+                    stencil_middle: Entity::new(1),
+                    stencil_end: Entity::new(2),
                 }
-                .render(&context),
+                .render_start(&context),
             )
             .and_right(
                 BetweenBars {
@@ -169,8 +260,11 @@ mod tests {
                     time: Some((6, 8)),
                     key: Some(6),
                     barline: Some(Barline::Normal),
+                    stencil_start: Entity::new(0),
+                    stencil_middle: Entity::new(1),
+                    stencil_end: Entity::new(2),
                 }
-                .render(&context),
+                .render_start(&context),
             )
             .and_right(
                 BetweenBars {
@@ -178,8 +272,11 @@ mod tests {
                     time: Some((6, 8)),
                     key: Some(-6),
                     barline: Some(Barline::Normal),
+                    stencil_start: Entity::new(0),
+                    stencil_middle: Entity::new(1),
+                    stencil_end: Entity::new(2),
                 }
-                .render(&context),
+                .render_start(&context),
             )
             .with_translation(Vec2::new(0f64, 1000f64))
             .to_svg_doc_for_testing(),

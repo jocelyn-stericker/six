@@ -437,6 +437,18 @@ impl Render {
             None
         };
 
+        let stencil_start = self.entities.create();
+        self.stencils.insert(stencil_start, Stencil::default());
+        self.parents.insert(stencil_start, entity);
+
+        let stencil_middle = self.entities.create();
+        self.parents.insert(stencil_middle, entity);
+        self.stencils.insert(stencil_middle, Stencil::default());
+
+        let stencil_end = self.entities.create();
+        self.parents.insert(stencil_end, entity);
+        self.stencils.insert(stencil_end, Stencil::default());
+
         self.between_bars.insert(
             entity,
             BetweenBars {
@@ -444,17 +456,16 @@ impl Render {
                 clef,
                 time,
                 key,
+                stencil_start,
+                stencil_middle,
+                stencil_end,
             },
         );
         self.contexts.insert(entity, Context::default());
-        self.stencils.insert(entity, Stencil::default());
 
         entity.id()
     }
 
-    /// Insert content that lives before or after a bar, without attaching it to a staff.
-    ///
-    /// This includes signatures, barlines, clefs, etc.
     pub fn between_bars_update(
         &mut self,
         entity: usize,
@@ -472,6 +483,8 @@ impl Render {
             None
         };
 
+        let bb = self.between_bars.remove(&entity).unwrap();
+
         self.between_bars.insert(
             entity,
             BetweenBars {
@@ -479,6 +492,7 @@ impl Render {
                 clef,
                 time,
                 key,
+                ..bb
             },
         );
     }
@@ -577,6 +591,7 @@ impl Render {
                     .and_then(|root| self.songs.get(&root))
                     .map(|root| (root.width / 7.0 * 1000.0, root.height / 7.0 * 1000.0)),
                 &self.bars,
+                &self.between_bars,
                 &self.stencils,
                 &mut self.spacing,
                 &mut self.staffs,

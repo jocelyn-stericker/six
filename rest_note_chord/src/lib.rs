@@ -9,7 +9,7 @@ use kurbo::Vec2;
 use rhythm::{Duration, NoteValue};
 use stencil::Stencil;
 
-pub use context::{Context, Place};
+pub use context::Context;
 pub use sys_print_rnc::sys_print_rnc;
 pub use sys_space_time_warp::{sys_apply_warp, sys_record_space_time_warp, SpaceTimeWarp};
 pub use sys_update_rnc_timing::sys_update_rnc_timing;

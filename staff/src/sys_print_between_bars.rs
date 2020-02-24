@@ -8,9 +8,11 @@ use stencil::Stencil;
 pub fn sys_print_between_bars(
     between_bars: &HashMap<Entity, BetweenBars>,
     contexts: &HashMap<Entity, Context>,
-    render: &mut HashMap<Entity, Stencil>,
+    stencils: &mut HashMap<Entity, Stencil>,
 ) {
-    for (between_bar, stencil, context) in (between_bars, render, contexts).join().values_mut() {
-        **stencil = between_bar.render(context);
+    for (between_bar, context) in (between_bars, contexts).join().values_mut() {
+        *stencils.get_mut(&between_bar.stencil_start).unwrap() = between_bar.render_start(context);
+        *stencils.get_mut(&between_bar.stencil_middle).unwrap() = between_bar.render_mid(context);
+        *stencils.get_mut(&between_bar.stencil_end).unwrap() = between_bar.render_end(context);
     }
 }

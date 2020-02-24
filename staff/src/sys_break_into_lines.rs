@@ -1,6 +1,6 @@
 use num_rational::Rational;
 
-use crate::{LineOfStaff, Staff};
+use crate::{BetweenBars, LineOfStaff, Staff};
 use entity::{EntitiesRes, Entity, Join};
 use rhythm::{Bar, Duration, RelativeRhythmicSpacing};
 use std::collections::HashMap;
@@ -9,10 +9,64 @@ use stencil::Stencil;
 pub(crate) const STAFF_MARGIN: f64 = 2500f64;
 
 #[derive(Debug, Clone)]
+struct BetweenMeta {
+    /// Stencil and width if at start of line.
+    start: (Entity, f64),
+    /// Stencil and width if in middle of line.
+    mid: (Entity, f64),
+    /// Stencil and width if at end of line.
+    end: (Entity, f64),
+}
+
+#[derive(Debug, Clone)]
+/// Line-splitting metadata for notes and betweens.
+enum ItemMeta {
+    Note(Duration, Entity, f64),
+    Between(BetweenMeta),
+}
+
+impl ItemMeta {
+    fn start_meta(&self) -> (Entity, f64) {
+        match self {
+            ItemMeta::Note(_, stencil, width) => (*stencil, *width),
+            ItemMeta::Between(bm) => bm.start,
+        }
+    }
+
+    fn mid_meta(&self) -> (Entity, f64) {
+        match self {
+            ItemMeta::Note(_, stencil, width) => (*stencil, *width),
+            ItemMeta::Between(bm) => bm.mid,
+        }
+    }
+
+    fn end_meta(&self) -> (Entity, f64) {
+        match self {
+            ItemMeta::Note(_, stencil, width) => (*stencil, *width),
+            ItemMeta::Between(bm) => bm.end,
+        }
+    }
+
+    fn duration(&self) -> Option<Duration> {
+        match self {
+            ItemMeta::Note(duration, _, _) => Some(*duration),
+            ItemMeta::Between(_) => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ConditionalChildren {
+    start: Entity,
+    mid: Entity,
+    end: Entity,
+}
+
+#[derive(Debug, Clone)]
 struct PartialSolution {
     shortest: Rational,
-    entities: Vec<Entity>,
-    children: Vec<(Entity, Option<Duration>, f64)>,
+    entities: Vec<ConditionalChildren>,
+    children: Vec<ItemMeta>,
     width: f64,
     is_valid: bool,
 }
@@ -31,42 +85,74 @@ impl Default for PartialSolution {
 
 impl PartialSolution {
     fn add_bar(&mut self, entity: Entity, bar: &Bar, stencils: &HashMap<Entity, Stencil>) {
-        self.entities.push(entity);
+        self.entities.push(ConditionalChildren {
+            start: entity,
+            mid: entity,
+            end: entity,
+        });
         for (duration, _, entity, _) in bar.children() {
             let stencil = &stencils[&entity];
             self.shortest = self.shortest.min(duration.duration());
             self.children
-                .push((entity, Some(duration), stencil.rect().x1));
+                .push(ItemMeta::Note(duration, entity, stencil.rect().x1));
         }
 
         let mut advance_step = 400.0f64;
-        for (_, time, min_width) in &self.children {
-            if let Some(time) = time {
-                advance_step = advance_step
-                    .max(min_width / RelativeRhythmicSpacing::new(self.shortest, time).relative);
+        for meta in &self.children {
+            if let Some(ref duration) = meta.duration() {
+                advance_step = advance_step.max(
+                    meta.mid_meta().1
+                        / RelativeRhythmicSpacing::new(self.shortest, duration).relative,
+                );
             }
         }
 
         let advance_step = advance_step + 100.0;
 
         self.width = 0.0;
-        for (_, time, min_width) in &self.children {
-            if let Some(time) = time {
+        for (i, meta) in self.children.iter().enumerate() {
+            if let Some(ref duration) = meta.duration() {
                 self.width +=
-                    advance_step * RelativeRhythmicSpacing::new(self.shortest, time).relative;
+                    advance_step * RelativeRhythmicSpacing::new(self.shortest, duration).relative;
             } else {
-                self.width += min_width;
+                self.width += if i == 0 {
+                    meta.start_meta().1
+                } else {
+                    meta.mid_meta().1
+                };
             }
         }
 
         self.is_valid = false;
     }
 
-    fn add_between(&mut self, entity: Entity, between: &Stencil) {
-        self.entities.push(entity);
+    fn add_between(&mut self, between: &BetweenBars, stencils: &HashMap<Entity, Stencil>) {
+        self.entities.push(ConditionalChildren {
+            start: between.stencil_start,
+            mid: between.stencil_middle,
+            end: between.stencil_end,
+        });
 
-        let w = between.advance();
-        self.children.push((entity, None, w));
+        self.children.push(ItemMeta::Between(BetweenMeta {
+            start: (
+                between.stencil_start,
+                stencils[&between.stencil_start].advance(),
+            ),
+            mid: (
+                between.stencil_middle,
+                stencils[&between.stencil_middle].advance(),
+            ),
+            end: (
+                between.stencil_end,
+                stencils[&between.stencil_end].advance(),
+            ),
+        }));
+        let w = if self.entities.len() == 1 {
+            stencils[&between.stencil_start].advance()
+        } else {
+            // TODO: should be end, but back to middle when adding another bar.
+            stencils[&between.stencil_middle].advance()
+        };
         self.width += w;
         self.is_valid = true;
     }
@@ -80,10 +166,11 @@ impl PartialSolution {
         spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
     ) {
         let mut advance_step = 400.0f64;
-        for (_, duration, min_width) in &self.children {
-            if let Some(duration) = duration {
+        for meta in &self.children {
+            if let Some(ref duration) = meta.duration() {
                 advance_step = advance_step.max(
-                    min_width / RelativeRhythmicSpacing::new(self.shortest, duration).relative,
+                    meta.mid_meta().1
+                        / RelativeRhythmicSpacing::new(self.shortest, duration).relative,
                 );
             }
         }
@@ -94,17 +181,21 @@ impl PartialSolution {
         let mut strut_width = 0.0;
         let mut advances = 0.0;
 
-        for (i, (_, duration, min_width)) in self.children.iter().enumerate() {
-            if let Some(duration) = duration {
+        for (i, meta) in self.children.iter().enumerate() {
+            if let Some(ref duration) = meta.duration() {
                 spring_width +=
                     advance_step * RelativeRhythmicSpacing::new(self.shortest, duration).relative;
                 advances += RelativeRhythmicSpacing::new(self.shortest, duration).relative;
             } else {
-                if i != 0 {
+                if i == 0 {
+                    strut_width += meta.start_meta().1;
+                } else if i + 1 == self.children.len() {
                     // HACK: padding after bar.
-                    strut_width += 200f64;
+                    strut_width += 200f64 + meta.end_meta().1;
+                } else {
+                    // HACK: padding after bar.
+                    strut_width += 200f64 + meta.mid_meta().1;
                 }
-                strut_width += min_width;
             }
         }
 
@@ -113,7 +204,7 @@ impl PartialSolution {
         advance_step += extra_width_to_allocate / advances;
 
         for maybe_bar in &self.entities {
-            if let Some(bar) = bars.get(maybe_bar) {
+            if let Some(bar) = bars.get(&maybe_bar.mid) {
                 let mut advance = 200f64;
                 for (dur, t, entity, _) in bar.children() {
                     let mut my_spacing = RelativeRhythmicSpacing::new(self.shortest, &dur);
@@ -134,6 +225,7 @@ pub fn sys_break_into_lines(
     entities: &EntitiesRes,
     page_size: Option<(f64, f64)>,
     bars: &HashMap<Entity, Bar>,
+    between_bars: &HashMap<Entity, BetweenBars>,
     stencils: &HashMap<Entity, Stencil>,
     spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
     staffs: &mut HashMap<Entity, Staff>,
@@ -149,28 +241,32 @@ pub fn sys_break_into_lines(
 
     let mut to_add = vec![];
     for (staff_id, (staff, children)) in (staffs, &mut *ordered_children).join() {
-        let mut chunks: Vec<Vec<Entity>> = Vec::new();
+        let mut chunks: Vec<Vec<ConditionalChildren>> = Vec::new();
         let mut current_solution = PartialSolution::default();
         let mut next_solution = PartialSolution::default();
         let mut good_solution = PartialSolution::default();
+        let mut recent_between = None;
 
         // This is greedy.
         for child in children {
             if let Some(bar) = bars.get(child) {
                 current_solution.add_bar(*child, bar, stencils);
                 next_solution.add_bar(*child, bar, stencils);
-            } else if let Some(stencil) = stencils.get(child) {
-                current_solution.add_between(*child, stencil);
-                next_solution.add_between(*child, stencil);
+            } else if let Some(between) = between_bars.get(child) {
+                current_solution.add_between(between, &stencils);
+                next_solution.add_between(between, &stencils);
+                recent_between = Some(between);
             } else {
                 panic!();
             }
 
             if current_solution.is_valid {
-                eprintln!("{:?} {:?}", current_solution.width, width);
                 if current_solution.width < width {
                     good_solution = current_solution.clone();
                     next_solution = PartialSolution::default();
+                    if let Some(between) = recent_between {
+                        next_solution.add_between(between, &stencils);
+                    }
                 } else {
                     good_solution.apply_spacing(width, bars, spacing);
                     let PartialSolution { entities, .. } = good_solution;
@@ -210,7 +306,22 @@ pub fn sys_break_into_lines(
                 parents.insert(line_of_staff_id, staff_id);
             }
 
-            to_add.push((staff.lines[line_number], line));
+            let line_len = line.len();
+            to_add.push((
+                staff.lines[line_number],
+                line.into_iter()
+                    .enumerate()
+                    .map(|(i, cond)| {
+                        if i == 0 {
+                            cond.start
+                        } else if i + 1 == line_len {
+                            cond.end
+                        } else {
+                            cond.mid
+                        }
+                    })
+                    .collect(),
+            ));
         }
     }
 
