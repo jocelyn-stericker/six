@@ -1,3 +1,6 @@
+[profile.dev]
+overflow-checks = false     # Disable integer overflow checks.
+
 [workspace]
 members = [
     "entity",

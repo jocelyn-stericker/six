@@ -186,16 +186,14 @@ impl PartialSolution {
                 spring_width +=
                     advance_step * RelativeRhythmicSpacing::new(self.shortest, duration).relative;
                 advances += RelativeRhythmicSpacing::new(self.shortest, duration).relative;
+            } else if i == 0 {
+                strut_width += meta.start_meta().1;
+            } else if i + 1 == self.children.len() {
+                // HACK: padding after bar.
+                strut_width += 200f64 + meta.end_meta().1;
             } else {
-                if i == 0 {
-                    strut_width += meta.start_meta().1;
-                } else if i + 1 == self.children.len() {
-                    // HACK: padding after bar.
-                    strut_width += 200f64 + meta.end_meta().1;
-                } else {
-                    // HACK: padding after bar.
-                    strut_width += 200f64 + meta.mid_meta().1;
-                }
+                // HACK: padding after bar.
+                strut_width += 200f64 + meta.mid_meta().1;
             }
         }
 

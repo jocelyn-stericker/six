@@ -7,7 +7,14 @@ mod sys_update_world_bboxes;
 pub use stencil_map::StencilMap;
 pub use sys_update_world_bboxes::sys_update_world_bboxes;
 
-use kurbo::{Affine, BezPath, Line, Point, Rect, TranslateScale, Vec2};
+use kurbo::{BezPath, Line, Point, Rect, TranslateScale, Vec2};
+
+#[derive(Debug, Clone)]
+pub struct RawSvg {
+    pub(crate) svg: String,
+    pub(crate) bounds: Rect,
+    pub(crate) advance: f64,
+}
 
 /// A path with precomputed bounds.
 #[derive(Debug, Clone)]
@@ -29,6 +36,7 @@ pub struct CombineStencil(pub Vec<Stencil>);
 
 #[derive(Debug, Clone)]
 pub enum Stencil {
+    RawSvg(RawSvg),
     Path(Path),
     Text(Text),
     Combine(CombineStencil),
@@ -312,9 +320,9 @@ impl Stencil {
     /// Initialize a stencil, in staff cordinates.
     fn from_corefont(corefont: &(f64, [f64; 4], &str)) -> Stencil {
         assert_eq!(corefont::UNITS_PER_EM, 1000);
-        Stencil::Path(Path {
-            outline: Affine::FLIP_Y * BezPath::from_svg(corefont.2).expect("Invalid corefont"),
-            bounds: Rect::new(corefont.1[0], -corefont.1[1], corefont.1[2], -corefont.1[3]),
+        Stencil::RawSvg(RawSvg {
+            svg: corefont.2.to_owned(),
+            bounds: Rect::new(corefont.1[0], corefont.1[1], corefont.1[2], corefont.1[3]),
             advance: corefont.0,
         })
     }
@@ -582,7 +590,7 @@ impl Stencil {
 
     pub fn rect(&self) -> Rect {
         match self {
-            Stencil::Path(path) => path.bounds,
+            Stencil::Path(Path { bounds, .. }) | Stencil::RawSvg(RawSvg { bounds, .. }) => *bounds,
             Stencil::Translate(ts, child) => TranslateScale::translate(*ts) * child.rect(),
             Stencil::Combine(combine) => {
                 let mut rect = combine.0.first().map(|f| f.rect()).unwrap_or_default();
@@ -611,7 +619,9 @@ impl Stencil {
 
     pub fn advance(&self) -> f64 {
         match self {
-            Stencil::Path(path) => path.advance,
+            Stencil::Path(Path { advance, .. }) | Stencil::RawSvg(RawSvg { advance, .. }) => {
+                *advance
+            }
             Stencil::Translate(ts, child) => ts.x + child.advance(),
             Stencil::Combine(combine) => {
                 combine
@@ -633,6 +643,11 @@ impl Stencil {
     /// Generate an SVG representation of the string, without newlines.
     pub fn to_svg(&self) -> String {
         match self {
+            Stencil::RawSvg(svg) => [
+                "<path d=\"",
+                &svg.svg,
+                "\" />",
+            ].concat(),
             Stencil::Path(path) => [
                 "<path d=\"",
                 &path.outline.to_svg().replace('\n', ""),

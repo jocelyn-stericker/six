@@ -2,6 +2,7 @@ use entity::{EntitiesRes, Entity};
 use kurbo::Vec2;
 use pitch::{Clef, NoteName, Pitch};
 use rest_note_chord::Context;
+use std::cmp::Ordering;
 use stencil::Stencil;
 use wasm_bindgen::prelude::*;
 
@@ -36,12 +37,10 @@ pub fn get_pitches(key: i8, clef: Clef) -> Vec<Pitch> {
         Pitch::new(NoteName::F, None, 4 + octave_offset),
     ];
 
-    if key > 0 {
-        sharps[0..(key as usize)].into_iter().cloned().collect()
-    } else if key < 0 {
-        flats[0..(-key as usize)].into_iter().cloned().collect()
-    } else {
-        Vec::new()
+    match key.cmp(&0) {
+        Ordering::Greater => sharps[0..(key as usize)].iter().cloned().collect(),
+        Ordering::Less => flats[0..(-key as usize)].iter().cloned().collect(),
+        Ordering::Equal => Vec::new(),
     }
 }
 
