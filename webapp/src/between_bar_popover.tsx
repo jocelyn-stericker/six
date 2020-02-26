@@ -7,20 +7,28 @@ export interface Props {
   tsNum: number;
   tsDen: number;
   setClef: (clef: Clef) => void;
+  setKs: (ks: number) => void;
   setTs: (ts: [number, number]) => void;
+  onInsertBarRight: () => void;
+  onRemoveBarRight: () => void | null;
 }
 
 export default function BetweenBarPopover({
   children,
   setClef,
+  setKs,
   setTs,
   tsNum,
   tsDen,
+  onInsertBarRight,
+  onRemoveBarRight,
 }: Props) {
   return (
     <Popover
       position="right-top"
       popoverClassName="bp3-dark"
+      captureDismiss={true}
+      minimal={true}
       modifiers={
         {
           preventOverflow: true,
@@ -30,6 +38,18 @@ export default function BetweenBarPopover({
       hasBackdrop={true}
       content={
         <Menu large={true}>
+          <MenuItem
+            icon="blank"
+            text="Insert Bar Right"
+            onClick={onInsertBarRight}
+          />
+          <MenuItem
+            icon="blank"
+            text="Remove Next Bar"
+            disabled={!onRemoveBarRight}
+            onClick={onRemoveBarRight}
+          />
+          <MenuDivider />
           <MenuItem
             text="Edit Time Signature"
             icon={"ts" as any}
@@ -152,41 +172,74 @@ export default function BetweenBarPopover({
               hoverOpenDelay: 350,
             }}
           >
-            <MenuItem icon="blank" text="G♭ Major / e♭ minor (6♭)" />
-            <MenuItem icon="blank" text="D♭ Major / b♭ minor (5♭)" />
-            <MenuItem icon="blank" text="A♭ Major / f minor (4♭)" />
-            <MenuItem icon="blank" text="E♭ Major / c minor (3♭)" />
-            <MenuItem icon="blank" text="B♭ Major / g minor (2♭)" />
-            <MenuItem icon="blank" text="F Major / d minor (♭)" />
-            <MenuItem icon="blank" text="C Major / a minor" />
-            <MenuItem icon="blank" text="G Major / e minor (♯)" />
-            <MenuItem icon="blank" text="D Major / b minor (2♯)" />
-            <MenuItem icon="blank" text="A Major / f♯ minor (3♯)" />
-            <MenuItem icon="blank" text="E Major / c♯ minor (4♯)" />
-            <MenuItem icon="blank" text="B Major / g♯ minor (5♯)" />
-            <MenuItem icon="blank" text="F♯ Major / d♯ minor (6♯)" />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(-6)}
+              text="G♭ Major / e♭ minor (6♭)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(-5)}
+              text="D♭ Major / b♭ minor (5♭)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(-4)}
+              text="A♭ Major / f minor (4♭)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(-3)}
+              text="E♭ Major / c minor (3♭)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(-2)}
+              text="B♭ Major / g minor (2♭)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(-1)}
+              text="F Major / d minor (♭)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(0)}
+              text="C Major / a minor"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(1)}
+              text="G Major / e minor (♯)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(2)}
+              text="D Major / b minor (2♯)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(3)}
+              text="A Major / f♯ minor (3♯)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(4)}
+              text="E Major / c♯ minor (4♯)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(5)}
+              text="B Major / g♯ minor (5♯)"
+            />
+            <MenuItem
+              icon="blank"
+              onClick={() => setKs(6)}
+              text="F♯ Major / d♯ minor (6♯)"
+            />
             <MenuDivider />
             <MenuItem text="No change" icon="delete" />
           </MenuItem>
-          <MenuDivider />
-          <MenuItem
-            text="Edit Barline"
-            icon="blank"
-            popoverProps={{
-              interactionKind: "hover",
-              hoverCloseDelay: 350,
-              hoverOpenDelay: 350,
-            }}
-          >
-            <MenuItem icon="blank" text="Single" />
-            <MenuItem icon="blank" text="Double" />
-            <MenuItem icon="blank" text="Final" />
-            <MenuDivider />
-            <MenuItem icon="blank" text="Start Repeat" />
-            <MenuItem icon="blank" text="End Repeat" />
-          </MenuItem>
-          <MenuItem icon="blank" text="Insert Bar" />
-          <MenuItem icon="blank" text="Remove Next Bar" />
         </Menu>
       }
     >

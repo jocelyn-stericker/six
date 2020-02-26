@@ -98,3 +98,7 @@ html body, html .ui-text {
 .between-bars {
     fill: #e16162;
 }
+
+.between-edit:hover {
+    border: 1px solid #e16162;
+}

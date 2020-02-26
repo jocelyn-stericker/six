@@ -125,8 +125,9 @@ impl BetweenBars {
         match self.barline {
             Some(Barline::Normal) => {
                 stencil = stencil
-                    .and_right(Stencil::padding(100.0))
+                    .and_right(Stencil::padding(200.0))
                     .and_right(Stencil::barline_thin(0.0, -500.0, 500.0))
+                    .and_right(Stencil::padding(200.0))
             }
             Some(Barline::Final) => {
                 stencil = stencil

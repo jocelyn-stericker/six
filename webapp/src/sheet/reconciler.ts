@@ -348,7 +348,8 @@ const Reconciler = ReactReconciler({
       (oldProps.clef !== newProps.clef ||
         oldProps.tsNum !== newProps.tsNum ||
         oldProps.tsDen !== newProps.tsDen ||
-        oldProps.ks !== newProps.ks)
+        oldProps.ks !== newProps.ks ||
+        oldProps.barline !== newProps.barline)
     ) {
       instance.container.between_bars_update(
         instance.entity,

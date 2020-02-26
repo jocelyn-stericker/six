@@ -70,6 +70,16 @@ type ApplyInvertAction =
       prevClef: Clef;
     }
   | {
+      type: "ADD_BAR";
+      barIdx: number;
+      bar: Bar;
+    }
+  | {
+      type: "REMOVE_BAR";
+      barIdx: number;
+      bar: Bar;
+    }
+  | {
       type: "SET_TITLE";
       title: string;
       prevTitle: string;
@@ -188,6 +198,18 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         ks: action.prevKs,
         prevKs: action.ks,
       };
+    case "ADD_BAR":
+      return {
+        type: "REMOVE_BAR",
+        barIdx: action.barIdx,
+        bar: action.bar,
+      };
+    case "REMOVE_BAR":
+      return {
+        type: "ADD_BAR",
+        barIdx: action.barIdx,
+        bar: action.bar,
+      };
     case "SET_AUTHOR":
       return {
         type: "SET_AUTHOR",
@@ -230,6 +252,10 @@ function apply(state: State, action: ApplyInvertAction) {
       startDen,
       divisions,
     });
+  } else if (action.type === "ADD_BAR") {
+    state.song.part.bars.splice(action.barIdx, 0, action.bar);
+  } else if (action.type === "REMOVE_BAR") {
+    state.song.part.bars.splice(action.barIdx, 1);
   } else if (action.type === "SET_CLEF") {
     state.song.global.clef = action.clef;
   } else if (action.type === "SET_TS") {
@@ -256,6 +282,8 @@ export function reduce(state: State, action: Action): State {
     case "SET_TS":
     case "SET_KS":
     case "SET_CLEF":
+    case "ADD_BAR":
+    case "REMOVE_BAR":
       apply(state, action);
       state.undoStack.push(action);
       state.redoStack = [];

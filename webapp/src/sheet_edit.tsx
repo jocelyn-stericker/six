@@ -130,6 +130,7 @@ function SheetEdit({ appState, dispatch }: Props) {
     proposedInsertion,
     setProposedInsertion,
   ] = useState<ProposedInsertion | null>(null);
+  const [editMode, setEditMode] = useState(false);
 
   const songRef = useRef<Render>(null);
 
@@ -172,6 +173,9 @@ function SheetEdit({ appState, dispatch }: Props) {
           );
         }}
         onMouseMove={ev => {
+          if (editMode) {
+            setTimeout(() => setEditMode(false), 0);
+          }
           if (dragState && proposedInsertion) {
             let deltaX = ev.clientX - dragState.startX;
             const steps = Math.trunc(deltaX / 30);
@@ -211,6 +215,9 @@ function SheetEdit({ appState, dispatch }: Props) {
           });
         }}
         onMouseUp={() => {
+          if (editMode) {
+            return;
+          }
           setDragState(null);
           if (insertionDuration[0] / insertionDuration[1] > 1 / 4) {
             setInsertionDuration([1, 4]);
@@ -256,6 +263,13 @@ function SheetEdit({ appState, dispatch }: Props) {
                         prevClef: appState.song.global.clef,
                       })
                     }
+                    setKs={ks =>
+                      dispatch({
+                        type: "SET_KS",
+                        ks,
+                        prevKs: appState.song.global.ks,
+                      })
+                    }
                     setTs={([num, den]) =>
                       dispatch({
                         type: "SET_TS",
@@ -265,8 +279,30 @@ function SheetEdit({ appState, dispatch }: Props) {
                         prevDen: appState.song.global.tsDen,
                       })
                     }
+                    onInsertBarRight={() => {
+                      dispatch({
+                        type: "ADD_BAR",
+                        barIdx: 0,
+                        bar: {
+                          barline: "normal",
+                          notes: [],
+                        },
+                      });
+                    }}
+                    onRemoveBarRight={
+                      appState.song.part.bars[0] &&
+                      (() => {
+                        dispatch({
+                          type: "REMOVE_BAR",
+                          barIdx: 0,
+                          bar: appState.song.part.bars[0],
+                        });
+                      })
+                    }
                   >
                     <div
+                      onMouseOver={() => setEditMode(true)}
+                      className="between-edit"
                       style={{
                         width,
                         height,
@@ -284,7 +320,9 @@ function SheetEdit({ appState, dispatch }: Props) {
                   numer={appState.song.global.tsNum}
                   denom={appState.song.global.tsDen}
                   className={
-                    proposedInsertion && proposedInsertion.barIdx === barIdx
+                    !editMode &&
+                    proposedInsertion &&
+                    proposedInsertion.barIdx === barIdx
                       ? "six-bar-hover"
                       : "six-bar"
                   }
@@ -343,6 +381,7 @@ function SheetEdit({ appState, dispatch }: Props) {
                     ),
                   )}
                   {!hoverMatchesAny &&
+                    !editMode &&
                     proposedInsertion &&
                     proposedInsertion.barIdx === barIdx &&
                     proposedInsertion.divisions.map((div, idx) => (
@@ -375,6 +414,13 @@ function SheetEdit({ appState, dispatch }: Props) {
                             prevClef: appState.song.global.clef,
                           })
                         }
+                        setKs={ks =>
+                          dispatch({
+                            type: "SET_KS",
+                            ks,
+                            prevKs: appState.song.global.ks,
+                          })
+                        }
                         setTs={([num, den]) =>
                           dispatch({
                             type: "SET_TS",
@@ -384,8 +430,30 @@ function SheetEdit({ appState, dispatch }: Props) {
                             prevDen: appState.song.global.tsDen,
                           })
                         }
+                        onInsertBarRight={() => {
+                          dispatch({
+                            type: "ADD_BAR",
+                            barIdx: barIdx + 1,
+                            bar: {
+                              barline: "normal",
+                              notes: [],
+                            },
+                          });
+                        }}
+                        onRemoveBarRight={
+                          appState.song.part.bars[barIdx + 1] &&
+                          (() => {
+                            dispatch({
+                              type: "REMOVE_BAR",
+                              barIdx: barIdx + 1,
+                              bar: appState.song.part.bars[barIdx + 1],
+                            });
+                          })
+                        }
                       >
                         <div
+                          onMouseOver={() => setEditMode(true)}
+                          className="between-edit"
                           style={{
                             width,
                             height,

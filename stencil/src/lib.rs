@@ -322,7 +322,7 @@ impl Stencil {
         assert_eq!(corefont::UNITS_PER_EM, 1000);
         Stencil::RawSvg(RawSvg {
             svg: corefont.2.to_owned(),
-            bounds: Rect::new(corefont.1[0], corefont.1[1], corefont.1[2], corefont.1[3]),
+            bounds: Rect::new(corefont.1[0], -corefont.1[1], corefont.1[2], -corefont.1[3]),
             advance: corefont.0,
         })
     }

@@ -2,7 +2,6 @@ import React, { useReducer } from "react";
 
 import "normalize.css";
 import "./app.css";
-import Toolbar from "./toolbar";
 import { reduce, getInitialState } from "./store";
 import About from "./about";
 import Meta from "./meta";
@@ -18,13 +17,6 @@ export default function App() {
       <About />
       <Meta appState={appState} dispatch={dispatch} />
       <div className="six-note-editor">
-        <Toolbar
-          canUndo={appState.undoStack.length > 0}
-          onUndo={() => dispatch({ type: "UNDO" })}
-          onSave={() => alert("save")}
-          onOpen={() => alert("open")}
-          onReset={() => dispatch({ type: "RESET" })}
-        />
         <React.Suspense fallback={null}>
           <AppHotkeys
             onUndo={() => dispatch({ type: "UNDO" })}
