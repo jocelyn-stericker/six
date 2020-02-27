@@ -2,7 +2,6 @@
  color: #abd1c6;
  margin: 16px 16px 24px;
  padding: 0 16px 16px;
- border: none;
  font-size: 16px;
  border: 1px solid #abd1c6;
  max-width: 1002px;
@@ -27,6 +26,21 @@
 .meta input.bp3-input:focus {
     outline-color: #e16162;
     box-shadow: 0 0 0 1px #e16162, 0 0 0 3px #e16162, inset 0 1px 1px #e16162;
+}
+
+.meta .bp3-numeric-input .bp3-button-group {
+    border: 1px solid #abd1c6;
+    border-left: none;
+}
+
+.meta .bp3-numeric-input button.bp3-button,
+.meta .bp3-numeric-input button.bp3-button:hover {
+  box-shadow: none;
+  background: none;
+}
+
+.meta .bp3-numeric-input button.bp3-button:hover svg {
+    color: #e16162;
 }
 
 .meta input::placeholder {

@@ -5,6 +5,7 @@ import {
   FormGroup,
   InputGroup,
   Divider,
+  NumericInput,
   HTMLSelect,
 } from "@blueprintjs/core";
 import { Action, State } from "./store";
@@ -19,6 +20,11 @@ interface Props {
 }
 
 export default function Meta({ appState, dispatch }: Props) {
+  const minBars = appState.song.part.bars.reduce(
+    (memo, bar, idx) => (bar.notes.length > 0 ? idx + 1 : memo),
+    1,
+  );
+  const maxBars = 20;
   return (
     <React.Fragment>
       <div className="meta bp3-dark">
@@ -52,6 +58,25 @@ export default function Meta({ appState, dispatch }: Props) {
                 prevAuthor: appState.song.global.author,
               });
             }}
+          />
+        </FormGroup>
+        <FormGroup label="Number of Bars">
+          <NumericInput
+            value={appState.song.part.bars.length}
+            onValueChange={count => {
+              if (count < minBars || count > maxBars) {
+                return;
+              }
+              dispatch({
+                type: "SET_BAR_COUNT",
+                prevCount: appState.song.part.bars.length,
+                count,
+              });
+            }}
+            min={minBars}
+            max={maxBars}
+            large={true}
+            clampValueOnBlur={true}
           />
         </FormGroup>
       </div>

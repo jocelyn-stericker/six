@@ -14,9 +14,13 @@ export default function App() {
 
   return (
     <React.Fragment>
-      <About />
+      <About
+        title={appState.song.global.title}
+        author={appState.song.global.author}
+      />
       <Meta appState={appState} dispatch={dispatch} />
       <div className="six-note-editor">
+        <h2>Notes</h2>
         <React.Suspense fallback={null}>
           <AppHotkeys
             onUndo={() => dispatch({ type: "UNDO" })}

@@ -1,4 +1,6 @@
 import React, { useState, useRef, useMemo, createRef } from "react";
+import PieMenu, { Slice } from "react-pie-menu";
+import { ThemeProvider, css } from "styled-components";
 
 import Sheet, { Barline } from "./sheet";
 import { Render, Clef } from "./sheet/reconciler";
@@ -6,6 +8,20 @@ import { Action, State, TiedNote, Clef as ClefStr } from "./store";
 
 const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
 const NotePopover = React.lazy(() => import("./note_popover"));
+const theme = {
+  slice: {
+    container: css`
+      background: ${({ centerRadius }: any) =>
+        `radial-gradient(transparent ${centerRadius}, #004643cc ${centerRadius})`};
+      color: #abd1c6;
+      :hover {
+        background: ${({ centerRadius }: any) =>
+          `radial-gradient(transparent ${centerRadius}, #f9bc60 ${centerRadius})`};
+        color: #001e1d;
+      }
+    `,
+  },
+};
 
 interface Props {
   appState: State;
@@ -98,18 +114,6 @@ function getProposedInsertion(
   };
 }
 
-const STEPS = [
-  [1, 1],
-  [3, 4],
-  [1, 2],
-  [3, 8],
-  [1, 4],
-  [3, 16],
-  [1, 8],
-  [3, 32],
-  [1, 16],
-];
-
 function clefStrToNum(clef: ClefStr): Clef {
   if (clef === "g") {
     return Clef.G;
@@ -138,7 +142,6 @@ function SheetEdit({ appState, dispatch }: Props) {
   const [dragState, setDragState] = useState<{
     startX: number;
     startY: number;
-    origInsertionDuration: [number, number];
   } | null>(null);
 
   const barRefs = useMemo(
@@ -151,8 +154,66 @@ function SheetEdit({ appState, dispatch }: Props) {
 
   const hoverMatchesAny = false;
 
+  function addNote(frac: [number, number]) {
+    if (proposedInsertion) {
+      let newProposedInsertion = getProposedInsertion(
+        songRef.current,
+        appState,
+        barRefs[proposedInsertion.barIdx].current,
+        [
+          proposedInsertion.barIdx,
+          proposedInsertion.startNum,
+          proposedInsertion.startDen,
+        ],
+        frac,
+      );
+      if (newProposedInsertion) {
+        dispatch({
+          type: "ADD_NOTE",
+          barIdx: newProposedInsertion.barIdx,
+          startNum: newProposedInsertion.startNum,
+          startDen: newProposedInsertion.startDen,
+          divisions: newProposedInsertion.divisions,
+        });
+      }
+      setDragState(null);
+      setNumChanges(numChanges + 1);
+    }
+  }
+
   return (
     <div style={{ position: "relative" }}>
+      {dragState && (
+        <ThemeProvider theme={theme}>
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 100,
+              userSelect: "none",
+            }}
+          >
+            <PieMenu
+              centerX={`${dragState.startX}px`}
+              centerY={`${dragState.startY}px`}
+              centerRadius="20px"
+              radius="100px"
+            >
+              <Slice onSelect={() => addNote([1, 1])}>1</Slice>
+              <Slice onSelect={() => addNote([1, 2])}>1/2</Slice>
+              <Slice onSelect={() => addNote([1, 4])}>1/4</Slice>
+              <Slice onSelect={() => addNote([1, 8])}>1/8</Slice>
+              <Slice onSelect={() => addNote([1, 16])}>1/16</Slice>
+              <Slice>.</Slice>
+              <Slice>#</Slice>
+              <Slice>b</Slice>
+            </PieMenu>
+          </div>
+        </ThemeProvider>
+      )}
       <Sheet
         onHoverTimeChanged={time => {
           if (dragState) {
@@ -172,47 +233,18 @@ function SheetEdit({ appState, dispatch }: Props) {
             ),
           );
         }}
-        onMouseMove={ev => {
+        onMouseMove={_ev => {
           if (editMode) {
             setTimeout(() => setEditMode(false), 0);
           }
-          if (dragState && proposedInsertion) {
-            let deltaX = ev.clientX - dragState.startX;
-            const steps = Math.trunc(deltaX / 30);
-            let step = STEPS.findIndex(
-              x =>
-                x[0] === dragState.origInsertionDuration[0] &&
-                x[1] === dragState.origInsertionDuration[1],
-            );
-            step = Math.min(Math.max(step - steps, 0), STEPS.length - 1);
-            const frac = STEPS[step];
-            if (
-              frac[1] !== insertionDuration[1] ||
-              frac[0] !== insertionDuration[0]
-            ) {
-              setInsertionDuration(frac);
-              setProposedInsertion(
-                getProposedInsertion(
-                  songRef.current,
-                  appState,
-                  barRefs[proposedInsertion.barIdx].current,
-                  [
-                    proposedInsertion.barIdx,
-                    proposedInsertion.startNum,
-                    proposedInsertion.startDen,
-                  ],
-                  frac,
-                ),
-              );
-            }
-          }
         }}
         onMouseDown={(_, ev) => {
-          setDragState({
-            startX: ev.clientX,
-            startY: ev.clientY,
-            origInsertionDuration: [insertionDuration[0], insertionDuration[1]],
-          });
+          if (proposedInsertion) {
+            setDragState({
+              startX: ev.clientX,
+              startY: ev.clientY,
+            });
+          }
         }}
         onMouseUp={() => {
           if (editMode) {

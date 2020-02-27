@@ -80,6 +80,11 @@ type ApplyInvertAction =
       bar: Bar;
     }
   | {
+      type: "SET_BAR_COUNT";
+      count: number;
+      prevCount: number;
+    }
+  | {
       type: "SET_TITLE";
       title: string;
       prevTitle: string;
@@ -210,6 +215,12 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         barIdx: action.barIdx,
         bar: action.bar,
       };
+    case "SET_BAR_COUNT":
+      return {
+        type: "SET_BAR_COUNT",
+        count: action.prevCount,
+        prevCount: action.count,
+      };
     case "SET_AUTHOR":
       return {
         type: "SET_AUTHOR",
@@ -253,9 +264,25 @@ function apply(state: State, action: ApplyInvertAction) {
       divisions,
     });
   } else if (action.type === "ADD_BAR") {
+    state.song.part.bars[state.song.part.bars.length - 1].barline = "normal";
     state.song.part.bars.splice(action.barIdx, 0, action.bar);
+    state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
   } else if (action.type === "REMOVE_BAR") {
+    state.song.part.bars[state.song.part.bars.length - 1].barline = "normal";
     state.song.part.bars.splice(action.barIdx, 1);
+    state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
+  } else if (action.type === "SET_BAR_COUNT") {
+    state.song.part.bars[state.song.part.bars.length - 1].barline = "normal";
+    while (state.song.part.bars.length < action.count) {
+      state.song.part.bars.push({
+        notes: [],
+        barline: "normal",
+      });
+    }
+    while (state.song.part.bars.length > action.count) {
+      state.song.part.bars.pop();
+    }
+    state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
   } else if (action.type === "SET_CLEF") {
     state.song.global.clef = action.clef;
   } else if (action.type === "SET_TS") {
@@ -284,6 +311,7 @@ export function reduce(state: State, action: Action): State {
     case "SET_CLEF":
     case "ADD_BAR":
     case "REMOVE_BAR":
+    case "SET_BAR_COUNT":
       apply(state, action);
       state.undoStack.push(action);
       state.redoStack = [];
