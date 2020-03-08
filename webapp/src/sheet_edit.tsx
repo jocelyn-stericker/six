@@ -4,7 +4,7 @@ import { ThemeProvider, css } from "styled-components";
 
 import Sheet, { Barline } from "./sheet";
 import { Render, Clef } from "./sheet/reconciler";
-import { Action, State, TiedNote, Clef as ClefStr } from "./store";
+import { Action, State, TiedNote, Clef as ClefStr, setTs } from "./store";
 
 const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
 const NotePopover = React.lazy(() => import("./note_popover"));
@@ -181,8 +181,17 @@ function SheetEdit({ appState, dispatch }: Props) {
     }
   }
 
+  let currTs = appState.song.global.between[0].ts;
+
   return (
-    <div style={{ position: "relative" }}>
+    <div
+      style={{ position: "relative" }}
+      onMouseOut={() => {
+        if (!dragState) {
+          setProposedInsertion(null);
+        }
+      }}
+    >
       {dragState && (
         <ThemeProvider theme={theme}>
           <div
@@ -269,7 +278,6 @@ function SheetEdit({ appState, dispatch }: Props) {
       >
         <song
           freezeSpacing={proposedInsertion == null ? undefined : numChanges}
-          key={`${appState.song.global.tsNum}_${appState.song.global.tsDen}`}
           ref={songRef}
           width={215.9}
           height={279.4}
@@ -278,40 +286,38 @@ function SheetEdit({ appState, dispatch }: Props) {
         >
           <staff>
             <between
-              clef={clefStrToNum(appState.song.global.clef)}
-              tsNum={appState.song.global.tsNum}
-              tsDen={appState.song.global.tsDen}
-              ks={appState.song.global.ks}
+              clef={clefStrToNum(appState.song.global.between[0].clef)}
+              tsNum={appState.song.global.between[0].ts[0]}
+              tsDen={appState.song.global.between[0].ts[1]}
+              ks={appState.song.global.between[0].ks}
               className="between-bars"
               html={({ width, height }) => (
                 <React.Suspense fallback={null}>
                   <BetweenBarPopover
-                    tsNum={appState.song.global.tsNum}
-                    tsDen={appState.song.global.tsDen}
-                    setClef={clef =>
+                    tsNum={appState.song.global.between[0].ts[0]}
+                    tsDen={appState.song.global.between[0].ts[1]}
+                    setClef={clef => {
+                      setNumChanges(numChanges + 1);
                       dispatch({
                         type: "SET_CLEF",
                         clef,
-                        prevClef: appState.song.global.clef,
-                      })
-                    }
-                    setKs={ks =>
+                        prevClef: appState.song.global.between[0].clef,
+                      });
+                    }}
+                    setKs={ks => {
+                      setNumChanges(numChanges + 1);
                       dispatch({
                         type: "SET_KS",
                         ks,
-                        prevKs: appState.song.global.ks,
-                      })
-                    }
-                    setTs={([num, den]) =>
-                      dispatch({
-                        type: "SET_TS",
-                        num,
-                        den,
-                        prevNum: appState.song.global.tsNum,
-                        prevDen: appState.song.global.tsDen,
-                      })
-                    }
+                        prevKs: appState.song.global.between[0].ks,
+                      });
+                    }}
+                    setTs={([num, den]) => {
+                      setNumChanges(numChanges + 1);
+                      dispatch(setTs(appState, [num, den]));
+                    }}
                     onInsertBarRight={() => {
+                      setNumChanges(numChanges + 1);
                       dispatch({
                         type: "ADD_BAR",
                         barIdx: 0,
@@ -322,14 +328,16 @@ function SheetEdit({ appState, dispatch }: Props) {
                       });
                     }}
                     onRemoveBarRight={
-                      appState.song.part.bars[0] &&
-                      (() => {
-                        dispatch({
-                          type: "REMOVE_BAR",
-                          barIdx: 0,
-                          bar: appState.song.part.bars[0],
-                        });
-                      })
+                      (appState.song.part.bars.length > 1 &&
+                        (() => {
+                          setNumChanges(numChanges + 1);
+                          dispatch({
+                            type: "REMOVE_BAR",
+                            barIdx: 0,
+                            bar: appState.song.part.bars[0],
+                          });
+                        })) ||
+                      null
                     }
                   >
                     <div
@@ -345,159 +353,165 @@ function SheetEdit({ appState, dispatch }: Props) {
                 </React.Suspense>
               )}
             />
-            {appState.song.part.bars.map((bar, barIdx) => (
-              <React.Fragment key={barIdx}>
-                <bar
-                  ref={barRefs[barIdx]}
-                  numer={appState.song.global.tsNum}
-                  denom={appState.song.global.tsDen}
-                  className={
-                    !editMode &&
-                    proposedInsertion &&
-                    proposedInsertion.barIdx === barIdx
-                      ? "six-bar-hover"
-                      : "six-bar"
-                  }
-                >
-                  {bar.notes.map(
-                    (
-                      {
-                        divisions,
-                        startNum: tiedStartNum,
-                        startDen: tiedStartDen,
-                      },
-                      divisionIdx,
-                    ) => (
-                      <React.Fragment key={divisionIdx}>
-                        {divisions.map(
-                          ({ noteValue, dots, startNum, startDen }, jdx) => (
-                            <rnc
-                              className="six-real-note"
-                              key={jdx}
-                              noteValue={noteValue}
-                              dots={dots}
-                              startNum={startNum}
-                              startDen={startDen}
-                              isNote={true}
-                              isTemporary={false}
-                              html={({ width, height }) => (
-                                <React.Suspense fallback={null}>
-                                  <NotePopover
-                                    onDeleteNote={() => {
-                                      dispatch({
-                                        type: "REMOVE_NOTE",
-                                        barIdx,
-                                        startNum: tiedStartNum,
-                                        startDen: tiedStartDen,
-                                        divisions,
-                                      });
-                                    }}
-                                  >
-                                    <div
-                                      onMouseOver={() =>
-                                        setProposedInsertion(null)
-                                      }
-                                      style={{
-                                        width,
-                                        height,
-                                        cursor: "pointer",
+            {appState.song.part.bars.map((bar, barIdx) => {
+              currTs = appState.song.global.between[barIdx]?.ts ?? currTs;
+
+              // TODO: have stable keys even when adding/removing bars.
+              return (
+                <React.Fragment key={`${currTs[0]}_${currTs[1]}_${barIdx}`}>
+                  <bar
+                    ref={barRefs[barIdx]}
+                    numer={currTs[0]}
+                    denom={currTs[1]}
+                    className={
+                      !editMode &&
+                      proposedInsertion &&
+                      proposedInsertion.barIdx === barIdx
+                        ? "six-bar-hover"
+                        : "six-bar"
+                    }
+                  >
+                    {bar.notes.map(
+                      (
+                        {
+                          divisions,
+                          startNum: tiedStartNum,
+                          startDen: tiedStartDen,
+                        },
+                        divisionIdx,
+                      ) => (
+                        <React.Fragment key={divisionIdx}>
+                          {divisions.map(
+                            ({ noteValue, dots, startNum, startDen }, jdx) => (
+                              <rnc
+                                className="six-real-note"
+                                key={jdx}
+                                noteValue={noteValue}
+                                dots={dots}
+                                startNum={startNum}
+                                startDen={startDen}
+                                isNote={true}
+                                isTemporary={false}
+                                html={({ width, height }) => (
+                                  <React.Suspense fallback={null}>
+                                    <NotePopover
+                                      onDeleteNote={() => {
+                                        setNumChanges(numChanges + 1);
+                                        dispatch({
+                                          type: "REMOVE_NOTE",
+                                          barIdx,
+                                          startNum: tiedStartNum,
+                                          startDen: tiedStartDen,
+                                          divisions,
+                                        });
                                       }}
-                                    />
-                                  </NotePopover>
-                                </React.Suspense>
-                              )}
-                            />
-                          ),
-                        )}
-                      </React.Fragment>
-                    ),
-                  )}
-                  {!hoverMatchesAny &&
-                    !editMode &&
-                    proposedInsertion &&
-                    proposedInsertion.barIdx === barIdx &&
-                    proposedInsertion.divisions.map((div, idx) => (
-                      <rnc
-                        key={idx}
-                        className="six-note-to-add"
-                        noteValue={div.noteValue}
-                        dots={div.dots}
-                        startNum={div.startNum}
-                        startDen={div.startDen}
-                        isNote={true}
-                        isTemporary={true}
-                      />
-                    ))}
-                </bar>
-                <between
-                  barline={
-                    bar.barline === "normal" ? Barline.Normal : Barline.Final
-                  }
-                  className="between-bars"
-                  html={({ width, height }) => (
-                    <React.Suspense fallback={null}>
-                      <BetweenBarPopover
-                        tsNum={appState.song.global.tsNum}
-                        tsDen={appState.song.global.tsDen}
-                        setClef={clef =>
-                          dispatch({
-                            type: "SET_CLEF",
-                            clef,
-                            prevClef: appState.song.global.clef,
-                          })
-                        }
-                        setKs={ks =>
-                          dispatch({
-                            type: "SET_KS",
-                            ks,
-                            prevKs: appState.song.global.ks,
-                          })
-                        }
-                        setTs={([num, den]) =>
-                          dispatch({
-                            type: "SET_TS",
-                            num,
-                            den,
-                            prevNum: appState.song.global.tsNum,
-                            prevDen: appState.song.global.tsDen,
-                          })
-                        }
-                        onInsertBarRight={() => {
-                          dispatch({
-                            type: "ADD_BAR",
-                            barIdx: barIdx + 1,
-                            bar: {
-                              barline: "normal",
-                              notes: [],
-                            },
-                          });
-                        }}
-                        onRemoveBarRight={
-                          appState.song.part.bars[barIdx + 1] &&
-                          (() => {
-                            dispatch({
-                              type: "REMOVE_BAR",
-                              barIdx: barIdx + 1,
-                              bar: appState.song.part.bars[barIdx + 1],
-                            });
-                          })
-                        }
-                      >
-                        <div
-                          onMouseOver={() => setEditMode(true)}
-                          className="between-edit"
-                          style={{
-                            width,
-                            height,
-                            cursor: "pointer",
-                          }}
+                                    >
+                                      <div
+                                        onMouseOver={() =>
+                                          setProposedInsertion(null)
+                                        }
+                                        style={{
+                                          width,
+                                          height,
+                                          cursor: "pointer",
+                                        }}
+                                      />
+                                    </NotePopover>
+                                  </React.Suspense>
+                                )}
+                              />
+                            ),
+                          )}
+                        </React.Fragment>
+                      ),
+                    )}
+                    {!hoverMatchesAny &&
+                      !editMode &&
+                      proposedInsertion &&
+                      proposedInsertion.barIdx === barIdx &&
+                      proposedInsertion.divisions.map((div, idx) => (
+                        <rnc
+                          key={idx}
+                          className="six-note-to-add"
+                          noteValue={div.noteValue}
+                          dots={div.dots}
+                          startNum={div.startNum}
+                          startDen={div.startDen}
+                          isNote={true}
+                          isTemporary={true}
                         />
-                      </BetweenBarPopover>
-                    </React.Suspense>
-                  )}
-                />
-              </React.Fragment>
-            ))}
+                      ))}
+                  </bar>
+                  <between
+                    barline={
+                      bar.barline === "normal" ? Barline.Normal : Barline.Final
+                    }
+                    tsNum={appState.song.global.between[barIdx + 1]?.ts?.[0]}
+                    tsDen={appState.song.global.between[barIdx + 1]?.ts?.[1]}
+                    className="between-bars"
+                    html={({ width, height }) => (
+                      <React.Suspense fallback={null}>
+                        <BetweenBarPopover
+                          tsNum={appState.song.global.between[0].ts[0]}
+                          tsDen={appState.song.global.between[0].ts[1]}
+                          setClef={clef => {
+                            setNumChanges(numChanges + 1);
+                            dispatch({
+                              type: "SET_CLEF",
+                              clef,
+                              prevClef: appState.song.global.between[0].clef,
+                            });
+                          }}
+                          setKs={ks => {
+                            setNumChanges(numChanges + 1);
+                            dispatch({
+                              type: "SET_KS",
+                              ks,
+                              prevKs: appState.song.global.between[0].ks,
+                            });
+                          }}
+                          setTs={([num, den]) => {
+                            setNumChanges(numChanges + 1);
+                            dispatch(setTs(appState, [num, den]));
+                          }}
+                          onInsertBarRight={() => {
+                            setNumChanges(numChanges + 1);
+                            dispatch({
+                              type: "ADD_BAR",
+                              barIdx: barIdx + 1,
+                              bar: {
+                                barline: "normal",
+                                notes: [],
+                              },
+                            });
+                          }}
+                          onRemoveBarRight={
+                            appState.song.part.bars[barIdx + 1] &&
+                            (() => {
+                              dispatch({
+                                type: "REMOVE_BAR",
+                                barIdx: barIdx + 1,
+                                bar: appState.song.part.bars[barIdx + 1],
+                              });
+                            })
+                          }
+                        >
+                          <div
+                            onMouseOver={() => setEditMode(true)}
+                            className="between-edit"
+                            style={{
+                              width,
+                              height,
+                              cursor: "pointer",
+                            }}
+                          />
+                        </BetweenBarPopover>
+                      </React.Suspense>
+                    )}
+                  />
+                </React.Fragment>
+              );
+            })}
           </staff>
         </song>
       </Sheet>

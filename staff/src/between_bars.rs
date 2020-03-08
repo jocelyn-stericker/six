@@ -38,8 +38,8 @@ pub fn get_pitches(key: i8, clef: Clef) -> Vec<Pitch> {
     ];
 
     match key.cmp(&0) {
-        Ordering::Greater => sharps[0..(key as usize)].iter().cloned().collect(),
-        Ordering::Less => flats[0..(-key as usize)].iter().cloned().collect(),
+        Ordering::Greater => sharps[0..(key as usize)].to_vec(),
+        Ordering::Less => flats[0..(-key as usize)].to_vec(),
         Ordering::Equal => Vec::new(),
     }
 }

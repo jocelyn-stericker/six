@@ -8,7 +8,7 @@ import {
   NumericInput,
   HTMLSelect,
 } from "@blueprintjs/core";
-import { Action, State } from "./store";
+import { Action, State, setTs } from "./store";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
 import "./blueprint/theme.css";
@@ -88,11 +88,11 @@ export default function Meta({ appState, dispatch }: Props) {
             onChange={ev => {
               dispatch({
                 type: "SET_CLEF",
-                prevClef: appState.song.global.clef as any,
+                prevClef: appState.song.global.between[0].clef as any,
                 clef: ev.currentTarget.value as any,
               });
             }}
-            selectedValue={appState.song.global.clef}
+            selectedValue={appState.song.global.between[0].clef}
           >
             <Radio large={true} label="Treble" value="g" />
             <Radio large={true} label="Bass" value="f" />
@@ -105,16 +105,16 @@ export default function Meta({ appState, dispatch }: Props) {
           className="meta-group"
         >
           <HTMLSelect
-            disabled={appState.song.global.clef === "percussion"}
+            disabled={appState.song.global.between[0].clef === "percussion"}
             value={
-              appState.song.global.clef === "percussion"
+              appState.song.global.between[0].clef === "percussion"
                 ? 0
-                : appState.song.global.ks
+                : appState.song.global.between[0].ks
             }
             onChange={ev => {
               dispatch({
                 type: "SET_KS",
-                prevKs: appState.song.global.ks as any,
+                prevKs: appState.song.global.between[0].ks as any,
                 ks: parseInt(ev.currentTarget.value),
               });
             }}
@@ -142,15 +142,9 @@ export default function Meta({ appState, dispatch }: Props) {
               const [num, den] = ev.currentTarget.value
                 .split("/")
                 .map(ts => parseInt(ts));
-              dispatch({
-                type: "SET_TS",
-                num,
-                den,
-                prevNum: appState.song.global.tsNum,
-                prevDen: appState.song.global.tsDen,
-              });
+              dispatch(setTs(appState, [num, den]));
             }}
-            selectedValue={`${appState.song.global.tsNum}/${appState.song.global.tsDen}`}
+            selectedValue={`${appState.song.global.between[0].ts[0]}/${appState.song.global.between[0].ts[1]}`}
             className="meta-ts-select"
           >
             <Radio label="4/4" value="4/4" />

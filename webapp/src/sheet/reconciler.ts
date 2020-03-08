@@ -138,17 +138,16 @@ function createInstance(
     type = "song";
     const title = spec.props.title || "Untitled";
     const author = spec.props.author || "Anonymous";
-    entity = container.song_create(
+    entity = container.song_create();
+    container.song_set_freeze_spacing(
+      entity,
       typeof spec.props.freezeSpacing === "number"
         ? spec.props.freezeSpacing
         : undefined,
-      spec.props.width,
-      spec.props.height,
-      title,
-      getTextWidth(7, title),
-      author,
-      getTextWidth(5, author),
     );
+    container.song_set_size(entity, spec.props.width, spec.props.height);
+    container.song_set_title(entity, title, getTextWidth(7, title));
+    container.song_set_author(entity, author, getTextWidth(5, author));
   } else if (spec.type === "staff") {
     type = "staff";
     entity = container.staff_create();

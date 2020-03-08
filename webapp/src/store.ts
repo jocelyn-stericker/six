@@ -1,12 +1,15 @@
 export type Clef = "g" | "f" | "percussion";
 
-export interface Global {
-  tsNum: number;
-  tsDen: number;
+export interface Between {
+  ts: [number, number];
   ks: number;
+  clef: Clef;
+}
+
+export interface Global {
   title: string;
   author: string;
-  clef: Clef;
+  between: { [0]: Between; [key: number]: Partial<Between> };
 }
 
 export type TiedNote = Array<{
@@ -37,6 +40,23 @@ export interface Song {
   part: Part;
 }
 
+export interface ActionSetTs {
+  type: "SET_TS";
+  num: number;
+  den: number;
+  prevNum: number;
+  prevDen: number;
+
+  // We never change the ts of existing music.
+  // Instead, we add bars when one is already filled.
+  barAddCount: number;
+  barKeepCount: number;
+  // For undo.
+  barRemoveCount: number;
+
+  after: [number, number] | null;
+}
+
 type ApplyInvertAction =
   | {
       type: "REMOVE_NOTE";
@@ -52,13 +72,7 @@ type ApplyInvertAction =
       startDen: number;
       divisions: TiedNote;
     }
-  | {
-      type: "SET_TS";
-      num: number;
-      den: number;
-      prevNum: number;
-      prevDen: number;
-    }
+  | ActionSetTs
   | {
       type: "SET_KS";
       ks: number;
@@ -118,12 +132,15 @@ export function getInitialState(): State {
     song: {
       v: "0.1.0",
       global: {
-        tsNum: 4,
-        tsDen: 4,
-        ks: 0,
-        clef: "g",
         title: "",
         author: "",
+        between: {
+          0: {
+            ts: [4, 4],
+            ks: 0,
+            clef: "g",
+          },
+        },
       },
       part: {
         bars: [
@@ -196,6 +213,10 @@ function invert(action: ApplyInvertAction): ApplyInvertAction {
         den: action.prevDen,
         prevNum: action.num,
         prevDen: action.den,
+        barAddCount: action.barRemoveCount,
+        barKeepCount: action.barKeepCount,
+        barRemoveCount: action.barAddCount,
+        after: action.after,
       };
     case "SET_KS":
       return {
@@ -267,10 +288,34 @@ function apply(state: State, action: ApplyInvertAction) {
     state.song.part.bars[state.song.part.bars.length - 1].barline = "normal";
     state.song.part.bars.splice(action.barIdx, 0, action.bar);
     state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
+    let newBetween: { [0]: Between; [key: number]: Partial<Between> } = {
+      [0]: state.song.global.between[0],
+    };
+    Object.entries(state.song.global.between).map(([key, val]) => {
+      let num = parseInt(key);
+      if (num > action.barIdx) {
+        newBetween[num + 1] = val;
+      } else {
+        newBetween[num] = val;
+      }
+    });
+    state.song.global.between = newBetween;
   } else if (action.type === "REMOVE_BAR") {
     state.song.part.bars[state.song.part.bars.length - 1].barline = "normal";
     state.song.part.bars.splice(action.barIdx, 1);
     state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
+    let newBetween: { [0]: Between; [key: number]: Partial<Between> } = {
+      [0]: state.song.global.between[0],
+    };
+    Object.entries(state.song.global.between).map(([key, val]) => {
+      let num = parseInt(key);
+      if (num > action.barIdx) {
+        newBetween[num - 1] = val;
+      } else {
+        newBetween[num] = val;
+      }
+    });
+    state.song.global.between = newBetween;
   } else if (action.type === "SET_BAR_COUNT") {
     state.song.part.bars[state.song.part.bars.length - 1].barline = "normal";
     while (state.song.part.bars.length < action.count) {
@@ -284,13 +329,54 @@ function apply(state: State, action: ApplyInvertAction) {
     }
     state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
   } else if (action.type === "SET_CLEF") {
-    state.song.global.clef = action.clef;
+    state.song.global.between[0].clef = action.clef;
   } else if (action.type === "SET_TS") {
-    const { num, den } = action;
-    state.song.global.tsNum = num;
-    state.song.global.tsDen = den;
+    const {
+      num,
+      den,
+      barKeepCount,
+      barAddCount,
+      barRemoveCount,
+      after,
+    } = action;
+    let newBetween: { [0]: Between; [key: number]: Partial<Between> } = {
+      [0]: state.song.global.between[0],
+    };
+    Object.entries(state.song.global.between).map(([key, val]) => {
+      let num = parseInt(key);
+      num += barAddCount - barRemoveCount;
+      if (num >= 0) {
+        newBetween[num] = val;
+      }
+    });
+    newBetween[0] = {
+      ...state.song.global.between[0],
+      ...newBetween[0],
+      ts: [num, den],
+    };
+    let endIdx = barKeepCount + barAddCount - barRemoveCount;
+    newBetween[endIdx] = newBetween[endIdx] ?? {};
+    newBetween[endIdx].ts =
+      after && (after[0] !== num || after[1] !== den)
+        ? [after[0], after[1]]
+        : undefined;
+    state.song.part.bars.splice(
+      0,
+      barRemoveCount,
+      ...Array(barAddCount)
+        .fill(null)
+        .map(
+          () =>
+            ({
+              notes: [],
+              barline: "normal",
+            } as Bar),
+        ),
+    );
+
+    state.song.global.between = newBetween;
   } else if (action.type === "SET_KS") {
-    state.song.global.ks = action.ks;
+    state.song.global.between[0].ks = action.ks;
   } else if (action.type === "SET_TITLE") {
     state.song.global.title = action.title;
   } else if (action.type === "SET_AUTHOR") {
@@ -362,4 +448,32 @@ export function reduce(state: State, action: Action): State {
       return getInitialState();
     }
   }
+}
+
+export function setTs(
+  appState: State,
+  [num, den]: [number, number],
+): ActionSetTs {
+  let barsWithoutContent = 0;
+  let after = appState.song.global.between[0].ts;
+  while (
+    appState.song.part.bars[barsWithoutContent]?.notes.length === 0 &&
+    (!barsWithoutContent ||
+      !appState.song.global.between[barsWithoutContent]?.ts)
+  ) {
+    barsWithoutContent += 1;
+    after = appState.song.global.between[barsWithoutContent]?.ts ?? after;
+  }
+
+  return {
+    type: "SET_TS",
+    num,
+    den,
+    prevNum: appState.song.global.between[0].ts[0],
+    prevDen: appState.song.global.between[0].ts[1],
+    barAddCount: barsWithoutContent === 0 ? 1 : 0,
+    barKeepCount: barsWithoutContent,
+    barRemoveCount: 0,
+    after,
+  };
 }

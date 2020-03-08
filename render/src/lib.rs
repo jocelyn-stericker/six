@@ -18,7 +18,7 @@ use rest_note_chord::{
 use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing};
 use staff::{
     sys_break_into_lines, sys_print_between_bars, sys_print_staff, sys_print_staff_lines,
-    sys_update_context, Barline, BetweenBars, LineOfStaff, Staff,
+    sys_update_context, Barline, BetweenBars, BreakIntoLineComponents, LineOfStaff, Staff,
 };
 use std::collections::{HashMap, HashSet};
 use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
@@ -195,34 +195,10 @@ impl Render {
     }
 
     /// Create a song, without attaching it as the document root.
-    pub fn song_create(
-        &mut self,
-        freeze_spacing: Option<isize>,
-        width: f64,
-        height: f64,
-        title: &str,
-        title_width: f64,
-        author: &str,
-        author_width: f64,
-    ) -> usize {
+    pub fn song_create(&mut self) -> usize {
         let entity = self.entities.create();
 
-        self.songs.insert(
-            entity,
-            Song {
-                freeze_spacing,
-                prev_freeze_spacing: None,
-                width,
-                height,
-                rastal_size: 3,
-                title: title.to_string(),
-                title_width,
-                title_stencil: None,
-                author: author.to_string(),
-                author_width,
-                author_stencil: None,
-            },
-        );
+        self.songs.insert(entity, Song::default());
         self.ordered_children.insert(entity, vec![]);
         self.stencil_maps.insert(entity, StencilMap::default());
 
@@ -585,20 +561,21 @@ impl Render {
             sys_apply_warp(&self.bars, &mut self.spacing, &self.warps);
         } else {
             // TODO(joshuan): scale is fixed as rastal size 3.
-            sys_break_into_lines(
-                &self.entities,
-                self.root
+            sys_break_into_lines(BreakIntoLineComponents {
+                entities: &self.entities,
+                page_size: self
+                    .root
                     .and_then(|root| self.songs.get(&root))
                     .map(|root| (root.width / 7.0 * 1000.0, root.height / 7.0 * 1000.0)),
-                &self.bars,
-                &self.between_bars,
-                &self.stencils,
-                &mut self.spacing,
-                &mut self.staffs,
-                &mut self.parents,
-                &mut self.ordered_children,
-                &mut self.line_of_staffs,
-            );
+                bars: &self.bars,
+                between_bars: &self.between_bars,
+                stencils: &self.stencils,
+                spacing: &mut self.spacing,
+                staffs: &mut self.staffs,
+                parents: &mut self.parents,
+                ordered_children: &mut self.ordered_children,
+                line_of_staffs: &mut self.line_of_staffs,
+            });
             sys_record_space_time_warp(&self.bars, &self.spacing, &mut self.warps);
         }
 
@@ -824,15 +801,10 @@ mod tests {
         use stencil::snapshot;
 
         let mut render = Render::default();
-        let song = render.song_create(
-            None,
-            215.9,
-            279.4,
-            "Six Eight",
-            26.4f64,
-            "Six Eight",
-            26.4f64 * 5f64 / 7f64,
-        );
+        let song = render.song_create();
+        render.song_set_size(song, 215.9, 279.4);
+        render.song_set_title(song, "Six Eight", 26.4f64);
+        render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
 
         let staff = render.staff_create();
         let clef =

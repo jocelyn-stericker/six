@@ -219,26 +219,30 @@ impl PartialSolution {
     }
 }
 
-pub fn sys_break_into_lines(
-    entities: &EntitiesRes,
-    page_size: Option<(f64, f64)>,
-    bars: &HashMap<Entity, Bar>,
-    between_bars: &HashMap<Entity, BetweenBars>,
-    stencils: &HashMap<Entity, Stencil>,
-    spacing: &mut HashMap<Entity, RelativeRhythmicSpacing>,
-    staffs: &mut HashMap<Entity, Staff>,
-    parents: &mut HashMap<Entity, Entity>,
-    ordered_children: &mut HashMap<Entity, Vec<Entity>>,
-    line_of_staffs: &mut HashMap<Entity, LineOfStaff>,
-) {
-    if page_size.is_none() {
+pub struct BreakIntoLineComponents<'a> {
+    pub entities: &'a EntitiesRes,
+    pub page_size: Option<(f64, f64)>,
+    pub bars: &'a HashMap<Entity, Bar>,
+    pub between_bars: &'a HashMap<Entity, BetweenBars>,
+    pub stencils: &'a HashMap<Entity, Stencil>,
+    pub spacing: &'a mut HashMap<Entity, RelativeRhythmicSpacing>,
+    pub staffs: &'a mut HashMap<Entity, Staff>,
+    pub parents: &'a mut HashMap<Entity, Entity>,
+    pub ordered_children: &'a mut HashMap<Entity, Vec<Entity>>,
+    pub line_of_staffs: &'a mut HashMap<Entity, LineOfStaff>,
+}
+
+pub fn sys_break_into_lines(components: BreakIntoLineComponents) {
+    if components.page_size.is_none() {
         return;
     }
 
-    let width = page_size.unwrap().0 - STAFF_MARGIN * 2f64;
+    let width = components.page_size.unwrap().0 - STAFF_MARGIN * 2f64;
 
     let mut to_add = vec![];
-    for (staff_id, (staff, children)) in (staffs, &mut *ordered_children).join() {
+    for (staff_id, (staff, children)) in
+        (components.staffs, &mut *components.ordered_children).join()
+    {
         let mut chunks: Vec<Vec<ConditionalChildren>> = Vec::new();
         let mut current_solution = PartialSolution::default();
         let mut next_solution = PartialSolution::default();
@@ -247,12 +251,12 @@ pub fn sys_break_into_lines(
 
         // This is greedy.
         for child in children {
-            if let Some(bar) = bars.get(child) {
-                current_solution.add_bar(*child, bar, stencils);
-                next_solution.add_bar(*child, bar, stencils);
-            } else if let Some(between) = between_bars.get(child) {
-                current_solution.add_between(between, &stencils);
-                next_solution.add_between(between, &stencils);
+            if let Some(bar) = components.bars.get(child) {
+                current_solution.add_bar(*child, bar, components.stencils);
+                next_solution.add_bar(*child, bar, components.stencils);
+            } else if let Some(between) = components.between_bars.get(child) {
+                current_solution.add_between(between, &components.stencils);
+                next_solution.add_between(between, &components.stencils);
                 recent_between = Some(between);
             } else {
                 panic!();
@@ -263,10 +267,10 @@ pub fn sys_break_into_lines(
                     good_solution = current_solution.clone();
                     next_solution = PartialSolution::default();
                     if let Some(between) = recent_between {
-                        next_solution.add_between(between, &stencils);
+                        next_solution.add_between(between, &components.stencils);
                     }
                 } else {
-                    good_solution.apply_spacing(width, bars, spacing);
+                    good_solution.apply_spacing(width, components.bars, components.spacing);
                     let PartialSolution { entities, .. } = good_solution;
                     current_solution = next_solution.clone();
                     good_solution = PartialSolution::default();
@@ -281,7 +285,11 @@ pub fn sys_break_into_lines(
         if !current_solution.entities.is_empty() {
             // Pad the spacing a bit.
             let extra_space = (width - current_solution.width) / 8f64;
-            current_solution.apply_spacing(current_solution.width + extra_space, bars, spacing);
+            current_solution.apply_spacing(
+                current_solution.width + extra_space,
+                components.bars,
+                components.spacing,
+            );
             chunks.push(current_solution.entities);
         }
 
@@ -292,16 +300,18 @@ pub fn sys_break_into_lines(
         for (line_number, line) in chunks.into_iter().enumerate() {
             if staff.lines.len() == line_number {
                 // This is a line of Staff.
-                let line_of_staff_id = entities.create();
+                let line_of_staff_id = components.entities.create();
                 // This is the 5 staff lines for the line of Staff.
-                let staff_lines_id = entities.create();
+                let staff_lines_id = components.entities.create();
 
-                parents.insert(staff_lines_id, line_of_staff_id);
+                components.parents.insert(staff_lines_id, line_of_staff_id);
 
-                line_of_staffs.insert(line_of_staff_id, LineOfStaff::new(staff_lines_id));
+                components
+                    .line_of_staffs
+                    .insert(line_of_staff_id, LineOfStaff::new(staff_lines_id));
 
                 staff.lines.push(line_of_staff_id);
-                parents.insert(line_of_staff_id, staff_id);
+                components.parents.insert(line_of_staff_id, staff_id);
             }
 
             let line_len = line.len();
@@ -324,6 +334,6 @@ pub fn sys_break_into_lines(
     }
 
     for (entity, val) in to_add {
-        ordered_children.insert(entity, val);
+        components.ordered_children.insert(entity, val);
     }
 }

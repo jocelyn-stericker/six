@@ -112,7 +112,6 @@ export default function SheetMusicView(props: Props) {
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
 
   useLayoutEffect(() => {
-    console.time("render svg");
     render(props.children, container);
     container.exec();
     let stencilPairs = container.stencils().split("\n");
@@ -142,8 +141,6 @@ export default function SheetMusicView(props: Props) {
       cl.push(parseInt(parents[i]));
       children[parents[i + 1] as any] = cl;
     }
-
-    console.timeEnd("render svg");
 
     setStencils(stencils);
     setStencilMeta(stencilMeta);

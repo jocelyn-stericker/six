@@ -10,7 +10,7 @@ export interface Props {
   setKs: (ks: number) => void;
   setTs: (ts: [number, number]) => void;
   onInsertBarRight: () => void;
-  onRemoveBarRight: () => void | null;
+  onRemoveBarRight: (() => void) | null;
 }
 
 export default function BetweenBarPopover({
@@ -47,7 +47,7 @@ export default function BetweenBarPopover({
             icon="blank"
             text="Remove Next Bar"
             disabled={!onRemoveBarRight}
-            onClick={onRemoveBarRight}
+            onClick={onRemoveBarRight ?? (() => undefined)}
           />
           <MenuDivider />
           <MenuItem

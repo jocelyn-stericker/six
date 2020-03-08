@@ -10,7 +10,7 @@ pub enum Clef {
 
 impl Clef {
     /// Y-position of C0, in steps.
-    pub fn offset(&self) -> i32 {
+    pub fn offset(self) -> i32 {
         match self {
             Clef::G | Clef::Percussion => 34,
             Clef::F => 22,
@@ -31,7 +31,7 @@ pub enum NoteName {
 }
 
 impl NoteName {
-    pub fn index(&self) -> i32 {
+    pub fn index(self) -> i32 {
         match self {
             NoteName::C => 0,
             NoteName::D => 1,
@@ -75,16 +75,16 @@ impl Pitch {
         Self::new(NoteName::C, None, 4)
     }
 
-    pub fn midi(&self) -> u8 {
+    pub fn midi(self) -> u8 {
         ((self.octave + 1) * 12 + (self.name as i8) + self.modifier.map(|m| m as i8).unwrap_or(0))
             as u8
     }
 
-    pub fn name(&self) -> NoteName {
+    pub fn name(self) -> NoteName {
         self.name
     }
 
-    pub fn modifier(&self) -> Option<NoteModifier> {
+    pub fn modifier(self) -> Option<NoteModifier> {
         self.modifier
     }
 
@@ -94,11 +94,11 @@ impl Pitch {
     ///
     /// Middle C (60) is C4.
     /// A440 is A4.
-    pub fn octave(&self) -> i8 {
+    pub fn octave(self) -> i8 {
         self.octave
     }
 
-    pub fn y(&self, clef: Clef) -> f64 {
+    pub fn y(self, clef: Clef) -> f64 {
         (clef.offset() - self.name().index() - 7 * (self.octave() as i32)) as f64 * 125f64
     }
 }
