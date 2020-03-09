@@ -1,149 +1,23 @@
 import React, { useState, useRef, useMemo, createRef } from "react";
-import PieMenu, { Slice } from "react-pie-menu";
-import { ThemeProvider, css } from "styled-components";
 
-import Sheet, { Barline } from "./sheet";
-import { Render, Clef } from "./sheet/reconciler";
-import { Action, State, TiedNote, Clef as ClefStr, setTs } from "./store";
+import Sheet from "./sheet";
+import { Render } from "./sheet/reconciler";
+import { Action, State, addNote, removeNote } from "./store";
+import splitDurationIntoParts, {
+  NoteAddPatch,
+} from "./split_duration_into_parts";
+import Between from "./between";
 
-const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
 const NotePopover = React.lazy(() => import("./note_popover"));
-const theme = {
-  slice: {
-    container: css`
-      background: ${({ centerRadius }: any) =>
-        `radial-gradient(transparent ${centerRadius}, #004643cc ${centerRadius})`};
-      color: #abd1c6;
-      :hover {
-        background: ${({ centerRadius }: any) =>
-          `radial-gradient(transparent ${centerRadius}, #f9bc60 ${centerRadius})`};
-        color: #001e1d;
-      }
-    `,
-  },
-};
+const NoteInsertMenu = React.lazy(() => import("./note_insert_menu"));
 
 interface Props {
   appState: State;
   dispatch: (action: Action) => void;
 }
 
-interface ProposedInsertion {
-  barIdx: number;
-  startNum: number;
-  startDen: number;
-  divisions: TiedNote;
-}
-
-function count(noteValue: number, dots: number) {
-  let base = Math.pow(2, noteValue);
-  let total = base;
-  for (let i = 0; i < dots; ++i) {
-    total += base / 2;
-    base / 2;
-  }
-
-  return total;
-}
-
-function getProposedInsertion(
-  render: Render | null,
-  appState: State,
-  barEntity: number | null,
-  time: [number, number, number] | null,
-  insertionDuration: Array<number>,
-): ProposedInsertion | null {
-  if (!render) {
-    return null;
-  }
-  if (!time) {
-    return null;
-  }
-  if (!barEntity) {
-    return null;
-  }
-
-  const rawDivisions = render.split_note(
-    barEntity,
-    time[1],
-    time[2],
-    insertionDuration[0],
-    insertionDuration[1],
-  );
-  const start = time[1] / time[2];
-
-  const divisions = [];
-  let end = start;
-  for (let i = 0; i < rawDivisions.length; i += 4) {
-    end += count(rawDivisions[i], rawDivisions[i + 1]);
-    divisions.push({
-      noteValue: rawDivisions[i],
-      dots: rawDivisions[i + 1],
-      startNum: rawDivisions[i + 2],
-      startDen: rawDivisions[i + 3],
-    });
-  }
-  if (!divisions.length) {
-    return null;
-  }
-
-  if (
-    appState.song.part.bars[time[0]].notes.some(note => {
-      let noteStart = note.startNum / note.startDen;
-      let noteEnd =
-        noteStart +
-        note.divisions.reduce(
-          (sum, { noteValue, dots }) => sum + count(noteValue, dots),
-          0,
-        );
-      // TODO: check if this note is in the middle of the proposed one.
-      return (
-        (start <= noteStart && end > noteStart) ||
-        (start < noteEnd && end >= noteEnd)
-      );
-    })
-  ) {
-    return null;
-  }
-
-  return {
-    barIdx: time[0],
-    startNum: time[1],
-    startDen: time[2],
-    divisions,
-  };
-}
-
-function clefStrToNum(clef: ClefStr): Clef {
-  if (clef === "g") {
-    return Clef.G;
-  }
-  if (clef === "f") {
-    return Clef.F;
-  }
-  if (clef === "percussion") {
-    return Clef.Percussion;
-  }
-
-  throw new Error("Unexpected clef");
-}
-
 function SheetEdit({ appState, dispatch }: Props) {
-  const [insertionDuration, setInsertionDuration] = useState([1, 8]);
-  const [
-    proposedInsertion,
-    setProposedInsertion,
-  ] = useState<ProposedInsertion | null>(null);
-  const [editMode, setEditMode] = useState(false);
-
   const songRef = useRef<Render>(null);
-
-  const [numChanges, setNumChanges] = useState(0);
-  const [dragState, setDragState] = useState<{
-    startX: number;
-    startY: number;
-  } | null>(null);
-
   const barRefs = useMemo(
     () =>
       Array.from({ length: appState.song.part.bars.length }).map(() =>
@@ -152,34 +26,13 @@ function SheetEdit({ appState, dispatch }: Props) {
     [appState.song.part.bars.length],
   );
 
-  const hoverMatchesAny = false;
+  const [preview, setPreview] = useState<NoteAddPatch | null>(null);
+  const [numChanges, setNumChanges] = useState(0);
+  const [noteMutationClickPos, setNoteMutationClickPos] = useState<
+    [number, number] | null
+  >(null);
 
-  function addNote(frac: [number, number]) {
-    if (proposedInsertion) {
-      let newProposedInsertion = getProposedInsertion(
-        songRef.current,
-        appState,
-        barRefs[proposedInsertion.barIdx].current,
-        [
-          proposedInsertion.barIdx,
-          proposedInsertion.startNum,
-          proposedInsertion.startDen,
-        ],
-        frac,
-      );
-      if (newProposedInsertion) {
-        dispatch({
-          type: "ADD_NOTE",
-          barIdx: newProposedInsertion.barIdx,
-          startNum: newProposedInsertion.startNum,
-          startDen: newProposedInsertion.startDen,
-          divisions: newProposedInsertion.divisions,
-        });
-      }
-      setDragState(null);
-      setNumChanges(numChanges + 1);
-    }
-  }
+  const hoverMatchesAny = false;
 
   let currTs = appState.song.global.between[0].ts;
 
@@ -187,97 +40,65 @@ function SheetEdit({ appState, dispatch }: Props) {
     <div
       style={{ position: "relative" }}
       onMouseOut={() => {
-        if (!dragState) {
-          setProposedInsertion(null);
+        if (!noteMutationClickPos) {
+          setPreview(null);
         }
       }}
     >
-      {dragState && (
-        <ThemeProvider theme={theme}>
-          <div
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 100,
-              userSelect: "none",
+      {noteMutationClickPos && preview && (
+        <React.Suspense fallback={null}>
+          <NoteInsertMenu
+            pos={noteMutationClickPos}
+            onAddNote={duration => {
+              let insertion = splitDurationIntoParts(
+                songRef.current,
+                appState,
+                barRefs[preview.barIdx].current,
+                [preview.barIdx, preview.startTime[0], preview.startTime[1]],
+                duration,
+              );
+              if (insertion) {
+                dispatch(
+                  addNote({
+                    barIdx: insertion.barIdx,
+                    startTime: insertion.startTime,
+                    divisions: insertion.divisions,
+                  }),
+                );
+              }
+              setNoteMutationClickPos(null);
+              setNumChanges(numChanges + 1);
             }}
-          >
-            <PieMenu
-              centerX={`${dragState.startX}px`}
-              centerY={`${dragState.startY}px`}
-              centerRadius="20px"
-              radius="100px"
-            >
-              <Slice onSelect={() => addNote([1, 1])}>1</Slice>
-              <Slice onSelect={() => addNote([1, 2])}>1/2</Slice>
-              <Slice onSelect={() => addNote([1, 4])}>1/4</Slice>
-              <Slice onSelect={() => addNote([1, 8])}>1/8</Slice>
-              <Slice onSelect={() => addNote([1, 16])}>1/16</Slice>
-              <Slice>.</Slice>
-              <Slice>#</Slice>
-              <Slice>b</Slice>
-            </PieMenu>
-          </div>
-        </ThemeProvider>
+          />
+        </React.Suspense>
       )}
       <Sheet
         onHoverTimeChanged={time => {
-          if (dragState) {
+          if (noteMutationClickPos) {
             return;
           }
           if (!time) {
-            setProposedInsertion(null);
+            setPreview(null);
             return;
           }
-          setProposedInsertion(
-            getProposedInsertion(
+          setPreview(
+            splitDurationIntoParts(
               songRef.current,
               appState,
               barRefs[time[0]].current,
               time,
-              insertionDuration,
+              [1, 4],
             ),
           );
         }}
-        onMouseMove={_ev => {
-          if (editMode) {
-            setTimeout(() => setEditMode(false), 0);
-          }
-        }}
         onMouseDown={(_, ev) => {
-          if (proposedInsertion) {
-            setDragState({
-              startX: ev.clientX,
-              startY: ev.clientY,
-            });
-          }
-        }}
-        onMouseUp={() => {
-          if (editMode) {
-            return;
-          }
-          setDragState(null);
-          if (insertionDuration[0] / insertionDuration[1] > 1 / 4) {
-            setInsertionDuration([1, 4]);
-          }
-
-          if (proposedInsertion) {
-            dispatch({
-              type: "ADD_NOTE",
-              barIdx: proposedInsertion.barIdx,
-              startNum: proposedInsertion.startNum,
-              startDen: proposedInsertion.startDen,
-              divisions: proposedInsertion.divisions,
-            });
-            setNumChanges(numChanges + 1);
+          if (preview) {
+            setNoteMutationClickPos([ev.clientX, ev.clientY]);
           }
         }}
       >
         <song
-          freezeSpacing={proposedInsertion == null ? undefined : numChanges}
+          freezeSpacing={preview == null ? undefined : numChanges}
           ref={songRef}
           width={215.9}
           height={279.4}
@@ -285,73 +106,13 @@ function SheetEdit({ appState, dispatch }: Props) {
           author={appState.song.global.author}
         >
           <staff>
-            <between
-              clef={clefStrToNum(appState.song.global.between[0].clef)}
-              tsNum={appState.song.global.between[0].ts[0]}
-              tsDen={appState.song.global.between[0].ts[1]}
-              ks={appState.song.global.between[0].ks}
-              className="between-bars"
-              html={({ width, height }) => (
-                <React.Suspense fallback={null}>
-                  <BetweenBarPopover
-                    tsNum={appState.song.global.between[0].ts[0]}
-                    tsDen={appState.song.global.between[0].ts[1]}
-                    setClef={clef => {
-                      setNumChanges(numChanges + 1);
-                      dispatch({
-                        type: "SET_CLEF",
-                        clef,
-                        prevClef: appState.song.global.between[0].clef,
-                      });
-                    }}
-                    setKs={ks => {
-                      setNumChanges(numChanges + 1);
-                      dispatch({
-                        type: "SET_KS",
-                        ks,
-                        prevKs: appState.song.global.between[0].ks,
-                      });
-                    }}
-                    setTs={([num, den]) => {
-                      setNumChanges(numChanges + 1);
-                      dispatch(setTs(appState, [num, den]));
-                    }}
-                    onInsertBarRight={() => {
-                      setNumChanges(numChanges + 1);
-                      dispatch({
-                        type: "ADD_BAR",
-                        barIdx: 0,
-                        bar: {
-                          barline: "normal",
-                          notes: [],
-                        },
-                      });
-                    }}
-                    onRemoveBarRight={
-                      (appState.song.part.bars.length > 1 &&
-                        (() => {
-                          setNumChanges(numChanges + 1);
-                          dispatch({
-                            type: "REMOVE_BAR",
-                            barIdx: 0,
-                            bar: appState.song.part.bars[0],
-                          });
-                        })) ||
-                      null
-                    }
-                  >
-                    <div
-                      onMouseOver={() => setEditMode(true)}
-                      className="between-edit"
-                      style={{
-                        width,
-                        height,
-                        cursor: "pointer",
-                      }}
-                    />
-                  </BetweenBarPopover>
-                </React.Suspense>
-              )}
+            <Between
+              appState={appState}
+              dispatch={ev => {
+                setNumChanges(numChanges + 1);
+                dispatch(ev);
+              }}
+              beforeBar={0}
             />
             {appState.song.part.bars.map((bar, barIdx) => {
               currTs = appState.song.global.between[barIdx]?.ts ?? currTs;
@@ -364,32 +125,26 @@ function SheetEdit({ appState, dispatch }: Props) {
                     numer={currTs[0]}
                     denom={currTs[1]}
                     className={
-                      !editMode &&
-                      proposedInsertion &&
-                      proposedInsertion.barIdx === barIdx
+                      preview && preview.barIdx === barIdx
                         ? "six-bar-hover"
                         : "six-bar"
                     }
                   >
                     {bar.notes.map(
                       (
-                        {
-                          divisions,
-                          startNum: tiedStartNum,
-                          startDen: tiedStartDen,
-                        },
+                        { divisions, startTime: tiedStartTime },
                         divisionIdx,
                       ) => (
                         <React.Fragment key={divisionIdx}>
                           {divisions.map(
-                            ({ noteValue, dots, startNum, startDen }, jdx) => (
+                            ({ noteValue, dots, startTime }, jdx) => (
                               <rnc
                                 className="six-real-note"
                                 key={jdx}
                                 noteValue={noteValue}
                                 dots={dots}
-                                startNum={startNum}
-                                startDen={startDen}
+                                startNum={startTime[0]}
+                                startDen={startTime[1]}
                                 isNote={true}
                                 isTemporary={false}
                                 html={({ width, height }) => (
@@ -397,19 +152,17 @@ function SheetEdit({ appState, dispatch }: Props) {
                                     <NotePopover
                                       onDeleteNote={() => {
                                         setNumChanges(numChanges + 1);
-                                        dispatch({
-                                          type: "REMOVE_NOTE",
-                                          barIdx,
-                                          startNum: tiedStartNum,
-                                          startDen: tiedStartDen,
-                                          divisions,
-                                        });
+                                        dispatch(
+                                          removeNote({
+                                            barIdx,
+                                            startTime: tiedStartTime,
+                                            divisions,
+                                          }),
+                                        );
                                       }}
                                     >
                                       <div
-                                        onMouseOver={() =>
-                                          setProposedInsertion(null)
-                                        }
+                                        onMouseOver={() => setPreview(null)}
                                         style={{
                                           width,
                                           height,
@@ -426,88 +179,28 @@ function SheetEdit({ appState, dispatch }: Props) {
                       ),
                     )}
                     {!hoverMatchesAny &&
-                      !editMode &&
-                      proposedInsertion &&
-                      proposedInsertion.barIdx === barIdx &&
-                      proposedInsertion.divisions.map((div, idx) => (
+                      preview &&
+                      preview.barIdx === barIdx &&
+                      preview.divisions.map((div, idx) => (
                         <rnc
                           key={idx}
                           className="six-note-to-add"
                           noteValue={div.noteValue}
                           dots={div.dots}
-                          startNum={div.startNum}
-                          startDen={div.startDen}
+                          startNum={div.startTime[0]}
+                          startDen={div.startTime[1]}
                           isNote={true}
                           isTemporary={true}
                         />
                       ))}
                   </bar>
-                  <between
-                    barline={
-                      bar.barline === "normal" ? Barline.Normal : Barline.Final
-                    }
-                    tsNum={appState.song.global.between[barIdx + 1]?.ts?.[0]}
-                    tsDen={appState.song.global.between[barIdx + 1]?.ts?.[1]}
-                    className="between-bars"
-                    html={({ width, height }) => (
-                      <React.Suspense fallback={null}>
-                        <BetweenBarPopover
-                          tsNum={appState.song.global.between[0].ts[0]}
-                          tsDen={appState.song.global.between[0].ts[1]}
-                          setClef={clef => {
-                            setNumChanges(numChanges + 1);
-                            dispatch({
-                              type: "SET_CLEF",
-                              clef,
-                              prevClef: appState.song.global.between[0].clef,
-                            });
-                          }}
-                          setKs={ks => {
-                            setNumChanges(numChanges + 1);
-                            dispatch({
-                              type: "SET_KS",
-                              ks,
-                              prevKs: appState.song.global.between[0].ks,
-                            });
-                          }}
-                          setTs={([num, den]) => {
-                            setNumChanges(numChanges + 1);
-                            dispatch(setTs(appState, [num, den]));
-                          }}
-                          onInsertBarRight={() => {
-                            setNumChanges(numChanges + 1);
-                            dispatch({
-                              type: "ADD_BAR",
-                              barIdx: barIdx + 1,
-                              bar: {
-                                barline: "normal",
-                                notes: [],
-                              },
-                            });
-                          }}
-                          onRemoveBarRight={
-                            appState.song.part.bars[barIdx + 1] &&
-                            (() => {
-                              dispatch({
-                                type: "REMOVE_BAR",
-                                barIdx: barIdx + 1,
-                                bar: appState.song.part.bars[barIdx + 1],
-                              });
-                            })
-                          }
-                        >
-                          <div
-                            onMouseOver={() => setEditMode(true)}
-                            className="between-edit"
-                            style={{
-                              width,
-                              height,
-                              cursor: "pointer",
-                            }}
-                          />
-                        </BetweenBarPopover>
-                      </React.Suspense>
-                    )}
+                  <Between
+                    appState={appState}
+                    dispatch={ev => {
+                      setNumChanges(numChanges + 1);
+                      dispatch(ev);
+                    }}
+                    beforeBar={barIdx + 1}
                   />
                 </React.Fragment>
               );

@@ -2,7 +2,7 @@ import React, { useReducer } from "react";
 
 import "normalize.css";
 import "./app.css";
-import { reduce, getInitialState } from "./store";
+import { reduce, getInitialState, undo, redo } from "./store";
 import About from "./about";
 import Meta from "./meta";
 
@@ -23,8 +23,8 @@ export default function App() {
         <h2>Notes</h2>
         <React.Suspense fallback={null}>
           <AppHotkeys
-            onUndo={() => dispatch({ type: "UNDO" })}
-            onRedo={() => dispatch({ type: "REDO" })}
+            onUndo={() => dispatch(undo())}
+            onRedo={() => dispatch(redo())}
           />
         </React.Suspense>
         <div className="six-note-editor-noteview">

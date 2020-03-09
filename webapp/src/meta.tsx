@@ -8,7 +8,16 @@ import {
   NumericInput,
   HTMLSelect,
 } from "@blueprintjs/core";
-import { Action, State, setTs } from "./store";
+import {
+  Action,
+  State,
+  setTs,
+  setKs,
+  setClef,
+  setBarCount,
+  setTitle,
+  setAuthor,
+} from "./store";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
 import "./blueprint/theme.css";
@@ -37,11 +46,7 @@ export default function Meta({ appState, dispatch }: Props) {
             autoFocus
             value={appState.song.global.title}
             onChange={(ev: React.FormEvent<HTMLInputElement>) => {
-              dispatch({
-                type: "SET_TITLE",
-                title: ev.currentTarget.value,
-                prevTitle: appState.song.global.title,
-              });
+              dispatch(setTitle(appState, ev.currentTarget.value));
             }}
           />
         </FormGroup>
@@ -52,11 +57,7 @@ export default function Meta({ appState, dispatch }: Props) {
             large={true}
             value={appState.song.global.author}
             onChange={(ev: React.FormEvent<HTMLInputElement>) => {
-              dispatch({
-                type: "SET_AUTHOR",
-                author: ev.currentTarget.value,
-                prevAuthor: appState.song.global.author,
-              });
+              dispatch(setAuthor(appState, ev.currentTarget.value));
             }}
           />
         </FormGroup>
@@ -67,11 +68,7 @@ export default function Meta({ appState, dispatch }: Props) {
               if (count < minBars || count > maxBars) {
                 return;
               }
-              dispatch({
-                type: "SET_BAR_COUNT",
-                prevCount: appState.song.part.bars.length,
-                count,
-              });
+              dispatch(setBarCount(appState, count));
             }}
             min={minBars}
             max={maxBars}
@@ -86,11 +83,7 @@ export default function Meta({ appState, dispatch }: Props) {
           <RadioGroup
             inline={true}
             onChange={ev => {
-              dispatch({
-                type: "SET_CLEF",
-                prevClef: appState.song.global.between[0].clef as any,
-                clef: ev.currentTarget.value as any,
-              });
+              dispatch(setClef(appState, ev.currentTarget.value as any));
             }}
             selectedValue={appState.song.global.between[0].clef}
           >
@@ -112,11 +105,7 @@ export default function Meta({ appState, dispatch }: Props) {
                 : appState.song.global.between[0].ks
             }
             onChange={ev => {
-              dispatch({
-                type: "SET_KS",
-                prevKs: appState.song.global.between[0].ks as any,
-                ks: parseInt(ev.currentTarget.value),
-              });
+              dispatch(setKs(appState, parseInt(ev.currentTarget.value)));
             }}
             options={[
               { label: "G♭ Major / e♭ minor (6♭)", value: -6 },
@@ -142,7 +131,7 @@ export default function Meta({ appState, dispatch }: Props) {
               const [num, den] = ev.currentTarget.value
                 .split("/")
                 .map(ts => parseInt(ts));
-              dispatch(setTs(appState, [num, den]));
+              dispatch(setTs(appState, { beforeBar: 0, ts: [num, den] }));
             }}
             selectedValue={`${appState.song.global.between[0].ts[0]}/${appState.song.global.between[0].ts[1]}`}
             className="meta-ts-select"

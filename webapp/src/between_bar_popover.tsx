@@ -4,8 +4,7 @@ import { Clef } from "./store";
 
 export interface Props {
   children: any;
-  tsNum: number;
-  tsDen: number;
+  ts?: [number, number];
   setClef: (clef: Clef) => void;
   setKs: (ks: number) => void;
   setTs: (ts: [number, number]) => void;
@@ -18,8 +17,7 @@ export default function BetweenBarPopover({
   setClef,
   setKs,
   setTs,
-  tsNum,
-  tsDen,
+  ts,
   onInsertBarRight,
   onRemoveBarRight,
 }: Props) {
@@ -65,38 +63,38 @@ export default function BetweenBarPopover({
             <MenuItem
               icon="blank"
               text="4/4"
-              active={tsNum === 4 && tsDen === 4}
+              active={ts?.[0] === 4 && ts?.[1] === 4}
               onClick={() => setTs([4, 4])}
             />
             <MenuItem
               icon="blank"
               text="2/2"
-              active={tsNum === 2 && tsDen === 2}
+              active={ts?.[0] === 2 && ts?.[1] === 2}
               onClick={() => setTs([2, 2])}
             />
             <MenuItem
               icon="blank"
               text="2/4"
-              active={tsNum === 2 && tsDen === 4}
+              active={ts?.[0] === 2 && ts?.[1] === 4}
               onClick={() => setTs([2, 4])}
             />
             <MenuItem
               icon="blank"
               text="4/8"
-              active={tsNum === 4 && tsDen === 8}
+              active={ts?.[0] === 4 && ts?.[1] === 8}
               onClick={() => setTs([4, 8])}
             />
             <MenuDivider />
             <MenuItem
               icon="blank"
               text="3/4"
-              active={tsNum === 3 && tsDen === 4}
+              active={ts?.[0] === 3 && ts?.[1] === 4}
               onClick={() => setTs([3, 4])}
             />
             <MenuItem
               icon="blank"
               text="3/8"
-              active={tsNum === 3 && tsDen === 8}
+              active={ts?.[0] === 3 && ts?.[1] === 8}
               onClick={() => setTs([3, 8])}
             />
             <li className="bp3-menu-header">
@@ -105,32 +103,32 @@ export default function BetweenBarPopover({
             <MenuItem
               icon="blank"
               text="6/8"
-              active={tsNum === 6 && tsDen === 8}
+              active={ts?.[0] === 6 && ts?.[1] === 8}
               onClick={() => setTs([6, 8])}
             />
             <MenuItem
               icon="blank"
               text="6/4"
-              active={tsNum === 6 && tsDen === 4}
+              active={ts?.[0] === 6 && ts?.[1] === 4}
               onClick={() => setTs([6, 4])}
             />
             <MenuItem
               icon="blank"
               text="6/16"
-              active={tsNum === 6 && tsDen === 16}
+              active={ts?.[0] === 6 && ts?.[1] === 16}
               onClick={() => setTs([6, 16])}
             />
             <MenuDivider />
             <MenuItem
               icon="blank"
               text="9/8"
-              active={tsNum === 9 && tsDen === 8}
+              active={ts?.[0] === 9 && ts?.[1] === 8}
               onClick={() => setTs([9, 8])}
             />
             <MenuItem
               icon="blank"
               text="12/8"
-              active={tsNum === 12 && tsDen === 8}
+              active={ts?.[0] === 12 && ts?.[1] === 8}
               onClick={() => setTs([12, 8])}
             />
             <MenuDivider />
