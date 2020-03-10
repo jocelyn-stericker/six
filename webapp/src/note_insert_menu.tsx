@@ -1,7 +1,7 @@
 import React from "react";
 import PieMenu, { Slice } from "react-pie-menu";
 
-import { ThemeProvider, css } from "styled-components";
+import { css, ThemeProvider } from "styled-components";
 
 const theme = {
   slice: {

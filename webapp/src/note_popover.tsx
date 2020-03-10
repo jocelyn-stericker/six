@@ -1,5 +1,5 @@
 import React from "react";
-import { Popover, Menu, MenuItem } from "@blueprintjs/core";
+import { Menu, MenuItem, Popover } from "@blueprintjs/core";
 
 export interface Props {
   children: any;

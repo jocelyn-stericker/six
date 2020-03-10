@@ -2,13 +2,13 @@ import React from "react";
 
 import {
   Action,
-  State,
-  Clef as ClefStr,
   addBar,
+  Clef as ClefStr,
   removeBar,
+  setClef,
   setKs,
   setTs,
-  setClef,
+  State,
 } from "./store";
 import { Barline, Clef } from "./sheet/reconciler";
 
@@ -58,10 +58,10 @@ export default function Between({
           <BetweenBarPopover
             ts={between?.ts}
             setClef={clef => {
-              dispatch(setClef(appState, clef));
+              dispatch(setClef(appState, { clef, beforeBar }));
             }}
             setKs={ks => {
-              dispatch(setKs(appState, ks));
+              dispatch(setKs(appState, { ks, beforeBar }));
             }}
             setTs={([num, den]) => {
               dispatch(setTs(appState, { beforeBar, ts: [num, den] }));

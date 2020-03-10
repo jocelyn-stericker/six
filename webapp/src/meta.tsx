@@ -1,22 +1,23 @@
 import React from "react";
 import {
-  RadioGroup,
-  Radio,
-  FormGroup,
-  InputGroup,
   Divider,
-  NumericInput,
+  FormGroup,
   HTMLSelect,
+  InputGroup,
+  NumericInput,
+  Radio,
+  RadioGroup,
 } from "@blueprintjs/core";
 import {
   Action,
-  State,
-  setTs,
-  setKs,
-  setClef,
-  setBarCount,
-  setTitle,
+  Clef,
   setAuthor,
+  setBarCount,
+  setClef,
+  setKs,
+  setTitle,
+  setTs,
+  State,
 } from "./store";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
@@ -83,7 +84,12 @@ export default function Meta({ appState, dispatch }: Props) {
           <RadioGroup
             inline={true}
             onChange={ev => {
-              dispatch(setClef(appState, ev.currentTarget.value as any));
+              dispatch(
+                setClef(appState, {
+                  clef: (ev.currentTarget.value as any) as Clef,
+                  beforeBar: 0,
+                }),
+              );
             }}
             selectedValue={appState.song.global.between[0].clef}
           >
@@ -105,7 +111,12 @@ export default function Meta({ appState, dispatch }: Props) {
                 : appState.song.global.between[0].ks
             }
             onChange={ev => {
-              dispatch(setKs(appState, parseInt(ev.currentTarget.value)));
+              dispatch(
+                setKs(appState, {
+                  ks: parseInt(ev.currentTarget.value),
+                  beforeBar: 0,
+                }),
+              );
             }}
             options={[
               { label: "G♭ Major / e♭ minor (6♭)", value: -6 },

@@ -2,7 +2,7 @@ import React, { useReducer } from "react";
 
 import "normalize.css";
 import "./app.css";
-import { reduce, getInitialState, undo, redo } from "./store";
+import { getInitialState, redo, reduce, undo } from "./store";
 import About from "./about";
 import Meta from "./meta";
 

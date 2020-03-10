@@ -1,8 +1,8 @@
-import React, { useState, useRef, useMemo, createRef } from "react";
+import React, { createRef, useMemo, useRef, useState } from "react";
 
 import Sheet from "./sheet";
 import { Render } from "./sheet/reconciler";
-import { Action, State, addNote, removeNote } from "./store";
+import { Action, addNote, removeNote, State } from "./store";
 import splitDurationIntoParts, {
   NoteAddPatch,
 } from "./split_duration_into_parts";

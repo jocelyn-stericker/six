@@ -1,4 +1,4 @@
-import { State, TiedNote, Clef, Bar } from "./state";
+import { Bar, Clef, State, TiedNote } from "./state";
 
 export interface AddNote {
   type: "ADD_NOTE";
@@ -80,27 +80,42 @@ export function setTs(
 
 export interface SetKs {
   type: "SET_KS";
-  ks: number;
-  prevKs: number;
+  ks?: number;
+  prevKs?: number;
+  beforeBar: number;
 }
-export function setKs(appState: State, ks: number): SetKs {
+export function setKs(
+  appState: State,
+  { ks, beforeBar }: { ks: number; beforeBar: number },
+): SetKs {
   return {
     type: "SET_KS",
     ks,
     prevKs: appState.song.global.between[0].ks,
+    beforeBar,
   };
 }
 
 export interface SetClef {
   type: "SET_CLEF";
-  clef: Clef;
-  prevClef: Clef;
+  clef?: Clef;
+  prevClef?: Clef;
+  beforeBar: number;
 }
-export function setClef(appState: State, clef: Clef): SetClef {
+export function setClef(
+  appState: State,
+  { clef, beforeBar }: { clef: Clef; beforeBar: number },
+): SetClef {
+  let priorClef: Clef | undefined;
+  for (let i = 0; i < beforeBar; i += 1) {
+    priorClef = appState.song.global.between[i]?.clef;
+  }
+
   return {
     type: "SET_CLEF",
-    clef,
-    prevClef: appState.song.global.between[0].clef,
+    clef: priorClef === clef ? undefined : clef,
+    prevClef: appState.song.global.between[beforeBar]?.clef ?? undefined,
+    beforeBar,
   };
 }
 

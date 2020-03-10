@@ -1,5 +1,5 @@
 import React from "react";
-import { Hotkeys, Hotkey, HotkeysTarget } from "@blueprintjs/core";
+import { Hotkey, Hotkeys, HotkeysTarget } from "@blueprintjs/core";
 
 export interface Props {
   onUndo: () => void;

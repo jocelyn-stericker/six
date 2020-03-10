@@ -119,7 +119,7 @@ impl BetweenBars {
         stencil
     }
 
-    pub fn render_mid(&self, _context: &Context) -> Stencil {
+    pub fn render_mid(&self, context: &Context) -> Stencil {
         let mut stencil = Stencil::default();
 
         match self.barline {
@@ -150,7 +150,7 @@ impl BetweenBars {
                 .and_right(Stencil::padding(100.0));
         }
 
-        if let (Some(key), Some(clef)) = (self.key, self.clef) {
+        if let (Some(key), clef) = (self.key, self.clef.unwrap_or(context.clef)) {
             if key != 0 && clef != Clef::Percussion {
                 stencil = stencil.and_right(Stencil::padding(100.0));
                 for pitch in get_pitches(key, clef) {

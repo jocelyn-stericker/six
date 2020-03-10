@@ -1,5 +1,5 @@
-import React, { useLayoutEffect, useState, useEffect, useRef } from "react";
-import { render, newRender } from "./reconciler";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { newRender, render } from "./reconciler";
 
 export type Render = import("./reconciler").Render;
 export { NoteValue, Barline } from "./reconciler";

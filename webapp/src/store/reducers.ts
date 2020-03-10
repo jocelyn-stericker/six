@@ -1,5 +1,5 @@
 import { Bar, State } from "./state";
-import { Invertible, Action } from "./actions";
+import { Action, Invertible } from "./actions";
 
 export function getInitialState(): State {
   return {
@@ -91,7 +91,10 @@ function apply(state: State, action: Invertible) {
       break;
     }
     case "SET_CLEF": {
-      state.song.global.between[0].clef = action.clef;
+      state.song.global.between[action.beforeBar] = {
+        ...state.song.global.between[action.beforeBar],
+        clef: action.clef,
+      };
       break;
     }
     case "SET_TS": {
@@ -147,7 +150,10 @@ function apply(state: State, action: Invertible) {
       break;
     }
     case "SET_KS": {
-      state.song.global.between[0].ks = action.ks;
+      state.song.global.between[action.beforeBar] = {
+        ...state.song.global.between[action.beforeBar],
+        ks: action.ks,
+      };
       break;
     }
     case "SET_TITLE": {
@@ -193,6 +199,7 @@ function invert(action: Invertible): Invertible {
         type: "SET_KS",
         ks: action.prevKs,
         prevKs: action.ks,
+        beforeBar: action.beforeBar,
       };
     case "ADD_BAR":
       return {
@@ -229,6 +236,7 @@ function invert(action: Invertible): Invertible {
         type: "SET_CLEF",
         clef: action.prevClef,
         prevClef: action.clef,
+        beforeBar: action.beforeBar,
       };
   }
 }

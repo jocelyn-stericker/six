@@ -1,5 +1,5 @@
 import React from "react";
-import { Popover, Menu, MenuItem, MenuDivider } from "@blueprintjs/core";
+import { Menu, MenuDivider, MenuItem, Popover } from "@blueprintjs/core";
 import { Clef } from "./store";
 
 export interface Props {
