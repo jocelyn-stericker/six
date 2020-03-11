@@ -10,9 +10,17 @@ use rhythm::{Duration, NoteValue};
 use stencil::Stencil;
 
 pub use context::Context;
+pub use pitch::Pitch;
 pub use sys_print_rnc::sys_print_rnc;
 pub use sys_space_time_warp::{sys_apply_warp, sys_record_space_time_warp, SpaceTimeWarp};
 pub use sys_update_rnc_timing::sys_update_rnc_timing;
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum PitchKind {
+    Rest,
+    Unpitched,
+    Pitch(Pitch),
+}
 
 /// A Rest, Note, or Chord.
 ///
@@ -22,16 +30,16 @@ pub use sys_update_rnc_timing::sys_update_rnc_timing;
 #[derive(Debug)]
 pub struct RestNoteChord {
     pub duration: Duration,
-    is_note: bool,
     pub natural_duration: Duration,
+    pub pitch: PitchKind,
 }
 
 impl RestNoteChord {
-    pub fn new(duration: Duration, is_note: bool) -> RestNoteChord {
+    pub fn new(duration: Duration, pitch: PitchKind) -> RestNoteChord {
         RestNoteChord {
             natural_duration: duration,
             duration,
-            is_note,
+            pitch,
         }
     }
 
@@ -40,76 +48,129 @@ impl RestNoteChord {
     }
 
     pub fn is_note(&self) -> bool {
-        self.is_note
+        match self.pitch {
+            PitchKind::Rest => false,
+            PitchKind::Unpitched | PitchKind::Pitch(_) => true,
+        }
     }
 
-    pub fn print(&self) -> Stencil {
+    pub fn print(&self, context: &Context) -> Stencil {
         let mut stencil;
         let head_right;
 
-        if self.is_note {
-            let (head, attachment) = match self.duration.duration_display_base() {
-                Some(NoteValue::Maxima) | Some(NoteValue::Longa) | Some(NoteValue::DoubleWhole) => {
-                    Stencil::notehead_x_double_whole()
-                }
-                Some(NoteValue::Whole) => Stencil::notehead_x_whole(),
-                Some(NoteValue::Half) => Stencil::notehead_x_half_up(),
-                Some(NoteValue::Quarter)
-                | Some(NoteValue::Eighth)
-                | Some(NoteValue::Sixteenth)
-                | Some(NoteValue::ThirtySecond)
-                | Some(NoteValue::SixtyFourth)
-                | Some(NoteValue::HundredTwentyEighth)
-                | Some(NoteValue::TwoHundredFiftySixth)
-                | None => Stencil::notehead_x_black_up(),
-            };
-
-            head_right = head.rect().x1;
-            stencil = head;
-
-            if let Some(attachment) = attachment {
-                let flag = match self.duration.duration_display_base() {
-                    Some(NoteValue::Eighth) => Some(Stencil::flag_up_8()),
-                    Some(NoteValue::Sixteenth) => Some(Stencil::flag_up_16()),
-                    Some(NoteValue::ThirtySecond) => Some(Stencil::flag_up_32()),
-                    Some(NoteValue::SixtyFourth) => Some(Stencil::flag_up_64()),
-                    Some(NoteValue::HundredTwentyEighth) => Some(Stencil::flag_up_128()),
-                    Some(NoteValue::TwoHundredFiftySixth) => Some(Stencil::flag_up_256()),
-                    _ => None,
+        match self.pitch {
+            PitchKind::Pitch(pitch) => {
+                let (head, attachment) = match self.duration.duration_display_base() {
+                    Some(NoteValue::Maxima)
+                    | Some(NoteValue::Longa)
+                    | Some(NoteValue::DoubleWhole) => Stencil::notehead_double_whole(),
+                    Some(NoteValue::Whole) => Stencil::notehead_whole(),
+                    Some(NoteValue::Half) => Stencil::notehead_half_up(),
+                    Some(NoteValue::Quarter)
+                    | Some(NoteValue::Eighth)
+                    | Some(NoteValue::Sixteenth)
+                    | Some(NoteValue::ThirtySecond)
+                    | Some(NoteValue::SixtyFourth)
+                    | Some(NoteValue::HundredTwentyEighth)
+                    | Some(NoteValue::TwoHundredFiftySixth)
+                    | None => Stencil::notehead_black_up(),
                 };
 
-                let top = attachment.y - 875.0;
-                let stem = Stencil::stem_line(
-                    attachment.x,
-                    attachment.y,
-                    top + flag.as_ref().map(|a| a.1.y).unwrap_or(0.0),
-                );
-                let stem_width = stem.rect().width();
-                stencil = stencil.and(stem);
+                head_right = head.rect().x1;
+                stencil = head.with_translation(Vec2::new(0.0, pitch.y(context.clef)));
 
-                if let Some((flag, _)) = flag {
-                    stencil = stencil.and(
-                        flag.with_translation(Vec2::new(attachment.x - stem_width / 2.0, top)),
+                if let Some(attachment) = attachment {
+                    let flag = match self.duration.duration_display_base() {
+                        Some(NoteValue::Eighth) => Some(Stencil::flag_up_8()),
+                        Some(NoteValue::Sixteenth) => Some(Stencil::flag_up_16()),
+                        Some(NoteValue::ThirtySecond) => Some(Stencil::flag_up_32()),
+                        Some(NoteValue::SixtyFourth) => Some(Stencil::flag_up_64()),
+                        Some(NoteValue::HundredTwentyEighth) => Some(Stencil::flag_up_128()),
+                        Some(NoteValue::TwoHundredFiftySixth) => Some(Stencil::flag_up_256()),
+                        _ => None,
+                    };
+
+                    let top = attachment.y - 875.0;
+                    let stem = Stencil::stem_line(
+                        attachment.x,
+                        attachment.y,
+                        top + flag.as_ref().map(|a| a.1.y).unwrap_or(0.0),
                     );
+                    let stem_width = stem.rect().width();
+                    stencil = stencil.and(stem);
+
+                    if let Some((flag, _)) = flag {
+                        stencil = stencil.and(
+                            flag.with_translation(Vec2::new(attachment.x - stem_width / 2.0, top)),
+                        );
+                    }
                 }
             }
-        } else {
-            stencil = match self.duration.duration_display_base() {
-                Some(NoteValue::Maxima) => Stencil::rest_maxima(),
-                Some(NoteValue::Longa) => Stencil::rest_longa(),
-                Some(NoteValue::DoubleWhole) => Stencil::rest_double_whole(),
-                Some(NoteValue::Whole) => Stencil::rest_whole(),
-                Some(NoteValue::Half) => Stencil::rest_half(),
-                Some(NoteValue::Quarter) => Stencil::rest_quarter(),
-                Some(NoteValue::Eighth) => Stencil::rest_8(),
-                Some(NoteValue::Sixteenth) => Stencil::rest_16(),
-                Some(NoteValue::ThirtySecond) => Stencil::rest_32(),
-                Some(NoteValue::SixtyFourth) => Stencil::rest_64(),
-                Some(NoteValue::HundredTwentyEighth) => Stencil::rest_128(),
-                Some(NoteValue::TwoHundredFiftySixth) => Stencil::rest_256(),
-                None => Stencil::padding(200.0),
-            };
-            head_right = stencil.rect().x1;
+            PitchKind::Unpitched => {
+                let (head, attachment) = match self.duration.duration_display_base() {
+                    Some(NoteValue::Maxima)
+                    | Some(NoteValue::Longa)
+                    | Some(NoteValue::DoubleWhole) => Stencil::notehead_x_double_whole(),
+                    Some(NoteValue::Whole) => Stencil::notehead_x_whole(),
+                    Some(NoteValue::Half) => Stencil::notehead_x_half_up(),
+                    Some(NoteValue::Quarter)
+                    | Some(NoteValue::Eighth)
+                    | Some(NoteValue::Sixteenth)
+                    | Some(NoteValue::ThirtySecond)
+                    | Some(NoteValue::SixtyFourth)
+                    | Some(NoteValue::HundredTwentyEighth)
+                    | Some(NoteValue::TwoHundredFiftySixth)
+                    | None => Stencil::notehead_x_black_up(),
+                };
+
+                head_right = head.rect().x1;
+                stencil = head;
+
+                if let Some(attachment) = attachment {
+                    let flag = match self.duration.duration_display_base() {
+                        Some(NoteValue::Eighth) => Some(Stencil::flag_up_8()),
+                        Some(NoteValue::Sixteenth) => Some(Stencil::flag_up_16()),
+                        Some(NoteValue::ThirtySecond) => Some(Stencil::flag_up_32()),
+                        Some(NoteValue::SixtyFourth) => Some(Stencil::flag_up_64()),
+                        Some(NoteValue::HundredTwentyEighth) => Some(Stencil::flag_up_128()),
+                        Some(NoteValue::TwoHundredFiftySixth) => Some(Stencil::flag_up_256()),
+                        _ => None,
+                    };
+
+                    let top = attachment.y - 875.0;
+                    let stem = Stencil::stem_line(
+                        attachment.x,
+                        attachment.y,
+                        top + flag.as_ref().map(|a| a.1.y).unwrap_or(0.0),
+                    );
+                    let stem_width = stem.rect().width();
+                    stencil = stencil.and(stem);
+
+                    if let Some((flag, _)) = flag {
+                        stencil = stencil.and(
+                            flag.with_translation(Vec2::new(attachment.x - stem_width / 2.0, top)),
+                        );
+                    }
+                }
+            }
+            PitchKind::Rest => {
+                stencil = match self.duration.duration_display_base() {
+                    Some(NoteValue::Maxima) => Stencil::rest_maxima(),
+                    Some(NoteValue::Longa) => Stencil::rest_longa(),
+                    Some(NoteValue::DoubleWhole) => Stencil::rest_double_whole(),
+                    Some(NoteValue::Whole) => Stencil::rest_whole(),
+                    Some(NoteValue::Half) => Stencil::rest_half(),
+                    Some(NoteValue::Quarter) => Stencil::rest_quarter(),
+                    Some(NoteValue::Eighth) => Stencil::rest_8(),
+                    Some(NoteValue::Sixteenth) => Stencil::rest_16(),
+                    Some(NoteValue::ThirtySecond) => Stencil::rest_32(),
+                    Some(NoteValue::SixtyFourth) => Stencil::rest_64(),
+                    Some(NoteValue::HundredTwentyEighth) => Stencil::rest_128(),
+                    Some(NoteValue::TwoHundredFiftySixth) => Stencil::rest_256(),
+                    None => Stencil::padding(200.0),
+                };
+                head_right = stencil.rect().x1;
+            }
         };
 
         if let Some(dots) = self.duration.display_dots() {
@@ -133,8 +194,8 @@ impl Default for RestNoteChord {
     fn default() -> RestNoteChord {
         RestNoteChord {
             duration: Duration::new(NoteValue::Quarter, 0, None),
-            is_note: false,
             natural_duration: Duration::new(NoteValue::Quarter, 0, None),
+            pitch: PitchKind::Rest,
         }
     }
 }
@@ -147,164 +208,303 @@ mod tests {
     fn print() {
         use kurbo::Vec2;
         use stencil::snapshot;
+        let context = Context::default();
 
         let notes = Stencil::padding(200.0)
             .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::DoubleWhole, 0, None), true).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Whole, 0, None), true).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Half, 0, None), true).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Quarter, 0, None), true).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Eighth, 0, None), true).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::Sixteenth, 0, None), true).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::ThirtySecond, 0, None), true).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::SixtyFourth, 0, None), true).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::HundredTwentyEighth, 0, None), true)
-                    .print(),
+                RestNoteChord::new(
+                    Duration::new(NoteValue::DoubleWhole, 0, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
-                    Duration::new(NoteValue::TwoHundredFiftySixth, 0, None),
-                    true,
+                    Duration::new(NoteValue::Whole, 0, None),
+                    PitchKind::Unpitched,
                 )
-                .print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::DoubleWhole, 1, None), true).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Whole, 1, None), true).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Half, 1, None), true).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Quarter, 1, None), true).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Eighth, 1, None), true).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::Sixteenth, 1, None), true).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::ThirtySecond, 1, None), true).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::SixtyFourth, 1, None), true).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::HundredTwentyEighth, 1, None), true)
-                    .print(),
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
-                    Duration::new(NoteValue::TwoHundredFiftySixth, 1, None),
-                    true,
+                    Duration::new(NoteValue::Half, 0, None),
+                    PitchKind::Unpitched,
                 )
-                .print(),
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::DoubleWhole, 0, None), false).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Whole, 0, None), false).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Half, 0, None), false).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::Quarter, 0, None), false).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Eighth, 0, None), false).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::Sixteenth, 0, None), false).print(),
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Quarter, 0, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::ThirtySecond, 0, None), false).print(),
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::SixtyFourth, 0, None), false).print(),
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::ThirtySecond, 0, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::SixtyFourth, 0, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::HundredTwentyEighth, 0, None),
-                    false,
+                    PitchKind::Unpitched,
                 )
-                .print(),
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::TwoHundredFiftySixth, 0, None),
-                    false,
+                    PitchKind::Unpitched,
                 )
-                .print(),
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::DoubleWhole, 2, None), false).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Whole, 2, None), false).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Half, 2, None), false).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::Quarter, 2, None), false).print(),
-            )
-            .and_right(Stencil::padding(200.0))
-            .and_right(RestNoteChord::new(Duration::new(NoteValue::Eighth, 2, None), false).print())
-            .and_right(Stencil::padding(200.0))
-            .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::Sixteenth, 2, None), false).print(),
+                RestNoteChord::new(
+                    Duration::new(NoteValue::DoubleWhole, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::ThirtySecond, 2, None), false).print(),
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Whole, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
-                RestNoteChord::new(Duration::new(NoteValue::SixtyFourth, 2, None), false).print(),
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Half, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Quarter, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Eighth, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Sixteenth, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::ThirtySecond, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::SixtyFourth, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::HundredTwentyEighth, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::TwoHundredFiftySixth, 1, None),
+                    PitchKind::Unpitched,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::DoubleWhole, 0, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(Duration::new(NoteValue::Whole, 0, None), PitchKind::Rest)
+                    .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(Duration::new(NoteValue::Half, 0, None), PitchKind::Rest)
+                    .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(Duration::new(NoteValue::Quarter, 0, None), PitchKind::Rest)
+                    .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(Duration::new(NoteValue::Eighth, 0, None), PitchKind::Rest)
+                    .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::ThirtySecond, 0, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::SixtyFourth, 0, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::HundredTwentyEighth, 0, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::TwoHundredFiftySixth, 0, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::DoubleWhole, 2, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(Duration::new(NoteValue::Whole, 2, None), PitchKind::Rest)
+                    .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(Duration::new(NoteValue::Half, 2, None), PitchKind::Rest)
+                    .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(Duration::new(NoteValue::Quarter, 2, None), PitchKind::Rest)
+                    .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(Duration::new(NoteValue::Eighth, 2, None), PitchKind::Rest)
+                    .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::Sixteenth, 2, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::ThirtySecond, 2, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
+            )
+            .and_right(Stencil::padding(200.0))
+            .and_right(
+                RestNoteChord::new(
+                    Duration::new(NoteValue::SixtyFourth, 2, None),
+                    PitchKind::Rest,
+                )
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::HundredTwentyEighth, 2, None),
-                    false,
+                    PitchKind::Rest,
                 )
-                .print(),
+                .print(&context),
             )
             .and_right(Stencil::padding(200.0))
             .and_right(
                 RestNoteChord::new(
                     Duration::new(NoteValue::TwoHundredFiftySixth, 2, None),
-                    false,
+                    PitchKind::Rest,
                 )
-                .print(),
+                .print(&context),
             );
 
         let right = notes.rect().x1;

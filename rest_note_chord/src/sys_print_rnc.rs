@@ -1,11 +1,15 @@
 use std::collections::HashMap;
 
-use crate::RestNoteChord;
+use crate::{Context, RestNoteChord};
 use entity::{Entity, Join};
 use stencil::Stencil;
 
-pub fn sys_print_rnc(rnc: &HashMap<Entity, RestNoteChord>, render: &mut HashMap<Entity, Stencil>) {
-    for (_id, (rnc, render)) in (rnc, render).join() {
-        *render = rnc.print();
+pub fn sys_print_rnc(
+    rnc: &HashMap<Entity, RestNoteChord>,
+    contexts: &HashMap<Entity, Context>,
+    render: &mut HashMap<Entity, Stencil>,
+) {
+    for (_id, (rnc, context, render)) in (rnc, contexts, render).join() {
+        *render = rnc.print(context);
     }
 }

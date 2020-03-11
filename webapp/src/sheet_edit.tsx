@@ -56,6 +56,7 @@ function SheetEdit({ appState, dispatch }: Props) {
                 barRefs[preview.barIdx].current,
                 [preview.barIdx, preview.startTime[0], preview.startTime[1]],
                 duration,
+                preview.pitch,
               );
               if (insertion) {
                 dispatch(
@@ -73,11 +74,11 @@ function SheetEdit({ appState, dispatch }: Props) {
         </React.Suspense>
       )}
       <Sheet
-        onHoverTimeChanged={time => {
+        onHover={(time, pitch) => {
           if (noteMutationClickPos) {
             return;
           }
-          if (!time) {
+          if (time == null || pitch == null) {
             setPreview(null);
             return;
           }
@@ -88,6 +89,7 @@ function SheetEdit({ appState, dispatch }: Props) {
               barRefs[time[0]].current,
               time,
               [1, 4],
+              pitch,
             ),
           );
         }}
@@ -191,6 +193,7 @@ function SheetEdit({ appState, dispatch }: Props) {
                           startDen={div.startTime[1]}
                           isNote={true}
                           isTemporary={true}
+                          pitch={preview.pitch}
                         />
                       ))}
                   </bar>

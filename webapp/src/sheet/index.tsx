@@ -9,19 +9,22 @@ export const TYPE_BETWEEN_BARS = 1;
 interface Props {
   children: any;
   onMouseDown?: (
-    time: null | [number, number, number],
+    time: null | [number, number, number, number],
     ev: React.MouseEvent,
   ) => void;
   onMouseUp?: (
-    time: null | [number, number, number],
+    time: null | [number, number, number, number],
     ev: React.MouseEvent,
   ) => void;
   onClick?: (
-    time: null | [number, number, number],
+    time: null | [number, number, number, number],
     ev: React.MouseEvent,
   ) => void;
   onMouseMove?: (ev: React.MouseEvent) => void;
-  onHoverTimeChanged: (time: [number, number, number] | null) => void;
+  onHover: (
+    time: [number, number, number] | null,
+    pitch: number | null,
+  ) => void;
 }
 
 /** [entity, x, y, scale] */
@@ -106,9 +109,9 @@ export default function SheetMusicView(props: Props) {
     [key: number]: Array<number>;
   }>({});
   const [root, setRoot] = useState<number | null>(null);
-  const [hoverTime, setHoverTime] = useState<[number, number, number] | null>(
-    null,
-  );
+  const [hoverInfo, setHoverInfo] = useState<
+    [number, number, number, number] | null
+  >(null);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
 
   useLayoutEffect(() => {
@@ -158,14 +161,17 @@ export default function SheetMusicView(props: Props) {
   const bound = svg.current && svg.current.getBoundingClientRect();
 
   function makeMouseHandler(
-    fn?: (time: null | [number, number, number], ev: React.MouseEvent) => void,
+    fn?: (
+      time: null | [number, number, number, number],
+      ev: React.MouseEvent,
+    ) => void,
   ) {
     return (ev: React.MouseEvent) => {
       if (!stencilMeta || !fn) {
         return;
       }
 
-      fn(hoverTime, ev);
+      fn(hoverInfo, ev);
     };
   }
 
@@ -192,18 +198,23 @@ export default function SheetMusicView(props: Props) {
           pt.y = ev.clientY;
           pt = pt.matrixTransform(ctm.inverse());
 
-          const time = container.get_time_for_cursor(pt.x, pt.y);
+          const info = container.get_hover_info(pt.x, pt.y);
 
-          if (
-            Boolean(hoverTime) !== Boolean(time) ||
-            (time &&
-              hoverTime &&
-              (time[0] !== hoverTime[0] ||
-                time[1] !== hoverTime[1] ||
-                time[2] !== hoverTime[2]))
-          ) {
-            setHoverTime(time ? [time[0], time[1], time[2]] : null);
-            props.onHoverTimeChanged(time ? [time[0], time[1], time[2]] : null);
+          if (info) {
+            if (
+              Boolean(hoverInfo) !== Boolean(info) ||
+              (hoverInfo &&
+                (info[0] !== hoverInfo[0] ||
+                  info[1] !== hoverInfo[1] ||
+                  info[2] !== hoverInfo[2] ||
+                  info[3] !== hoverInfo[3]))
+            ) {
+              setHoverInfo(info ? [info[0], info[1], info[2], info[3]] : null);
+              props.onHover(
+                info ? [info[0], info[1], info[2]] : null,
+                info ? info[3] : null,
+              );
+            }
           }
 
           if (props.onMouseMove) {

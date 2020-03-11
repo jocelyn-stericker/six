@@ -18,7 +18,7 @@ impl Clef {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum NoteName {
     C = 0,
@@ -31,6 +31,32 @@ pub enum NoteName {
 }
 
 impl NoteName {
+    pub fn new(i: u8) -> Option<NoteName> {
+        match i {
+            0 => Some(NoteName::C),
+            2 => Some(NoteName::D),
+            4 => Some(NoteName::E),
+            5 => Some(NoteName::F),
+            7 => Some(NoteName::G),
+            9 => Some(NoteName::A),
+            11 => Some(NoteName::B),
+            _ => None,
+        }
+    }
+
+    pub fn from_index(idx: u8) -> Option<NoteName> {
+        match idx {
+            0 => Some(NoteName::C),
+            1 => Some(NoteName::D),
+            2 => Some(NoteName::E),
+            3 => Some(NoteName::F),
+            4 => Some(NoteName::G),
+            5 => Some(NoteName::A),
+            6 => Some(NoteName::B),
+            _ => None,
+        }
+    }
+
     pub fn index(self) -> i32 {
         match self {
             NoteName::C => 0,
@@ -44,14 +70,14 @@ impl NoteName {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i8)]
 pub enum NoteModifier {
     SemiUp = 1,
     SemiDown = -1,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pitch {
     name: NoteName,
     modifier: Option<NoteModifier>,
@@ -65,6 +91,24 @@ impl Pitch {
             modifier,
             octave,
         }
+    }
+
+    pub fn from_y(y: f64, clef: Clef) -> Pitch {
+        let pitch = clef.offset() + (y / 125f64) as i32;
+        if pitch < 0 {
+            // TODO
+            Pitch::middle_c();
+        }
+        let octave = (pitch / 7) as i8;
+        let name = NoteName::from_index((pitch % 7) as u8).unwrap();
+        Pitch::new(name, None, octave)
+    }
+
+    pub fn from_midi(midi: u8) -> Pitch {
+        // TODO: accidentals
+        let octave = (midi / 12) as i8 - 1;
+        let name = NoteName::new(midi % 12).unwrap();
+        Pitch::new(name, None, octave)
     }
 
     pub fn a440() -> Pitch {

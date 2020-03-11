@@ -508,6 +508,42 @@ impl Stencil {
         )
     }
 
+    pub fn notehead_double_whole() -> (Stencil, Option<Point>) {
+        (Self::from_corefont(&corefont::NOTEHEAD_DOUBLE_WHOLE), None)
+    }
+
+    pub fn notehead_whole() -> (Stencil, Option<Point>) {
+        (Self::from_corefont(&corefont::NOTEHEAD_WHOLE), None)
+    }
+
+    pub fn notehead_half_up() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_HALF),
+            Some(Self::attachment(corefont::NOTEHEAD_HALF_STEM_UP)),
+        )
+    }
+
+    pub fn notehead_half_down() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_HALF),
+            Some(Self::attachment(corefont::NOTEHEAD_HALF_STEM_DOWN)),
+        )
+    }
+
+    pub fn notehead_black_up() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_BLACK),
+            Some(Self::attachment(corefont::NOTEHEAD_BLACK_STEM_UP)),
+        )
+    }
+
+    pub fn notehead_black_stem_down_attachment() -> (Stencil, Option<Point>) {
+        (
+            Self::from_corefont(&corefont::NOTEHEAD_BLACK),
+            Some(Self::attachment(corefont::NOTEHEAD_BLACK_STEM_DOWN)),
+        )
+    }
+
     pub fn flag_up_8() -> (Stencil, Point) {
         (
             Self::from_corefont(&corefont::FLAG8TH_UP),

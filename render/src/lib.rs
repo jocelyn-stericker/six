@@ -10,10 +10,10 @@ use sys_print_song::sys_print_song;
 use entity::{EntitiesRes, Entity, Join};
 use kurbo::Rect;
 use num_rational::Rational;
-use pitch::Clef;
+use pitch::{Clef, Pitch};
 use rest_note_chord::{
     sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_update_rnc_timing, Context,
-    RestNoteChord, SpaceTimeWarp,
+    PitchKind, RestNoteChord, SpaceTimeWarp,
 };
 use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing};
 use staff::{
@@ -311,7 +311,6 @@ impl Render {
         dots: u8,
         start_numer: isize,
         start_denom: isize,
-        is_note: bool,
     ) -> usize {
         let note_value = NoteValue::new(note_value).unwrap();
         let start = Rational::new(start_numer, start_denom);
@@ -322,7 +321,7 @@ impl Render {
             .insert(entity, RelativeRhythmicSpacing::default());
         self.rncs.insert(
             entity,
-            RestNoteChord::new(Duration::new(note_value, dots, None), is_note),
+            RestNoteChord::new(Duration::new(note_value, dots, None), PitchKind::Rest),
         );
         self.contexts.insert(
             entity,
@@ -335,6 +334,27 @@ impl Render {
         self.stencils.insert(entity, Stencil::default());
 
         entity.id()
+    }
+
+    pub fn rnc_set_rest(&mut self, rnc_id: usize) {
+        let rnc_id = Entity::new(rnc_id);
+        if let Some(rnc) = self.rncs.get_mut(&rnc_id) {
+            rnc.pitch = PitchKind::Rest;
+        }
+    }
+
+    pub fn rnc_set_unpitched(&mut self, rnc_id: usize) {
+        let rnc_id = Entity::new(rnc_id);
+        if let Some(rnc) = self.rncs.get_mut(&rnc_id) {
+            rnc.pitch = PitchKind::Unpitched;
+        }
+    }
+
+    pub fn rnc_set_pitch(&mut self, rnc_id: usize, midi: u8) {
+        let rnc_id = Entity::new(rnc_id);
+        if let Some(rnc) = self.rncs.get_mut(&rnc_id) {
+            rnc.pitch = PitchKind::Pitch(Pitch::from_midi(midi));
+        }
     }
 
     pub fn rnc_update_time(
@@ -554,7 +574,7 @@ impl Render {
             &mut self.stencils,
         );
 
-        sys_print_rnc(&self.rncs, &mut self.stencils);
+        sys_print_rnc(&self.rncs, &self.contexts, &mut self.stencils);
         sys_print_between_bars(&self.between_bars, &self.contexts, &mut self.stencils);
 
         if self.keep_spacing() {
@@ -687,10 +707,10 @@ impl Render {
         lines.join("\n")
     }
 
-    /// Returns [bar, num, den]
-    pub fn get_time_for_cursor(&self, x: f64, y: f64) -> Option<Vec<usize>> {
+    /// Returns [bar, num, den, pitch]
+    pub fn get_hover_info(&self, x: f64, y: f64) -> Option<Vec<isize>> {
         let quant = Rational::new(1, 8);
-        for (_id, (bbox, bar, start)) in (&self.world_bbox, &self.bars, &self.contexts).join() {
+        for (_id, (bbox, bar, context)) in (&self.world_bbox, &self.bars, &self.contexts).join() {
             if x >= bbox.x0 && x <= bbox.x1 && y >= bbox.y0 && y <= bbox.y1 {
                 let child_contexts: Vec<_> = bar
                     .children()
@@ -705,6 +725,9 @@ impl Render {
                         )
                     })
                     .collect();
+                let middle_y = (bbox.y0 + bbox.y1) / 2.0;
+
+                let pitch = Pitch::from_y(middle_y - y, context.clef);
                 for (i, (child_left, child_start_beat)) in child_contexts.iter().enumerate().rev() {
                     if *child_left <= x {
                         let next = child_contexts
@@ -721,18 +744,19 @@ impl Render {
                         let beat = child_start_beat + quant * (step as isize);
 
                         return Some(vec![
-                            start.bar,
-                            *beat.numer() as usize,
-                            *beat.denom() as usize,
-                            i,
+                            context.bar as isize,
+                            *beat.numer() as isize,
+                            *beat.denom() as isize,
+                            pitch.midi() as isize,
                         ]);
                     }
                 }
 
                 return Some(vec![
-                    start.bar,
-                    *start.beat.numer() as usize,
-                    *start.beat.denom() as usize,
+                    context.bar as isize,
+                    *context.beat.numer() as isize,
+                    *context.beat.denom() as isize,
+                    pitch.midi() as isize,
                 ]);
             }
         }
@@ -814,7 +838,8 @@ mod tests {
         let bar1 = render.bar_create(4, 4);
         render.child_append(staff, bar1);
 
-        let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8, true);
+        let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
+        render.rnc_set_unpitched(rnc1);
 
         render.bar_insert(bar1, rnc1, false);
         let barline = render.between_bars_create(Some(Barline::Normal), None, None, None, Some(0));
@@ -823,7 +848,8 @@ mod tests {
         let bar2 = render.bar_create(4, 4);
         render.child_append(staff, bar2);
 
-        let rnc2 = render.rnc_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4, true);
+        let rnc2 = render.rnc_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4);
+        render.rnc_set_unpitched(rnc2);
 
         render.bar_insert(bar2, rnc2, false);
 

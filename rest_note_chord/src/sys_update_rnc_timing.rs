@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{Context, RestNoteChord};
+use crate::{Context, PitchKind, RestNoteChord};
 use entity::{EntitiesRes, Entity};
 use rhythm::{Bar, RelativeRhythmicSpacing};
 use stencil::Stencil;
@@ -17,7 +17,7 @@ pub fn sys_update_rnc_timing(
     for (bar_id, bar) in bars {
         let bar_context = contexts.get(bar_id).cloned().unwrap_or_default();
         while let Some((duration, entity)) = bar.push_managed_entity(entities) {
-            rnc.insert(entity, RestNoteChord::new(duration, false));
+            rnc.insert(entity, RestNoteChord::new(duration, PitchKind::Rest));
             contexts.insert(entity, Context::default());
             spacing.insert(entity, RelativeRhythmicSpacing::default());
             parents.insert(entity, *bar_id);

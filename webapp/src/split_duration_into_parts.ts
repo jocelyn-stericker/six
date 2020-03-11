@@ -5,6 +5,7 @@ export interface NoteAddPatch {
   barIdx: number;
   startTime: [number, number];
   divisions: TiedNote;
+  pitch: number;
 }
 
 function count(noteValue: number, dots: number) {
@@ -24,6 +25,7 @@ export default function splitDurationIntoParts(
   barEntity: number | null,
   time: [number, number, number] | null,
   insertionDuration: [number, number],
+  pitch: number,
 ): NoteAddPatch | null {
   if (!render) {
     return null;
@@ -81,5 +83,6 @@ export default function splitDurationIntoParts(
     barIdx: time[0],
     startTime: [time[1], time[2]],
     divisions,
+    pitch,
   };
 }
