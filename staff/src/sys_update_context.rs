@@ -27,7 +27,15 @@ pub fn sys_update_context(
                 context.key = key;
                 context.time = time;
             }
-            if bars.contains_key(child) {
+            if let Some(bar) = bars.get(child) {
+                for (_, _, grandchild, _) in bar.children() {
+                    if let Some(context) = contexts.get_mut(&grandchild) {
+                        context.bar = idx;
+                        context.clef = clef;
+                        context.key = key;
+                        context.time = time;
+                    }
+                }
                 idx += 1;
             }
             if let Some(between_bar) = between_bars.get(child) {

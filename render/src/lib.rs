@@ -556,14 +556,6 @@ impl Render {
             ],
         );
 
-        sys_update_context(
-            &self.staffs,
-            &self.ordered_children,
-            &self.bars,
-            &self.between_bars,
-            &mut self.contexts,
-        );
-
         sys_update_rnc_timing(
             &self.entities,
             &mut self.rncs,
@@ -572,6 +564,14 @@ impl Render {
             &mut self.spacing,
             &mut self.parents,
             &mut self.stencils,
+        );
+
+        sys_update_context(
+            &self.staffs,
+            &self.ordered_children,
+            &self.bars,
+            &self.between_bars,
+            &mut self.contexts,
         );
 
         sys_print_rnc(&self.rncs, &self.contexts, &mut self.stencils);
