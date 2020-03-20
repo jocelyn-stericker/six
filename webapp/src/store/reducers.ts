@@ -46,7 +46,7 @@ function apply(state: State, action: Invertible) {
       break;
     }
     case "ADD_NOTE": {
-      const { barIdx, startTime, divisions } = action;
+      const { barIdx, startTime, divisions, pitch } = action;
       const barObj = state.song.part.bars[barIdx];
       if (!barObj) {
         return;
@@ -54,6 +54,7 @@ function apply(state: State, action: Invertible) {
       barObj.notes.push({
         startTime,
         divisions,
+        pitch,
       });
       break;
     }
@@ -175,6 +176,7 @@ function invert(action: Invertible): Invertible {
         barIdx: action.barIdx,
         startTime: action.startTime,
         divisions: action.divisions,
+        pitch: action.pitch,
       };
     case "ADD_NOTE":
       return {
@@ -182,6 +184,7 @@ function invert(action: Invertible): Invertible {
         barIdx: action.barIdx,
         startTime: action.startTime,
         divisions: action.divisions,
+        pitch: action.pitch,
       };
     case "SET_TS":
       return {

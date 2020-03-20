@@ -6,25 +6,22 @@ export { NoteValue, Barline } from "./reconciler";
 export const TYPE_RNC = 0;
 export const TYPE_BETWEEN_BARS = 1;
 
+export interface HoverInfo {
+  bar?: number;
+  time?: [number, number];
+  pitch?: {
+    base: number;
+    modifier: number;
+  };
+}
+
 interface Props {
   children: any;
-  onMouseDown?: (
-    time: null | [number, number, number, number],
-    ev: React.MouseEvent,
-  ) => void;
-  onMouseUp?: (
-    time: null | [number, number, number, number],
-    ev: React.MouseEvent,
-  ) => void;
-  onClick?: (
-    time: null | [number, number, number, number],
-    ev: React.MouseEvent,
-  ) => void;
+  onMouseDown?: (info: null | HoverInfo, ev: React.MouseEvent) => void;
+  onMouseUp?: (info: null | HoverInfo, ev: React.MouseEvent) => void;
+  onClick?: (info: null | HoverInfo, ev: React.MouseEvent) => void;
   onMouseMove?: (ev: React.MouseEvent) => void;
-  onHover: (
-    time: [number, number, number] | null,
-    pitch: number | null,
-  ) => void;
+  onHover: (info: HoverInfo) => void;
 }
 
 /** [entity, x, y, scale] */
@@ -109,9 +106,7 @@ export default function SheetMusicView(props: Props) {
     [key: number]: Array<number>;
   }>({});
   const [root, setRoot] = useState<number | null>(null);
-  const [hoverInfo, setHoverInfo] = useState<
-    [number, number, number, number] | null
-  >(null);
+  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
 
   useLayoutEffect(() => {
@@ -161,10 +156,7 @@ export default function SheetMusicView(props: Props) {
   const bound = svg.current && svg.current.getBoundingClientRect();
 
   function makeMouseHandler(
-    fn?: (
-      time: null | [number, number, number, number],
-      ev: React.MouseEvent,
-    ) => void,
+    fn?: (time: null | HoverInfo, ev: React.MouseEvent) => void,
   ) {
     return (ev: React.MouseEvent) => {
       if (!stencilMeta || !fn) {
@@ -198,23 +190,31 @@ export default function SheetMusicView(props: Props) {
           pt.y = ev.clientY;
           pt = pt.matrixTransform(ctm.inverse());
 
-          const info = container.get_hover_info(pt.x, pt.y);
+          const newHoverInfo = container.get_hover_info(pt.x, pt.y);
 
-          if (info) {
+          if (newHoverInfo) {
             if (
-              Boolean(hoverInfo) !== Boolean(info) ||
+              Boolean(hoverInfo) !== Boolean(newHoverInfo) ||
               (hoverInfo &&
-                (info[0] !== hoverInfo[0] ||
-                  info[1] !== hoverInfo[1] ||
-                  info[2] !== hoverInfo[2] ||
-                  info[3] !== hoverInfo[3]))
+                (newHoverInfo[0] !== hoverInfo.bar ||
+                  newHoverInfo[1] !== hoverInfo.time?.[0] ||
+                  newHoverInfo[2] !== hoverInfo.time?.[1] ||
+                  newHoverInfo[3] !== hoverInfo.pitch?.base ||
+                  newHoverInfo[4] !== hoverInfo.pitch?.modifier))
             ) {
-              setHoverInfo(info ? [info[0], info[1], info[2], info[3]] : null);
-              props.onHover(
-                info ? [info[0], info[1], info[2]] : null,
-                info ? info[3] : null,
-              );
+              const formattedHoverInfo: HoverInfo = {
+                bar: newHoverInfo[0],
+                time: [newHoverInfo[1], newHoverInfo[2]],
+                pitch: {
+                  base: newHoverInfo[3],
+                  modifier: newHoverInfo[4],
+                },
+              };
+              setHoverInfo(formattedHoverInfo);
+              props.onHover(formattedHoverInfo);
             }
+          } else {
+            props.onHover({});
           }
 
           if (props.onMouseMove) {

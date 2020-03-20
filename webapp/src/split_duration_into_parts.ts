@@ -1,11 +1,11 @@
-import { State, TiedNote } from "./store";
+import { Pitch, State, TiedNote } from "./store";
 import { Render } from "./sheet/reconciler";
 
 export interface NoteAddPatch {
   barIdx: number;
   startTime: [number, number];
   divisions: TiedNote;
-  pitch: number;
+  pitch: Pitch;
 }
 
 function count(noteValue: number, dots: number) {
@@ -23,9 +23,10 @@ export default function splitDurationIntoParts(
   render: Render | null,
   appState: State,
   barEntity: number | null,
-  time: [number, number, number] | null,
+  barIdx: number,
+  time: [number, number] | null,
   insertionDuration: [number, number],
-  pitch: number,
+  pitch: Pitch,
 ): NoteAddPatch | null {
   if (!render) {
     return null;
@@ -39,12 +40,12 @@ export default function splitDurationIntoParts(
 
   const rawDivisions = render.split_note(
     barEntity,
+    time[0],
     time[1],
-    time[2],
     insertionDuration[0],
     insertionDuration[1],
   );
-  const start = time[1] / time[2];
+  const start = time[0] / time[1];
 
   const divisions: TiedNote = [];
   let end = start;
@@ -61,7 +62,7 @@ export default function splitDurationIntoParts(
   }
 
   if (
-    appState.song.part.bars[time[0]].notes.some(note => {
+    appState.song.part.bars[barIdx].notes.some(note => {
       let noteStart = note.startTime[0] / note.startTime[1];
       let noteEnd =
         noteStart +
@@ -80,8 +81,8 @@ export default function splitDurationIntoParts(
   }
 
   return {
-    barIdx: time[0],
-    startTime: [time[1], time[2]],
+    barIdx,
+    startTime: [time[0], time[1]],
     divisions,
     pitch,
   };

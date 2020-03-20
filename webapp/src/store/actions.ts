@@ -1,10 +1,11 @@
-import { Bar, Clef, State, TiedNote } from "./state";
+import { Bar, Clef, Pitch, State, TiedNote } from "./state";
 
 export interface AddNote {
   type: "ADD_NOTE";
   barIdx: number;
   startTime: [number, number];
   divisions: TiedNote;
+  pitch: Pitch;
 }
 export function addNote(insertion: Omit<AddNote, "type">): AddNote {
   return {
@@ -18,6 +19,7 @@ export interface RemoveNote {
   barIdx: number;
   startTime: [number, number];
   divisions: TiedNote;
+  pitch: Pitch;
 }
 export function removeNote(insertion: Omit<AddNote, "type">): RemoveNote {
   return {

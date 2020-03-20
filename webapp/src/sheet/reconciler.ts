@@ -104,6 +104,7 @@ export interface RncProps extends Stylable {
   isNote: boolean;
   isTemporary: boolean;
   pitch?: number;
+  pitchModifier?: number;
 }
 
 // TODO: dedupe with JSX.IntrinsicElements
@@ -176,7 +177,11 @@ function createInstance(
       if (spec.props.pitch == null) {
         container.rnc_set_unpitched(entity);
       } else if (spec.props.pitch) {
-        container.rnc_set_pitch(entity, spec.props.pitch);
+        container.rnc_set_pitch(
+          entity,
+          spec.props.pitch,
+          spec.props.pitchModifier ?? 0,
+        );
       }
     } else {
       container.rnc_set_rest(entity);
@@ -356,10 +361,14 @@ const Reconciler = ReactReconciler({
       (oldProps.isNote !== newProps.isNote || oldProps.pitch !== newProps.pitch)
     ) {
       if (newProps.isNote) {
-        if (newProps.pitch == null) {
+        if (newProps.pitch == null || newProps.pitchModifier) {
           instance.container.rnc_set_unpitched(instance.entity);
         } else {
-          instance.container.rnc_set_pitch(instance.entity, newProps.pitch);
+          instance.container.rnc_set_pitch(
+            instance.entity,
+            newProps.pitch,
+            newProps.pitchModifier ?? 0,
+          );
         }
       } else {
         instance.container.rnc_set_rest(instance.entity);

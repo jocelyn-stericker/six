@@ -10,7 +10,7 @@ use sys_print_song::sys_print_song;
 use entity::{EntitiesRes, Entity, Join};
 use kurbo::Rect;
 use num_rational::Rational;
-use pitch::{Clef, Pitch};
+use pitch::{Clef, NoteModifier, Pitch};
 use rest_note_chord::{
     sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_update_rnc_timing, Context,
     PitchKind, RestNoteChord, SpaceTimeWarp,
@@ -350,10 +350,12 @@ impl Render {
         }
     }
 
-    pub fn rnc_set_pitch(&mut self, rnc_id: usize, midi: u8) {
+    pub fn rnc_set_pitch(&mut self, rnc_id: usize, midi: u8, modifier: i8) {
         let rnc_id = Entity::new(rnc_id);
         if let Some(rnc) = self.rncs.get_mut(&rnc_id) {
-            rnc.pitch = PitchKind::Pitch(Pitch::from_midi(midi));
+            rnc.pitch = PitchKind::Pitch(
+                Pitch::from_base_midi(midi, NoteModifier::from_raw(modifier)).unwrap_or_default(),
+            );
         }
     }
 
@@ -707,7 +709,7 @@ impl Render {
         lines.join("\n")
     }
 
-    /// Returns [bar, num, den, pitch]
+    /// Returns [bar, num, den, pitch_base, pitch_modifier]
     pub fn get_hover_info(&self, x: f64, y: f64) -> Option<Vec<isize>> {
         let quant = Rational::new(1, 8);
         for (_id, (bbox, bar, context)) in (&self.world_bbox, &self.bars, &self.contexts).join() {
@@ -747,7 +749,8 @@ impl Render {
                             context.bar as isize,
                             *beat.numer() as isize,
                             *beat.denom() as isize,
-                            pitch.midi() as isize,
+                            pitch.base_midi() as isize,
+                            pitch.modifier().map(|m| m as isize).unwrap_or(0),
                         ]);
                     }
                 }
@@ -756,7 +759,8 @@ impl Render {
                     context.bar as isize,
                     *context.beat.numer() as isize,
                     *context.beat.denom() as isize,
-                    pitch.midi() as isize,
+                    pitch.base_midi() as isize,
+                    pitch.modifier().map(|m| m as isize).unwrap_or(0),
                 ]);
             }
         }

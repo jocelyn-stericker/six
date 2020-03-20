@@ -537,7 +537,7 @@ impl Stencil {
         )
     }
 
-    pub fn notehead_black_stem_down_attachment() -> (Stencil, Option<Point>) {
+    pub fn notehead_black_down() -> (Stencil, Option<Point>) {
         (
             Self::from_corefont(&corefont::NOTEHEAD_BLACK),
             Some(Self::attachment(corefont::NOTEHEAD_BLACK_STEM_DOWN)),
@@ -583,6 +583,48 @@ impl Stencil {
         (
             Self::from_corefont(&corefont::FLAG256TH_UP),
             Self::attachment(corefont::FLAG256TH_UP_STEM_UP),
+        )
+    }
+
+    pub fn flag_down_8() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG8TH_DOWN),
+            Self::attachment(corefont::FLAG8TH_DOWN_STEM_DOWN),
+        )
+    }
+
+    pub fn flag_down_16() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG16TH_DOWN),
+            Self::attachment(corefont::FLAG16TH_DOWN_STEM_DOWN),
+        )
+    }
+
+    pub fn flag_down_32() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG32ND_DOWN),
+            Self::attachment(corefont::FLAG32ND_DOWN_STEM_DOWN),
+        )
+    }
+
+    pub fn flag_down_64() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG64TH_DOWN),
+            Self::attachment(corefont::FLAG64TH_DOWN_STEM_DOWN),
+        )
+    }
+
+    pub fn flag_down_128() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG128TH_DOWN),
+            Self::attachment(corefont::FLAG128TH_DOWN_STEM_DOWN),
+        )
+    }
+
+    pub fn flag_down_256() -> (Stencil, Point) {
+        (
+            Self::from_corefont(&corefont::FLAG256TH_DOWN),
+            Self::attachment(corefont::FLAG256TH_DOWN_STEM_DOWN),
         )
     }
 

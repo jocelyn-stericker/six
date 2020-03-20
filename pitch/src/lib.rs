@@ -77,11 +77,27 @@ pub enum NoteModifier {
     SemiDown = -1,
 }
 
+impl NoteModifier {
+    pub fn from_raw(modifier: i8) -> Option<NoteModifier> {
+        match modifier {
+            1 => Some(NoteModifier::SemiUp),
+            -1 => Some(NoteModifier::SemiDown),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pitch {
     name: NoteName,
     modifier: Option<NoteModifier>,
     octave: i8,
+}
+
+impl Default for Pitch {
+    fn default() -> Pitch {
+        Pitch::middle_c()
+    }
 }
 
 impl Pitch {
@@ -104,11 +120,11 @@ impl Pitch {
         Pitch::new(name, None, octave)
     }
 
-    pub fn from_midi(midi: u8) -> Pitch {
-        // TODO: accidentals
+    /// midi is a midi note that corresponds to a white key, and modifier is a modifier.
+    pub fn from_base_midi(midi: u8, modifier: Option<NoteModifier>) -> Option<Pitch> {
         let octave = (midi / 12) as i8 - 1;
-        let name = NoteName::new(midi % 12).unwrap();
-        Pitch::new(name, None, octave)
+        let name = NoteName::new(midi % 12)?;
+        Some(Pitch::new(name, modifier, octave))
     }
 
     pub fn a440() -> Pitch {
@@ -119,9 +135,12 @@ impl Pitch {
         Self::new(NoteName::C, None, 4)
     }
 
+    pub fn base_midi(self) -> u8 {
+        ((self.octave + 1) * 12 + (self.name as i8)) as u8
+    }
+
     pub fn midi(self) -> u8 {
-        ((self.octave + 1) * 12 + (self.name as i8) + self.modifier.map(|m| m as i8).unwrap_or(0))
-            as u8
+        self.base_midi() + (self.modifier.map(|m| m as i8).unwrap_or(0) as u8)
     }
 
     pub fn name(self) -> NoteName {

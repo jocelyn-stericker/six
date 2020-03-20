@@ -54,16 +54,19 @@ function SheetEdit({ appState, dispatch }: Props) {
                 songRef.current,
                 appState,
                 barRefs[preview.barIdx].current,
-                [preview.barIdx, preview.startTime[0], preview.startTime[1]],
+                preview.barIdx,
+                [preview.startTime[0], preview.startTime[1]],
                 duration,
                 preview.pitch,
               );
+              setPreview(null);
               if (insertion) {
                 dispatch(
                   addNote({
                     barIdx: insertion.barIdx,
                     startTime: insertion.startTime,
                     divisions: insertion.divisions,
+                    pitch: preview.pitch,
                   }),
                 );
               }
@@ -74,11 +77,15 @@ function SheetEdit({ appState, dispatch }: Props) {
         </React.Suspense>
       )}
       <Sheet
-        onHover={(time, pitch) => {
+        onHover={hoverInfo => {
           if (noteMutationClickPos) {
             return;
           }
-          if (time == null || pitch == null) {
+          if (
+            hoverInfo.bar == null ||
+            hoverInfo.time == null ||
+            hoverInfo.pitch == null
+          ) {
             setPreview(null);
             return;
           }
@@ -86,10 +93,11 @@ function SheetEdit({ appState, dispatch }: Props) {
             splitDurationIntoParts(
               songRef.current,
               appState,
-              barRefs[time[0]].current,
-              time,
+              barRefs[hoverInfo.bar].current,
+              hoverInfo.bar,
+              hoverInfo.time,
               [1, 4],
-              pitch,
+              hoverInfo.pitch,
             ),
           );
         }}
@@ -134,7 +142,7 @@ function SheetEdit({ appState, dispatch }: Props) {
                   >
                     {bar.notes.map(
                       (
-                        { divisions, startTime: tiedStartTime },
+                        { divisions, startTime: tiedStartTime, pitch },
                         divisionIdx,
                       ) => (
                         <React.Fragment key={divisionIdx}>
@@ -149,6 +157,8 @@ function SheetEdit({ appState, dispatch }: Props) {
                                 startDen={startTime[1]}
                                 isNote={true}
                                 isTemporary={false}
+                                pitch={pitch.base}
+                                pitchModifier={pitch.modifier}
                                 html={({ width, height }) => (
                                   <React.Suspense fallback={null}>
                                     <NotePopover
@@ -159,6 +169,7 @@ function SheetEdit({ appState, dispatch }: Props) {
                                             barIdx,
                                             startTime: tiedStartTime,
                                             divisions,
+                                            pitch,
                                           }),
                                         );
                                       }}
@@ -193,7 +204,8 @@ function SheetEdit({ appState, dispatch }: Props) {
                           startDen={div.startTime[1]}
                           isNote={true}
                           isTemporary={true}
-                          pitch={preview.pitch}
+                          pitch={preview.pitch.base}
+                          pitchModifier={preview.pitch.modifier}
                         />
                       ))}
                   </bar>

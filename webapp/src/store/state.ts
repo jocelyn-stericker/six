@@ -1,6 +1,12 @@
 import { Invertible } from "./actions";
 
 export type Clef = "g" | "f" | "percussion";
+export interface Pitch {
+  /// Note value for a white key.
+  base: number;
+  /// Difference between actual and base.
+  modifier: number;
+}
 
 export interface Between {
   ts: [number, number];
@@ -23,6 +29,7 @@ export type TiedNote = Array<{
 export interface Note {
   startTime: [number, number];
   divisions: TiedNote;
+  pitch: Pitch;
 }
 
 export interface Bar {
