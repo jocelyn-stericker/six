@@ -13,9 +13,9 @@ rhythm = {path = "../rhythm"}
 stencil = {path = "../stencil"}
 entity = {path = "../entity"}
 pitch = {path = "../pitch"}
-kurbo = "0.5.8"
-wasm-bindgen = "0.2.58"
+kurbo = "0.5.11"
+wasm-bindgen = "0.2.59"
 
 [dependencies.num-rational]
-version = "0.2.3"
+version = "0.2.4"
 default-features = false

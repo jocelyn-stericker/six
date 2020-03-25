@@ -8,8 +8,8 @@
 // pub(crate) static DASHED_BARLINE_GAP_LENGTH: f64 = 62.5_f64;
 // pub(crate) static DASHED_BARLINE_THICKNESS: f64 = 40_f64;
 // pub(crate) static HAIRPIN_THICKNESS: f64 = 40_f64;
-// pub(crate) static LEGER_LINE_EXTENSION: f64 = 100_f64;
-// pub(crate) static LEGER_LINE_THICKNESS: f64 = 40_f64;
+pub(crate) static LEGER_LINE_EXTENSION: f64 = 100_f64;
+pub(crate) static LEGER_LINE_THICKNESS: f64 = 40_f64;
 // pub(crate) static LYRIC_LINE_THICKNESS: f64 = 40_f64;
 // pub(crate) static OCTAVE_LINE_THICKNESS: f64 = 40_f64;
 // pub(crate) static PEDAL_LINE_THICKNESS: f64 = 40_f64;

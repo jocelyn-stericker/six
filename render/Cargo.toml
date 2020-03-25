@@ -17,9 +17,9 @@ rest_note_chord = { path = "../rest_note_chord" }
 rhythm = { path = "../rhythm" }
 staff = { path = "../staff" }
 stencil = { path = "../stencil" }
-kurbo = "0.5.8"
-wasm-bindgen = "0.2.58"
+kurbo = "0.5.11"
+wasm-bindgen = "0.2.59"
 
 [dependencies.num-rational]
-version = "0.2.3"
+version = "0.2.4"
 default-features = false

@@ -151,6 +151,28 @@ impl RestNoteChord {
                 } else {
                     stencil = head.with_translation(Vec2::new(0.0, pitch_y));
                 }
+
+                // TODO(joshuan): Leger lines should be their own entities.
+                if pitch_y >= 750.0 {
+                    let bottom_legers = (pitch_y / 250.0).floor() as usize - 2;
+                    for i in 0..bottom_legers {
+                        stencil = stencil.and(Stencil::leger_line(
+                            0.0,
+                            head_right,
+                            ((i + 3) as f64) * 250.0,
+                        ));
+                    }
+                }
+                if pitch_y <= -750.0 {
+                    let top_legers = (pitch_y / -250.0).floor() as usize - 2;
+                    for i in 0..top_legers {
+                        stencil = stencil.and(Stencil::leger_line(
+                            0.0,
+                            head_right,
+                            ((i + 3) as f64) * -250.0,
+                        ));
+                    }
+                }
             }
             PitchKind::Unpitched => {
                 let (head, attachment) = match self.duration.duration_display_base() {

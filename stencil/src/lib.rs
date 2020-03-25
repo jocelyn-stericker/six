@@ -186,6 +186,16 @@ impl Stencil {
         })
     }
 
+    pub fn leger_line(notehead_x0: f64, notehead_x1: f64, y: f64) -> Stencil {
+        Self::line(
+            Line::new(
+                Point::new(notehead_x0 - corefont::LEGER_LINE_EXTENSION, y),
+                Point::new(notehead_x1 + corefont::LEGER_LINE_EXTENSION, y),
+            ),
+            corefont::LEGER_LINE_THICKNESS,
+        )
+    }
+
     /// Draw a rounded rectangle
     ///
     /// This stencil has user-specified blot. The total thickness includes blot.

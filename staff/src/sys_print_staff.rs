@@ -35,7 +35,7 @@ pub fn sys_print_staff(
                     advance = advance.max(relative_spacing.end_x);
                 }
 
-                bar_stencil.set_explicit_rect(Rect::new(start, -1000f64, advance, 1000f64));
+                bar_stencil.set_explicit_rect(Rect::new(start, -1500f64, advance, 1500f64));
 
                 stencil_maps.insert(*child, bar_stencil);
 

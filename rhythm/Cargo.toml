@@ -11,7 +11,7 @@ repository = "https://github.com/jnetterf/six"
 entity = {path = "../entity"}
 
 [dependencies.num-rational]
-version = "0.2.3"
+version = "0.2.4"
 default-features = false
 
 [dependencies.num-traits]
