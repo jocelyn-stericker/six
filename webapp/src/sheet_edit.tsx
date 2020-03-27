@@ -49,6 +49,10 @@ function SheetEdit({ appState, dispatch }: Props) {
         <React.Suspense fallback={null}>
           <NoteInsertMenu
             pos={noteMutationClickPos}
+            onClose={() => {
+              setPreview(null);
+              setNoteMutationClickPos(null);
+            }}
             onAddNote={duration => {
               let insertion = splitDurationIntoParts(
                 songRef.current,
