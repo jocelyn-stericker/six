@@ -361,7 +361,7 @@ const Reconciler = ReactReconciler({
       (oldProps.isNote !== newProps.isNote || oldProps.pitch !== newProps.pitch)
     ) {
       if (newProps.isNote) {
-        if (newProps.pitch == null || newProps.pitchModifier) {
+        if (newProps.pitch == null) {
           instance.container.rnc_set_unpitched(instance.entity);
         } else {
           instance.container.rnc_set_pitch(

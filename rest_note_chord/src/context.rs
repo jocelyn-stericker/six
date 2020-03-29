@@ -1,7 +1,8 @@
 use num_rational::Rational;
-use pitch::Clef;
+use pitch::{Clef, NoteModifier, NoteName};
+use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Context {
     pub bar: usize,
     pub beat: Rational,
@@ -9,6 +10,7 @@ pub struct Context {
     pub clef: Clef,
     pub key: i8,
     pub time: (u8, u8),
+    pub accidentals: HashMap<(NoteName, i8), NoteModifier>,
 }
 
 impl Default for Context {
@@ -20,6 +22,7 @@ impl Default for Context {
             clef: Clef::G,
             key: 0,
             time: (4, 4),
+            accidentals: HashMap::new(),
         }
     }
 }

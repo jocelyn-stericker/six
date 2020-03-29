@@ -49,11 +49,12 @@ function SheetEdit({ appState, dispatch }: Props) {
         <React.Suspense fallback={null}>
           <NoteInsertMenu
             pos={noteMutationClickPos}
+            pitchModifier={preview.pitch.modifier ?? null}
             onClose={() => {
               setPreview(null);
               setNoteMutationClickPos(null);
             }}
-            onAddNote={duration => {
+            onAddNote={(duration, modifier) => {
               let insertion = splitDurationIntoParts(
                 songRef.current,
                 appState,
@@ -70,7 +71,10 @@ function SheetEdit({ appState, dispatch }: Props) {
                     barIdx: insertion.barIdx,
                     startTime: insertion.startTime,
                     divisions: insertion.divisions,
-                    pitch: preview.pitch,
+                    pitch: {
+                      base: preview.pitch.base,
+                      modifier,
+                    },
                   }),
                 );
               }

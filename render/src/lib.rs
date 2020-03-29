@@ -573,6 +573,7 @@ impl Render {
             &self.ordered_children,
             &self.bars,
             &self.between_bars,
+            &self.rncs,
             &mut self.contexts,
         );
 
@@ -729,7 +730,7 @@ impl Render {
                     .collect();
                 let middle_y = (bbox.y0 + bbox.y1) / 2.0;
 
-                let pitch = Pitch::from_y(middle_y - y, context.clef);
+                let pitch = Pitch::from_y(middle_y - y, context.clef, context.key);
                 for (i, (child_left, child_start_beat)) in child_contexts.iter().enumerate().rev() {
                     if *child_left <= x {
                         let next = child_contexts

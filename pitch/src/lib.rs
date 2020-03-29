@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -18,7 +20,7 @@ impl Clef {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum NoteName {
     C = 0,
@@ -70,6 +72,46 @@ impl NoteName {
     }
 }
 
+pub fn key_signature_note_names(key: i8) -> HashMap<NoteName, NoteModifier> {
+    let sharps = [
+        NoteName::F,
+        NoteName::C,
+        NoteName::G,
+        NoteName::D,
+        NoteName::A,
+        NoteName::E,
+        NoteName::B,
+    ];
+
+    let flats = [
+        NoteName::B,
+        NoteName::E,
+        NoteName::A,
+        NoteName::D,
+        NoteName::G,
+        NoteName::C,
+        NoteName::F,
+    ];
+
+    let mut map = HashMap::new();
+
+    match key.cmp(&0) {
+        Ordering::Greater => {
+            for sharp in &sharps[0..((key as usize).min(sharps.len()))] {
+                map.insert(*sharp, NoteModifier::SemiUp);
+            }
+        }
+        Ordering::Less => {
+            for flat in &flats[0..((-key as usize).min(flats.len()))] {
+                map.insert(*flat, NoteModifier::SemiDown);
+            }
+        }
+        Ordering::Equal => {}
+    };
+
+    map
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(i8)]
 pub enum NoteModifier {
@@ -109,7 +151,7 @@ impl Pitch {
         }
     }
 
-    pub fn from_y(y: f64, clef: Clef) -> Pitch {
+    pub fn from_y(y: f64, clef: Clef, key: i8) -> Pitch {
         let pitch = clef.offset() + (y / 125f64) as i32;
         if pitch < 0 {
             // TODO
@@ -117,7 +159,11 @@ impl Pitch {
         }
         let octave = (pitch / 7) as i8;
         let name = NoteName::from_index((pitch % 7) as u8).unwrap();
-        Pitch::new(name, None, octave)
+        Pitch::new(
+            name,
+            key_signature_note_names(key).get(&name).copied(),
+            octave,
+        )
     }
 
     /// midi is a midi note that corresponds to a white key, and modifier is a modifier.

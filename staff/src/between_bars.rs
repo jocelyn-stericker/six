@@ -6,7 +6,7 @@ use std::cmp::Ordering;
 use stencil::Stencil;
 use wasm_bindgen::prelude::*;
 
-pub fn get_pitches(key: i8, clef: Clef) -> Vec<Pitch> {
+pub fn key_signature_pitches(key: i8, clef: Clef) -> Vec<Pitch> {
     if clef == Clef::Percussion {
         return vec![];
     }
@@ -38,8 +38,8 @@ pub fn get_pitches(key: i8, clef: Clef) -> Vec<Pitch> {
     ];
 
     match key.cmp(&0) {
-        Ordering::Greater => sharps[0..(key as usize)].to_vec(),
-        Ordering::Less => flats[0..(-key as usize)].to_vec(),
+        Ordering::Greater => sharps[0..(key as usize).min(sharps.len())].to_vec(),
+        Ordering::Less => flats[0..(-key as usize).min(flats.len())].to_vec(),
         Ordering::Equal => Vec::new(),
     }
 }
@@ -98,7 +98,7 @@ impl BetweenBars {
 
         if key != 0 && clef != Clef::Percussion {
             stencil = stencil.and_right(Stencil::padding(100.0));
-            for pitch in get_pitches(key, clef) {
+            for pitch in key_signature_pitches(key, clef) {
                 stencil = stencil.and_right(
                     if key < 0 {
                         Stencil::flat()
@@ -153,7 +153,7 @@ impl BetweenBars {
         if let (Some(key), clef) = (self.key, self.clef.unwrap_or(context.clef)) {
             if key != 0 && clef != Clef::Percussion {
                 stencil = stencil.and_right(Stencil::padding(100.0));
-                for pitch in get_pitches(key, clef) {
+                for pitch in key_signature_pitches(key, clef) {
                     stencil = stencil.and_right(
                         if key < 0 {
                             Stencil::flat()
@@ -216,6 +216,7 @@ mod tests {
             clef: Clef::G,
             key: 0,
             time: (4, 4),
+            accidentals: Default::default(),
         };
 
         snapshot(

@@ -10,7 +10,7 @@ use rhythm::{Duration, NoteValue};
 use stencil::Stencil;
 
 pub use context::Context;
-pub use pitch::Pitch;
+pub use pitch::{NoteModifier, Pitch};
 pub use sys_print_rnc::sys_print_rnc;
 pub use sys_space_time_warp::{sys_apply_warp, sys_record_space_time_warp, SpaceTimeWarp};
 pub use sys_update_rnc_timing::sys_update_rnc_timing;
@@ -87,12 +87,30 @@ impl RestNoteChord {
                     | (None, false) => Stencil::notehead_black_down(),
                 };
 
+                stencil = Stencil::default();
+
+                // TODO(joshuan): accidentals should be their own entity.
+                if context
+                    .accidentals
+                    .get(&(pitch.name(), pitch.octave()))
+                    .cloned()
+                    != pitch.modifier()
+                {
+                    let accidental = match pitch.modifier() {
+                        None => Stencil::natural(),
+                        Some(NoteModifier::SemiUp) => Stencil::sharp(),
+                        Some(NoteModifier::SemiDown) => Stencil::flat(),
+                    };
+                    let x1 = accidental.rect().x1;
+                    stencil = stencil.and(accidental.with_translation(Vec2::new(-x1, pitch_y)));
+                }
+
                 head_right = head.rect().x1;
 
                 // TODO(joshuan): Determine direction elsewhere. Be clever with middle stems.
                 if let Some(attachment) = attachment {
                     if is_up {
-                        stencil = head.with_translation(Vec2::new(0.0, pitch_y));
+                        stencil = stencil.and(head.with_translation(Vec2::new(0.0, pitch_y)));
                         let flag = match self.duration.duration_display_base() {
                             Some(NoteValue::Eighth) => Some(Stencil::flag_up_8()),
                             Some(NoteValue::Sixteenth) => Some(Stencil::flag_up_16()),
@@ -130,7 +148,7 @@ impl RestNoteChord {
                             _ => None,
                         };
 
-                        stencil = head.with_translation(Vec2::new(0.0, pitch_y));
+                        stencil = stencil.and(head.with_translation(Vec2::new(0.0, pitch_y)));
 
                         let bottom = (attachment.y + pitch_y + 875.0).max(0.0);
                         let stem = Stencil::stem_line(
@@ -149,7 +167,7 @@ impl RestNoteChord {
                         }
                     }
                 } else {
-                    stencil = head.with_translation(Vec2::new(0.0, pitch_y));
+                    stencil = stencil.and(head.with_translation(Vec2::new(0.0, pitch_y)));
                 }
 
                 // TODO(joshuan): Leger lines should be their own entities.
