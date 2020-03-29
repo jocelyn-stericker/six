@@ -34,6 +34,13 @@ const theme = {
   },
 };
 
+function dotted(duration: [number, number], dots: number) {
+  for (let i = 0; i < dots; i += 1) {
+    duration = [duration[0] * 2 + 1, duration[1] * 2];
+  }
+  return duration;
+}
+
 export default function NoteInsertMenu({
   pos,
   onClose,
@@ -68,7 +75,9 @@ export default function NoteInsertMenu({
           centerRadius="20px"
           radius="100px"
         >
-          <Slice onSelect={() => onAddNote([1, 1], accidental ?? 0)}>
+          <Slice
+            onSelect={() => onAddNote(dotted([1, 1], dots), accidental ?? 0)}
+          >
             {/* Whole */}
             <svg viewBox="0 0 9 9" height="9mm" width="9mm">
               <g transform="translate(0,-288)">
@@ -76,7 +85,9 @@ export default function NoteInsertMenu({
               </g>
             </svg>
           </Slice>
-          <Slice onSelect={() => onAddNote([1, 2], accidental ?? 0)}>
+          <Slice
+            onSelect={() => onAddNote(dotted([1, 2], dots), accidental ?? 0)}
+          >
             {/* Half */}
             <svg width="9mm" height="9mm" viewBox="0 0 9 9">
               <g transform="translate(0,-288)">
@@ -84,7 +95,9 @@ export default function NoteInsertMenu({
               </g>
             </svg>
           </Slice>
-          <Slice onSelect={() => onAddNote([1, 4], accidental ?? 0)}>
+          <Slice
+            onSelect={() => onAddNote(dotted([1, 4], dots), accidental ?? 0)}
+          >
             {/* Quarter */}
             <svg viewBox="0 0 9 9" height="9mm" width="9mm">
               <g transform="translate(0,-288)">
@@ -92,7 +105,9 @@ export default function NoteInsertMenu({
               </g>
             </svg>
           </Slice>
-          <Slice onSelect={() => onAddNote([1, 8], accidental ?? 0)}>
+          <Slice
+            onSelect={() => onAddNote(dotted([1, 8], dots), accidental ?? 0)}
+          >
             {/* Eighth */}
             <svg width="9mm" height="9mm" viewBox="0 0 9 9">
               <g transform="translate(0,-288)">
@@ -100,7 +115,9 @@ export default function NoteInsertMenu({
               </g>
             </svg>
           </Slice>
-          <Slice onSelect={() => onAddNote([1, 16], accidental ?? 0)}>
+          <Slice
+            onSelect={() => onAddNote(dotted([1, 16], dots), accidental ?? 0)}
+          >
             {/* Sixteenth */}
             <svg width="9mm" height="9mm" viewBox="0 0 9 9">
               <g transform="translate(0,-288)">

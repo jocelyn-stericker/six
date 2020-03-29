@@ -57,10 +57,11 @@ impl RestNoteChord {
     pub fn print(&self, context: &Context) -> Stencil {
         let mut stencil;
         let head_right;
+        let pitch_y;
 
         match self.pitch {
             PitchKind::Pitch(pitch) => {
-                let pitch_y = pitch.y(context.clef);
+                pitch_y = pitch.y(context.clef);
                 let is_up = pitch_y > 0.0;
                 let (head, attachment) = match (self.duration.duration_display_base(), is_up) {
                     (Some(NoteValue::Maxima), _)
@@ -193,6 +194,7 @@ impl RestNoteChord {
                 }
             }
             PitchKind::Unpitched => {
+                pitch_y = 0.0;
                 let (head, attachment) = match self.duration.duration_display_base() {
                     Some(NoteValue::Maxima)
                     | Some(NoteValue::Longa)
@@ -240,6 +242,7 @@ impl RestNoteChord {
                 }
             }
             PitchKind::Rest => {
+                pitch_y = 0.0;
                 stencil = match self.duration.duration_display_base() {
                     Some(NoteValue::Maxima) => Stencil::rest_maxima(),
                     Some(NoteValue::Longa) => Stencil::rest_longa(),
@@ -269,7 +272,14 @@ impl RestNoteChord {
                 }
                 dot_stencil = dot_stencil.and_right(Stencil::augmentation_dot());
             }
-            stencil = stencil.and(dot_stencil.with_translation(Vec2::new(head_right, -125.0)));
+            stencil = stencil.and(dot_stencil.with_translation(Vec2::new(
+                head_right,
+                if pitch_y.abs() % 250.0 == 0.0 {
+                    pitch_y - 125.0
+                } else {
+                    pitch_y
+                },
+            )));
         }
 
         stencil
