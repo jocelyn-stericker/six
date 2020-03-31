@@ -88,6 +88,10 @@ impl NoteValue {
     pub fn has_flag(self) -> bool {
         self <= NoteValue::Eighth
     }
+
+    pub fn beam_count(self) -> u8 {
+        (-self.log2() - 2).max(0) as u8
+    }
 }
 
 /// The maximum number of dots a note or rest can have.

@@ -1,5 +1,6 @@
 use crate::duration::Duration;
 use crate::metre::{Metre, MetreSegment, Subdivision, Superdivision};
+use crate::rhythmic_beaming::RhythmicBeaming;
 use entity::{EntitiesRes, Entity};
 use num_integer::Integer;
 use num_rational::Rational;
@@ -656,6 +657,79 @@ impl Bar {
 
             split
         }
+    }
+
+    /// Determine how to beam several notes
+    pub fn beaming(&self, t0: Rational, durations: Vec<Duration>) -> Vec<Option<RhythmicBeaming>> {
+        // TODO: For now, we're going to assume beaming follows the same rules as long-note
+        // splitting. This isn't true, but it's a start.
+        let mut beams = Vec::with_capacity(durations.len());
+        let mut split_befores = Vec::with_capacity(durations.len());
+        let long_note_split = self.split_note(
+            t0,
+            Duration::exact(
+                durations.iter().map(|dur| dur.duration()).sum(),
+                // TODO: tuplets
+                None,
+            ),
+        );
+
+        let mut t = t0;
+        for split in &long_note_split {
+            let t_end = t + split.duration();
+
+            let mut t_candidate = t0;
+            let mut first_in_beam = true;
+            for (i, candidate) in durations.iter().enumerate() {
+                // Allows overshot.
+                if t_candidate < t_end && i >= beams.len() {
+                    beams.push(
+                        candidate
+                            .duration_display_base()
+                            .map(|val| val.beam_count())
+                            .unwrap_or(0),
+                    );
+                    split_befores.push(first_in_beam);
+                    first_in_beam = false;
+                }
+                t_candidate += candidate.duration();
+            }
+
+            t = t_end;
+        }
+
+        let mut beaming = Vec::with_capacity(durations.len());
+
+        for (i, (&beam, &split_before)) in beams.iter().zip(&split_befores).enumerate() {
+            beaming.push(if beam == 0 {
+                None
+            } else {
+                let prev = if !split_before {
+                    assert_ne!(i, 0);
+                    beams.get(i - 1).copied().unwrap_or(0)
+                } else {
+                    0
+                };
+
+                let split_after = split_befores.get(i + 1).copied().unwrap_or(true);
+                let next = if !split_after {
+                    beams.get(i + 1).copied().unwrap_or(0)
+                } else {
+                    0
+                };
+
+                if prev == 0 && next == 0 {
+                    None
+                } else {
+                    Some(RhythmicBeaming {
+                        entering: if prev > 0 { beam } else { 0 },
+                        leaving: if next > 0 { beam } else { 0 },
+                    })
+                }
+            });
+        }
+
+        beaming
     }
 
     fn target_managed_count(&self) -> usize {
@@ -2876,5 +2950,206 @@ mod bar_tests {
                 Duration::new(NoteValue::Half, 0, None)
             ]
         );
+    }
+
+    #[test]
+    fn beaming_basic_two_four() {
+        let two_four = Bar::new(Metre::new(2, 4));
+        assert_eq!(
+            two_four.beaming(
+                Rational::zero(),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
+
+        assert_eq!(
+            two_four.beaming(
+                Rational::new(1, 8),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
+    }
+
+    #[test]
+    fn beaming_basic_three_four() {
+        let three_four = Bar::new(Metre::new(3, 4));
+        assert_eq!(
+            three_four.beaming(
+                Rational::zero(),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
+    }
+
+    #[test]
+    fn beaming_three_four_is_not_six_eight() {
+        let three_four = Bar::new(Metre::new(3, 4));
+        assert_eq!(
+            three_four.beaming(
+                Rational::new(3, 8),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                None,
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
+
+        assert_eq!(
+            three_four.beaming(
+                Rational::new(1, 4),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Quarter, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+                None,
+            ]
+        );
+    }
+
+    #[test]
+    fn beaming_basic_four_eight() {
+        // TODO
+        // let four_eight = Bar::new(Metre::new(4, 8));
+        // assert_eq!(
+        //     four_eight.beaming(
+        //         Rational::zero(),
+        //         vec![
+        //             Duration::new(NoteValue::Sixteenth, 0, None),
+        //             Duration::new(NoteValue::Sixteenth, 0, None),
+        //             Duration::new(NoteValue::Sixteenth, 0, None),
+        //             Duration::new(NoteValue::Sixteenth, 0, None),
+        //             Duration::new(NoteValue::Sixteenth, 0, None),
+        //             Duration::new(NoteValue::Sixteenth, 0, None),
+        //             Duration::new(NoteValue::Sixteenth, 0, None),
+        //             Duration::new(NoteValue::Sixteenth, 0, None),
+        //         ]
+        //     ),
+        //     vec![
+        //         Some(RhythmicBeaming {
+        //             entering: 0,
+        //             leaving: 2,
+        //         }),
+        //         Some(RhythmicBeaming {
+        //             entering: 2,
+        //             leaving: 2,
+        //         }),
+        //         Some(RhythmicBeaming {
+        //             entering: 2,
+        //             leaving: 2,
+        //         }),
+        //         Some(RhythmicBeaming {
+        //             entering: 2,
+        //             leaving: 0,
+        //         }),
+        //         Some(RhythmicBeaming {
+        //             entering: 0,
+        //             leaving: 2,
+        //         }),
+        //         Some(RhythmicBeaming {
+        //             entering: 2,
+        //             leaving: 2,
+        //         }),
+        //         Some(RhythmicBeaming {
+        //             entering: 2,
+        //             leaving: 2,
+        //         }),
+        //         Some(RhythmicBeaming {
+        //             entering: 2,
+        //             leaving: 0,
+        //         }),
+        //     ]
+        // );
     }
 }
