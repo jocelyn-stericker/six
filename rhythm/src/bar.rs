@@ -683,6 +683,15 @@ impl Bar {
             for (i, candidate) in durations.iter().enumerate() {
                 // Allows overshot.
                 if t_candidate < t_end && i >= beams.len() {
+                    if self
+                        .metre()
+                        .on_division(t_candidate)
+                        .map(|t| t.subdivisions() >= 2)
+                        .unwrap_or(false)
+                    {
+                        // 4/8, 4/4, and compound time must not cross beat.
+                        first_in_beam = true;
+                    }
                     beams.push(
                         candidate
                             .duration_display_base()
@@ -3100,56 +3109,177 @@ mod bar_tests {
 
     #[test]
     fn beaming_basic_four_eight() {
-        // TODO
-        // let four_eight = Bar::new(Metre::new(4, 8));
-        // assert_eq!(
-        //     four_eight.beaming(
-        //         Rational::zero(),
-        //         vec![
-        //             Duration::new(NoteValue::Sixteenth, 0, None),
-        //             Duration::new(NoteValue::Sixteenth, 0, None),
-        //             Duration::new(NoteValue::Sixteenth, 0, None),
-        //             Duration::new(NoteValue::Sixteenth, 0, None),
-        //             Duration::new(NoteValue::Sixteenth, 0, None),
-        //             Duration::new(NoteValue::Sixteenth, 0, None),
-        //             Duration::new(NoteValue::Sixteenth, 0, None),
-        //             Duration::new(NoteValue::Sixteenth, 0, None),
-        //         ]
-        //     ),
-        //     vec![
-        //         Some(RhythmicBeaming {
-        //             entering: 0,
-        //             leaving: 2,
-        //         }),
-        //         Some(RhythmicBeaming {
-        //             entering: 2,
-        //             leaving: 2,
-        //         }),
-        //         Some(RhythmicBeaming {
-        //             entering: 2,
-        //             leaving: 2,
-        //         }),
-        //         Some(RhythmicBeaming {
-        //             entering: 2,
-        //             leaving: 0,
-        //         }),
-        //         Some(RhythmicBeaming {
-        //             entering: 0,
-        //             leaving: 2,
-        //         }),
-        //         Some(RhythmicBeaming {
-        //             entering: 2,
-        //             leaving: 2,
-        //         }),
-        //         Some(RhythmicBeaming {
-        //             entering: 2,
-        //             leaving: 2,
-        //         }),
-        //         Some(RhythmicBeaming {
-        //             entering: 2,
-        //             leaving: 0,
-        //         }),
-        //     ]
-        // );
+        let four_eight = Bar::new(Metre::new(4, 8));
+        assert_eq!(
+            four_eight.beaming(
+                Rational::zero(),
+                vec![
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 2,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
+                    leaving: 2,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
+                    leaving: 2,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
+                    leaving: 0,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 2,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
+                    leaving: 2,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
+                    leaving: 2,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
+                    leaving: 0,
+                }),
+            ]
+        );
+    }
+
+    #[test]
+    fn beaming_basic_four_four() {
+        let four_four = Bar::new(Metre::new(4, 4));
+        assert_eq!(
+            four_four.beaming(
+                Rational::zero(),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
+        assert_eq!(
+            four_four.beaming(
+                Rational::new(1, 8),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
+        assert_eq!(
+            four_four.beaming(
+                Rational::new(1, 4),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
     }
 }
