@@ -186,6 +186,22 @@ impl Stencil {
         })
     }
 
+    pub fn beam(mut line: Line, level: isize) -> Stencil {
+        let d = Vec2::new(0.0, level as f64 * corefont::BEAM_SPACING);
+        line.p0 += d;
+        line.p1 += d;
+        // TODO: this needs to be parallelogram.
+        Self::round_filled_box(
+            Rect::new(
+                line.p0.x - corefont::STEM_THICKNESS / 2.0,
+                line.p0.y - corefont::BEAM_THICKNESS / 2.0,
+                line.p1.x + corefont::STEM_THICKNESS / 2.0,
+                line.p1.y + corefont::BEAM_THICKNESS / 2.0,
+            ),
+            corefont::STEM_THICKNESS,
+        )
+    }
+
     pub fn leger_line(notehead_x0: f64, notehead_x1: f64, y: f64) -> Stencil {
         Self::line(
             Line::new(

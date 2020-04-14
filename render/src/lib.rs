@@ -8,12 +8,12 @@ use sys_print_meta::sys_print_meta;
 use sys_print_song::sys_print_song;
 
 use entity::{EntitiesRes, Entity, Join};
-use kurbo::Rect;
+use kurbo::{Point, Rect};
 use num_rational::Rational;
 use pitch::{Clef, NoteModifier, Pitch};
 use rest_note_chord::{
-    sys_apply_warp, sys_print_rnc, sys_record_space_time_warp, sys_update_rnc_timing, Context,
-    PitchKind, RestNoteChord, SpaceTimeWarp,
+    sys_apply_warp, sys_draft_beaming, sys_print_beams, sys_print_rnc, sys_record_space_time_warp,
+    sys_space_beams, sys_update_rnc_timing, Beam, Context, PitchKind, RestNoteChord, SpaceTimeWarp,
 };
 use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing};
 use staff::{
@@ -107,6 +107,8 @@ pub struct Render {
     bars: HashMap<Entity, Bar>,
     between_bars: HashMap<Entity, BetweenBars>,
     rncs: HashMap<Entity, RestNoteChord>,
+    beams: HashMap<Entity, Beam>,
+    beam_for_rnc: HashMap<Entity, Entity>,
     stencils: HashMap<Entity, Stencil>,
     stencil_maps: HashMap<Entity, StencilMap>,
     world_bbox: HashMap<Entity, Rect>,
@@ -114,6 +116,7 @@ pub struct Render {
     spacing: HashMap<Entity, RelativeRhythmicSpacing>,
     ordered_children: HashMap<Entity, Vec<Entity>>,
     warps: HashMap<Entity, SpaceTimeWarp>,
+    attachments: HashMap<Entity, Option<Point>>,
 }
 
 /// A DOM-based interface to Six Eight's ECS.
@@ -555,6 +558,9 @@ impl Render {
                 &mut self.spacing,
                 &mut self.ordered_children,
                 &mut self.warps,
+                &mut self.beams,
+                &mut self.beam_for_rnc,
+                &mut self.attachments,
             ],
         );
 
@@ -568,6 +574,14 @@ impl Render {
             &mut self.stencils,
         );
 
+        sys_draft_beaming(
+            &self.entities,
+            &self.bars,
+            &mut self.parents,
+            &mut self.beam_for_rnc,
+            &mut self.beams,
+        );
+
         sys_update_context(
             &self.staffs,
             &self.ordered_children,
@@ -577,7 +591,13 @@ impl Render {
             &mut self.contexts,
         );
 
-        sys_print_rnc(&self.rncs, &self.contexts, &mut self.stencils);
+        sys_print_rnc(
+            &self.rncs,
+            &self.contexts,
+            &self.beam_for_rnc,
+            &mut self.attachments,
+            &mut self.stencils,
+        );
         sys_print_between_bars(&self.between_bars, &self.contexts, &mut self.stencils);
 
         if self.keep_spacing() {
@@ -602,9 +622,20 @@ impl Render {
             sys_record_space_time_warp(&self.bars, &self.spacing, &mut self.warps);
         }
 
+        sys_space_beams(
+            &self.bars,
+            &self.spacing,
+            &self.beam_for_rnc,
+            &self.attachments,
+            &mut self.beams,
+        );
+
+        sys_print_beams(&self.beams, &mut self.stencils);
+
         sys_print_staff(
             &mut self.line_of_staffs,
             &self.bars,
+            &self.beam_for_rnc,
             &self.spacing,
             &self.stencils,
             &mut self.stencil_maps,
@@ -888,5 +919,43 @@ mod tests {
         assert_eq!(render.contexts.len(), 0);
         assert_eq!(render.spacing.len(), 0);
         assert_eq!(render.ordered_children.len(), 0);
+    }
+
+    #[test]
+    fn beaming_1() {
+        use rhythm::NoteValue;
+        use stencil::snapshot;
+
+        let mut render = Render::default();
+        let song = render.song_create();
+        render.song_set_size(song, 215.9, 279.4);
+        render.song_set_title(song, "Six Eight", 26.4f64);
+        render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
+
+        let staff = render.staff_create();
+        let clef = render.between_bars_create(None, Some(Clef::G), Some(4), Some(4), Some(0));
+        render.child_append(staff, clef);
+
+        let bar1 = render.bar_create(4, 4);
+        render.child_append(staff, bar1);
+
+        let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 0, 1);
+        let rnc2 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
+
+        render.rnc_set_pitch(rnc1, 60, 0);
+        render.bar_insert(bar1, rnc1, false);
+        render.rnc_set_pitch(rnc2, 60, 0);
+        render.bar_insert(bar1, rnc2, false);
+
+        let final_barline =
+            render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
+        render.child_append(staff, final_barline);
+
+        render.child_append(song, staff);
+        render.root_set(song);
+
+        render.exec();
+
+        snapshot("./snapshots/beaming_1.svg", &render.print_for_demo());
     }
 }

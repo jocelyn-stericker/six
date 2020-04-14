@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
-use crate::{Context, PitchKind, RestNoteChord};
+use crate::context::Context;
+use crate::{PitchKind, RestNoteChord};
 use entity::{EntitiesRes, Entity};
 use rhythm::{Bar, RelativeRhythmicSpacing};
 use stencil::Stencil;

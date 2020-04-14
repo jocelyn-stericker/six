@@ -1,3 +1,5 @@
+#![allow(clippy::blacklisted_name)]
+
 use crate::duration::Duration;
 use crate::metre::{Metre, MetreSegment, Subdivision, Superdivision};
 use crate::rhythmic_beaming::RhythmicBeaming;
@@ -567,7 +569,16 @@ impl Bar {
     }
 
     /// Determine how a note at a given position time be spelled, rhythmically.
-    pub fn split_note(&self, t: Rational, mut duration: Duration) -> Vec<Duration> {
+    pub fn split_note(&self, t: Rational, duration: Duration) -> Vec<Duration> {
+        self.metre_split_note(t, duration, true)
+    }
+
+    fn metre_split_note(
+        &self,
+        t: Rational,
+        mut duration: Duration,
+        with_rhythm: bool,
+    ) -> Vec<Duration> {
         if !duration.duration().is_positive() {
             return vec![];
         }
@@ -575,19 +586,21 @@ impl Bar {
         let t_end = t + duration.duration();
 
         let mut existing_note_start = Rational::new(0, 1);
-        for (existing_note, entity) in &self.rhythm {
-            let existing_note_end = existing_note_start + existing_note.duration();
-            if entity.is_explicit() {
-                if existing_note_start >= t && existing_note_start < t_end {
-                    duration = Duration::exact(existing_note_start - t, None);
-                    break;
+        if with_rhythm {
+            for (existing_note, entity) in &self.rhythm {
+                let existing_note_end = existing_note_start + existing_note.duration();
+                if entity.is_explicit() {
+                    if existing_note_start >= t && existing_note_start < t_end {
+                        duration = Duration::exact(existing_note_start - t, None);
+                        break;
+                    }
+                    if existing_note_start < t && existing_note_end > t {
+                        return vec![];
+                    }
                 }
-                if existing_note_start < t && existing_note_end > t {
-                    return vec![];
-                }
-            }
 
-            existing_note_start = existing_note_end;
+                existing_note_start = existing_note_end;
+            }
         }
 
         // TODO(joshuan): Split results up into printable bits.
@@ -636,9 +649,10 @@ impl Bar {
                 }
                 if t_end > t {
                     let mut split = vec![Duration::exact(t_end - t, None)];
-                    split.append(&mut self.split_note(
+                    split.append(&mut self.metre_split_note(
                         t_end,
                         Duration::exact(duration.duration() - t_end, Some(duration.tuplet())),
+                        with_rhythm,
                     ));
                     return split;
                 }
@@ -650,9 +664,10 @@ impl Bar {
             vec![duration]
         } else {
             let mut split = vec![Duration::exact(div_end - t, Some(duration.tuplet()))];
-            split.append(&mut self.split_note(
+            split.append(&mut self.metre_split_note(
                 div_end,
                 Duration::exact(duration.duration() - (div_end - t), Some(duration.tuplet())),
+                with_rhythm,
             ));
 
             split
@@ -665,13 +680,14 @@ impl Bar {
         // splitting. This isn't true, but it's a start.
         let mut beams = Vec::with_capacity(durations.len());
         let mut split_befores = Vec::with_capacity(durations.len());
-        let long_note_split = self.split_note(
+        let long_note_split = self.metre_split_note(
             t0,
             Duration::exact(
                 durations.iter().map(|dur| dur.duration()).sum(),
                 // TODO: tuplets
                 None,
             ),
+            false,
         );
 
         let mut t = t0;
@@ -3244,6 +3260,25 @@ mod bar_tests {
                 }),
                 Some(RhythmicBeaming {
                     entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
+        assert_eq!(
+            four_four.beaming(
+                Rational::new(0, 1),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
                     leaving: 1,
                 }),
                 Some(RhythmicBeaming {
