@@ -54,6 +54,7 @@ export default function NoteInsertMenu({
 }) {
   const [accidental, setAccidental] = useState(pitchModifier);
   const [dots, setDots] = useState(0);
+  const [initialTime] = useState(() => Date.now());
 
   return (
     <ThemeProvider theme={theme}>
@@ -67,7 +68,11 @@ export default function NoteInsertMenu({
           zIndex: 100,
           userSelect: "none",
         }}
-        onMouseUp={onClose}
+        onMouseUp={() => {
+          if (initialTime - Date.now() > 20) {
+            onClose();
+          }
+        }}
       >
         <PieMenu
           centerX={`${pos[0]}px`}

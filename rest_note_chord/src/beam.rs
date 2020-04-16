@@ -70,8 +70,11 @@ impl Beam {
                 }
                 stencil = stencil.and(Stencil::beam(
                     Line::new(
-                        Point::new(attachment.stem_start.x, attachment.extreme_y),
-                        Point::new(end_x, end_y),
+                        Point::new(
+                            attachment.stem_start.x,
+                            attachment.extreme_y + 187.5 * (l as f64),
+                        ),
+                        Point::new(end_x, end_y + 187.5 * (l as f64)),
                     ),
                     level as isize,
                 ));

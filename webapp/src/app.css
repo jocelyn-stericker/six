@@ -86,6 +86,10 @@ html body, html .ui-text {
   background: #f9bc60;
 }
 
+.six-sheet {
+  touch-action: manipulation;
+}
+
 .six-sheet > g {
   pointer-events: none;
 }
