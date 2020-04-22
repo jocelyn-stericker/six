@@ -7,8 +7,9 @@ use sys_delete_orphans::sys_delete_orphans;
 use sys_print_meta::sys_print_meta;
 use sys_print_song::sys_print_song;
 
+use base64;
 use entity::{EntitiesRes, Entity, Join};
-use kurbo::{Point, Rect};
+use kurbo::{Affine, Point, Rect, Size, Vec2};
 use num_rational::Rational;
 use pitch::{Clef, NoteModifier, Pitch};
 use rest_note_chord::{
@@ -21,7 +22,7 @@ use staff::{
     sys_update_context, Barline, BetweenBars, BreakIntoLineComponents, LineOfStaff, Staff,
 };
 use std::collections::{HashMap, HashSet};
-use stencil::{sys_update_world_bboxes, Stencil, StencilMap};
+use stencil::{sys_update_world_bboxes, Pdf, Stencil, StencilMap};
 use wasm_bindgen::prelude::*;
 
 #[derive(Debug)]
@@ -845,6 +846,25 @@ impl Render {
         if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
             root.clone()
                 .to_svg_doc_for_testing(song.scale(), &self.stencil_maps, &self.stencils)
+        } else {
+            String::default()
+        }
+    }
+
+    pub fn to_pdf(&self) -> String {
+        let song = &self.songs[&self.root.unwrap()];
+
+        if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
+            let mut pdf = Pdf::new();
+            let scale = song.scale();
+            pdf.add_page(Size::new(215.9, 279.4));
+            pdf.write_stencil_map(
+                root,
+                Affine::translate(Vec2::new(0.0, 279.4)) * Affine::scale(scale) * Affine::FLIP_Y,
+                &self.stencils,
+                &self.stencil_maps,
+            );
+            base64::encode(pdf.into_binary())
         } else {
             String::default()
         }

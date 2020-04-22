@@ -1,9 +1,11 @@
 #![allow(clippy::implicit_hasher)]
 
 mod corefont;
+mod pdf;
 mod stencil_map;
 mod sys_update_world_bboxes;
 
+pub use pdf::Pdf;
 pub use stencil_map::StencilMap;
 pub use sys_update_world_bboxes::sys_update_world_bboxes;
 
@@ -747,29 +749,23 @@ impl Stencil {
     /// Generate an SVG representation of the string, without newlines.
     pub fn to_svg(&self) -> String {
         match self {
-            Stencil::RawSvg(svg) => [
-                "<path d=\"",
-                &svg.svg,
-                "\" />",
-            ].concat(),
+            Stencil::RawSvg(svg) => ["<path d=\"", &svg.svg, "\" />"].concat(),
             Stencil::Path(path) => [
                 "<path d=\"",
                 &path.outline.to_svg().replace('\n', ""),
                 "\" />",
             ]
             .concat(),
-            Stencil::Translate(translation, child) => {
-                [
-                    "<g transform=\"translate(",
-                    &translation.x.round().to_string(),
-                    ",",
-                    &translation.y.round().to_string(),
-                    ")\">",
-                    &child.to_svg(),
-                    "</g>",
-                ]
-                .concat()
-            }
+            Stencil::Translate(translation, child) => [
+                "<g transform=\"translate(",
+                &translation.x.round().to_string(),
+                ",",
+                &translation.y.round().to_string(),
+                ")\">",
+                &child.to_svg(),
+                "</g>",
+            ]
+            .concat(),
             Stencil::Combine(combine) => {
                 let mut parts = Vec::with_capacity(combine.0.len() + 2);
                 parts.push("<g>".to_owned());
@@ -779,15 +775,14 @@ impl Stencil {
                 parts.push("</g>".to_owned());
                 parts.concat()
             }
-            Stencil::Text(text) => {
-                [
-                    "<text style=\"font-size: ",
-                    &text.font_size.round().to_string(),
-                    "px; font-family: Palatino, 'Palatino Linotype', 'Palatino LT STD', 'Book Antiqua', Georgia, serif; \">",
-                    &escape(&text.text),
-                    "</text>",
-                ].concat()
-            }
+            Stencil::Text(text) => [
+                "<text style=\"font-size: ",
+                &text.font_size.round().to_string(),
+                "px; font-family: 'Times New Roman', Times, serif \">",
+                &escape(&text.text),
+                "</text>",
+            ]
+            .concat(),
         }
     }
 

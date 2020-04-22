@@ -10,3 +10,4 @@ repository = "https://github.com/jnetterf/six"
 [dependencies]
 entity = {path = "../entity"}
 kurbo = "0.5.11"
+deflate = "0.8.4"

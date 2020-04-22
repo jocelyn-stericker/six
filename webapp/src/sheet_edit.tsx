@@ -35,6 +35,7 @@ function SheetEdit({ appState, dispatch }: Props) {
   const hoverMatchesAny = false;
 
   let currTs = appState.song.global.between[0].ts;
+  let sheet = useRef<{ toPDF: () => string }>(null);
 
   return (
     <div
@@ -85,6 +86,7 @@ function SheetEdit({ appState, dispatch }: Props) {
         </React.Suspense>
       )}
       <Sheet
+        ref={sheet}
         onHover={hoverInfo => {
           if (noteMutationClickPos) {
             return;
@@ -231,6 +233,18 @@ function SheetEdit({ appState, dispatch }: Props) {
           </staff>
         </song>
       </Sheet>
+      <button
+        onClick={() => {
+          const pdf = sheet.current?.toPDF();
+
+          const a = document.createElement("a");
+          a.href = `data:application/pdf;base64,${pdf}`;
+          a.download = "68.pdf";
+          a.click();
+        }}
+      >
+        Export PDF
+      </button>
     </div>
   );
 }

@@ -1,4 +1,11 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { newRender, render } from "./reconciler";
 
 export type Render = import("./reconciler").Render;
@@ -86,207 +93,217 @@ function StencilView({
   }
 }
 
-export default function SheetMusicView(props: Props) {
-  // create/destroy Rust container
-  const [container] = useState(newRender);
-  useEffect(() => {
-    return () => {
-      container.free();
-    };
-  }, [container]);
+const SheetMusicView = forwardRef(
+  (props: Props, ref: React.Ref<{ toPDF: () => string }>) => {
+    // create/destroy Rust container
+    const [container] = useState(newRender);
+    useEffect(() => {
+      return () => {
+        container.free();
+      };
+    }, [container]);
 
-  // render loop
-  const [stencils, setStencils] = useState<{
-    [key: number]: StencilOrStencilMap;
-  } | null>(null);
-  const [stencilMeta, setStencilMeta] = useState<{
-    [key: number]: StencilMeta;
-  } | null>(null);
-  const [children, setChildren] = useState<{
-    [key: number]: Array<number>;
-  }>({});
-  const [root, setRoot] = useState<number | null>(null);
-  const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
-  const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
+    // render loop
+    const [stencils, setStencils] = useState<{
+      [key: number]: StencilOrStencilMap;
+    } | null>(null);
+    const [stencilMeta, setStencilMeta] = useState<{
+      [key: number]: StencilMeta;
+    } | null>(null);
+    const [children, setChildren] = useState<{
+      [key: number]: Array<number>;
+    }>({});
+    const [root, setRoot] = useState<number | null>(null);
+    const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
+    const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
 
-  useLayoutEffect(() => {
-    render(props.children, container);
-    container.exec();
-    let stencilPairs = container.stencils().split("\n");
-    let stencilMapPairs = container.stencil_maps().split("\n");
-    let stencilMetaPairs = container.get_stencil_bboxes().split("\n");
-    let parents = container.parents().split("\n");
+    useImperativeHandle(ref, () => ({
+      toPDF: () => container.to_pdf(),
+    }));
 
-    let stencils: { [key: number]: StencilOrStencilMap } = {};
-    for (let i = 0; i < stencilPairs.length; i += 2) {
-      stencils[stencilPairs[i] as any] = stencilPairs[i + 1];
-    }
+    useLayoutEffect(() => {
+      render(props.children, container);
+      container.exec();
+      let stencilPairs = container.stencils().split("\n");
+      let stencilMapPairs = container.stencil_maps().split("\n");
+      let stencilMetaPairs = container.get_stencil_bboxes().split("\n");
+      let parents = container.parents().split("\n");
 
-    for (let i = 0; i < stencilMapPairs.length; i += 2) {
-      stencils[stencilMapPairs[i] as any] = JSON.parse(stencilMapPairs[i + 1]);
-    }
-
-    let stencilMeta: { [key: number]: StencilMeta } = {};
-    for (let i = 0; i < stencilMetaPairs.length; i += 2) {
-      stencilMeta[stencilMetaPairs[i] as any] = JSON.parse(
-        stencilMetaPairs[i + 1],
-      );
-    }
-
-    let children: { [key: number]: Array<number> } = {};
-    for (let i = 0; i < parents.length; i += 2) {
-      let cl = children[parents[i + 1] as any] || [];
-      cl.push(parseInt(parents[i]));
-      children[parents[i + 1] as any] = cl;
-    }
-
-    setStencils(stencils);
-    setStencilMeta(stencilMeta);
-    setChildren(children);
-    const root = container.get_root_id();
-    setRoot(root || null);
-    setPageSize({
-      width: (root && container.get_song_width(root)) || 0,
-      height: (root && container.get_song_height(root)) || 0,
-    });
-  }, [container, props.children]);
-
-  const svg = useRef<SVGSVGElement>(null);
-
-  const bound = svg.current && svg.current.getBoundingClientRect();
-
-  function makeMouseHandler(
-    fn?: (time: null | HoverInfo, ev: React.MouseEvent) => void,
-  ) {
-    return (ev: React.MouseEvent) => {
-      if (!stencilMeta || !fn) {
-        return;
+      let stencils: { [key: number]: StencilOrStencilMap } = {};
+      for (let i = 0; i < stencilPairs.length; i += 2) {
+        stencils[stencilPairs[i] as any] = stencilPairs[i + 1];
       }
 
-      fn(hoverInfo, ev);
-    };
-  }
+      for (let i = 0; i < stencilMapPairs.length; i += 2) {
+        stencils[stencilMapPairs[i] as any] = JSON.parse(
+          stencilMapPairs[i + 1],
+        );
+      }
 
-  return (
-    <>
-      <svg
-        className="six-sheet"
-        viewBox={`0 0 ${pageSize.width} ${pageSize.height}`}
-        width="100%"
-        ref={svg}
-        onMouseDownCapture={makeMouseHandler(props.onMouseDown)}
-        onMouseUpCapture={makeMouseHandler(props.onMouseUp)}
-        onClick={makeMouseHandler(props.onClick)}
-        onMouseMove={ev => {
-          if (!svg || !svg.current || !stencilMeta) {
-            return;
-          }
-          const ctm = svg.current.getScreenCTM();
-          if (!ctm) {
-            return;
-          }
-          let pt = svg.current.createSVGPoint();
-          pt.x = ev.clientX;
-          pt.y = ev.clientY;
-          pt = pt.matrixTransform(ctm.inverse());
+      let stencilMeta: { [key: number]: StencilMeta } = {};
+      for (let i = 0; i < stencilMetaPairs.length; i += 2) {
+        stencilMeta[stencilMetaPairs[i] as any] = JSON.parse(
+          stencilMetaPairs[i + 1],
+        );
+      }
 
-          const newHoverInfo = container.get_hover_info(pt.x, pt.y);
+      let children: { [key: number]: Array<number> } = {};
+      for (let i = 0; i < parents.length; i += 2) {
+        let cl = children[parents[i + 1] as any] || [];
+        cl.push(parseInt(parents[i]));
+        children[parents[i + 1] as any] = cl;
+      }
 
-          if (newHoverInfo) {
-            if (
-              Boolean(hoverInfo) !== Boolean(newHoverInfo) ||
-              (hoverInfo &&
-                (newHoverInfo[0] !== hoverInfo.bar ||
-                  newHoverInfo[1] !== hoverInfo.time?.[0] ||
-                  newHoverInfo[2] !== hoverInfo.time?.[1] ||
-                  newHoverInfo[3] !== hoverInfo.pitch?.base ||
-                  newHoverInfo[4] !== hoverInfo.pitch?.modifier))
-            ) {
-              const formattedHoverInfo: HoverInfo = {
-                bar: newHoverInfo[0],
-                time: [newHoverInfo[1], newHoverInfo[2]],
-                pitch: {
-                  base: newHoverInfo[3],
-                  modifier: newHoverInfo[4],
-                },
-              };
-              setHoverInfo(formattedHoverInfo);
-              props.onHover(formattedHoverInfo);
+      setStencils(stencils);
+      setStencilMeta(stencilMeta);
+      setChildren(children);
+      const root = container.get_root_id();
+      setRoot(root || null);
+      setPageSize({
+        width: (root && container.get_song_width(root)) || 0,
+        height: (root && container.get_song_height(root)) || 0,
+      });
+    }, [container, props.children]);
+
+    const svg = useRef<SVGSVGElement>(null);
+
+    const bound = svg.current && svg.current.getBoundingClientRect();
+
+    function makeMouseHandler(
+      fn?: (time: null | HoverInfo, ev: React.MouseEvent) => void,
+    ) {
+      return (ev: React.MouseEvent) => {
+        if (!stencilMeta || !fn) {
+          return;
+        }
+
+        fn(hoverInfo, ev);
+      };
+    }
+
+    return (
+      <>
+        <svg
+          className="six-sheet"
+          viewBox={`0 0 ${pageSize.width} ${pageSize.height}`}
+          width="100%"
+          ref={svg}
+          onMouseDownCapture={makeMouseHandler(props.onMouseDown)}
+          onMouseUpCapture={makeMouseHandler(props.onMouseUp)}
+          onClick={makeMouseHandler(props.onClick)}
+          onMouseMove={ev => {
+            if (!svg || !svg.current || !stencilMeta) {
+              return;
             }
-          } else {
-            props.onHover({});
-          }
+            const ctm = svg.current.getScreenCTM();
+            if (!ctm) {
+              return;
+            }
+            let pt = svg.current.createSVGPoint();
+            pt.x = ev.clientX;
+            pt.y = ev.clientY;
+            pt = pt.matrixTransform(ctm.inverse());
 
-          if (props.onMouseMove) {
-            props.onMouseMove(ev);
-          }
-        }}
-      >
-        {root && stencils && stencils[root] && stencilMeta && (
-          <StencilView
-            id={root}
-            stencils={stencils}
-            stencilMeta={stencilMeta}
-            classNames={container.classNames}
-          />
-        )}
-      </svg>
-      {stencilMeta &&
-        Object.entries(container.html).map(([id, html]) => {
-          const meta = stencilMeta[id as any];
-          let applyTo;
-          if (meta) {
-            applyTo = [meta];
-          } else {
-            applyTo = (children[id as any] || [])
-              .map(m => stencilMeta[m])
-              .filter(m => m);
-          }
+            const newHoverInfo = container.get_hover_info(pt.x, pt.y);
 
-          return (
-            <React.Fragment key={id}>
-              {applyTo.map((meta, i) => {
-                if (!meta || !html || !svg.current || !bound) {
-                  return null;
-                }
+            if (newHoverInfo) {
+              if (
+                Boolean(hoverInfo) !== Boolean(newHoverInfo) ||
+                (hoverInfo &&
+                  (newHoverInfo[0] !== hoverInfo.bar ||
+                    newHoverInfo[1] !== hoverInfo.time?.[0] ||
+                    newHoverInfo[2] !== hoverInfo.time?.[1] ||
+                    newHoverInfo[3] !== hoverInfo.pitch?.base ||
+                    newHoverInfo[4] !== hoverInfo.pitch?.modifier))
+              ) {
+                const formattedHoverInfo: HoverInfo = {
+                  bar: newHoverInfo[0],
+                  time: [newHoverInfo[1], newHoverInfo[2]],
+                  pitch: {
+                    base: newHoverInfo[3],
+                    modifier: newHoverInfo[4],
+                  },
+                };
+                setHoverInfo(formattedHoverInfo);
+                props.onHover(formattedHoverInfo);
+              }
+            } else {
+              props.onHover({});
+            }
 
-                const ctm = svg.current.getScreenCTM();
-                if (!ctm) {
-                  return;
-                }
+            if (props.onMouseMove) {
+              props.onMouseMove(ev);
+            }
+          }}
+        >
+          {root && stencils && stencils[root] && stencilMeta && (
+            <StencilView
+              id={root}
+              stencils={stencils}
+              stencilMeta={stencilMeta}
+              classNames={container.classNames}
+            />
+          )}
+        </svg>
+        {stencilMeta &&
+          Object.entries(container.html).map(([id, html]) => {
+            const meta = stencilMeta[id as any];
+            let applyTo;
+            if (meta) {
+              applyTo = [meta];
+            } else {
+              applyTo = (children[id as any] || [])
+                .map(m => stencilMeta[m])
+                .filter(m => m);
+            }
 
-                let pt2 = svg.current.createSVGPoint();
-                pt2.x = meta[0];
-                pt2.y = meta[1];
-                pt2 = pt2.matrixTransform(ctm);
+            return (
+              <React.Fragment key={id}>
+                {applyTo.map((meta, i) => {
+                  if (!meta || !html || !svg.current || !bound) {
+                    return null;
+                  }
 
-                let pt3 = svg.current.createSVGPoint();
-                pt3.x = meta[2];
-                pt3.y = meta[3];
-                pt3 = pt3.matrixTransform(ctm);
+                  const ctm = svg.current.getScreenCTM();
+                  if (!ctm) {
+                    return;
+                  }
 
-                const width = pt3.x - pt2.x;
-                const height = pt3.y - pt2.y;
-                return (
-                  <div
-                    key={i}
-                    style={{
-                      position: "absolute",
-                      left: Math.round(pt2.x - bound.left),
-                      top: Math.round(pt2.y - bound.top),
-                      width,
-                      height,
-                    }}
-                  >
-                    <div style={{ position: "relative" }}>
-                      {html({ width, height })}
+                  let pt2 = svg.current.createSVGPoint();
+                  pt2.x = meta[0];
+                  pt2.y = meta[1];
+                  pt2 = pt2.matrixTransform(ctm);
+
+                  let pt3 = svg.current.createSVGPoint();
+                  pt3.x = meta[2];
+                  pt3.y = meta[3];
+                  pt3 = pt3.matrixTransform(ctm);
+
+                  const width = pt3.x - pt2.x;
+                  const height = pt3.y - pt2.y;
+                  return (
+                    <div
+                      key={i}
+                      style={{
+                        position: "absolute",
+                        left: Math.round(pt2.x - bound.left),
+                        top: Math.round(pt2.y - bound.top),
+                        width,
+                        height,
+                      }}
+                    >
+                      <div style={{ position: "relative" }}>
+                        {html({ width, height })}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </React.Fragment>
-          );
-        })}
-    </>
-  );
-}
+                  );
+                })}
+              </React.Fragment>
+            );
+          })}
+      </>
+    );
+  },
+);
+
+export default SheetMusicView;

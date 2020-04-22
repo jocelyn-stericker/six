@@ -19,6 +19,7 @@ staff = { path = "../staff" }
 stencil = { path = "../stencil" }
 kurbo = "0.5.11"
 wasm-bindgen = "0.2.59"
+base64 = "0.12.0"
 
 [dependencies.num-rational]
 version = "0.2.4"

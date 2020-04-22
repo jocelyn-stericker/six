@@ -123,7 +123,7 @@ function getTextWidth(fontSize: number, text: string) {
     return 0;
   }
   // TODO: sync title font with sys_print_meta.rs.
-  context.font = `${fontSize}px Palatino, "Palatino Linotype", "Palatino LT STD", "Book Antiqua", Georgia, serif`;
+  context.font = `${fontSize}px "Times New Roman", Times, serif`;
 
   return context.measureText(text).width;
 }
