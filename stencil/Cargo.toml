@@ -11,3 +11,4 @@ repository = "https://github.com/jnetterf/six"
 entity = {path = "../entity"}
 kurbo = "0.5.11"
 deflate = "0.8.4"
+base64 = "0.12.0"

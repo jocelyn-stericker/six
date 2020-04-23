@@ -56,6 +56,7 @@ pub struct Pdf {
     page_size: Option<Size>,
     compression: Option<Compression>,
     fill_color: Vec<(f32, f32, f32)>,
+    file: Option<usize>,
 }
 
 impl Default for Pdf {
@@ -85,8 +86,9 @@ impl Pdf {
                 },
             ],
             page_size: None,
-            compression: Some(Compression::Fast),
+            compression: None, // Some(Compression::Fast),
             fill_color: Vec::new(),
+            file: None,
         }
     }
 
@@ -256,6 +258,36 @@ impl Pdf {
         self.add_object(page_object, true, false);
     }
 
+    fn add_file(&mut self, file_str: &str) {
+        let file_stream = if let Some(level) = self.compression {
+            let compressed = deflate::deflate_bytes_zlib_conf(file_str.as_bytes(), level);
+            let mut file = format!(
+                "<< /Type /EmbeddedFile /Subtype /application#2Fjson /Length {} /Filter [/FlateDecode] >>\nstream\n",
+                compressed.len()
+            )
+            .into_bytes();
+            file.extend_from_slice(&compressed);
+            file.extend(b"endstream\n");
+            file
+        } else {
+            let mut file = Vec::new();
+            let file_bytes = file_str.as_bytes();
+            file.extend(
+                format!(
+                    "<< /Type /EmbeddedFile /Subtype /application#2Fjson /Length {} >>\nstream\n",
+                    file_bytes.len()
+                )
+                .bytes(),
+            );
+            file.extend(file_bytes);
+            file.extend(b"endstream\n");
+            file
+        };
+
+        let file_obj = self.add_object(file_stream, false, false);
+        self.file = Some(file_obj);
+    }
+
     fn add_object(&mut self, data: Vec<u8>, is_page: bool, is_xobject: bool) -> usize {
         self.objects.push(PdfObject {
             contents: data,
@@ -266,8 +298,9 @@ impl Pdf {
         self.objects.len()
     }
 
-    pub fn into_binary(self) -> Vec<u8> {
+    pub fn into_binary(mut self) -> Vec<u8> {
         let mut binary = Vec::new();
+        self.add_file("6/8");
         self.write_to(&mut binary)
             .expect("Vec<u8> should not have IO issues.");
         binary
@@ -317,21 +350,34 @@ impl Pdf {
 
         // Write out the catalog dictionary object
         self.objects[0].offset = Some(out.pos());
-        out.write_all(b"1 0 obj\n<< /Type /Catalog\n/Pages 2 0 R >>\nendobj\n")?;
+        let files = if let Some(file) = self.file {
+            format!(
+                "\n/Names << /EmbeddedFiles << /Names [ (sixeight.json) << /EF << /F {} 0 R] >> /F (sixeight.json) /Type F >> ] >> >>",
+                file
+            )
+        } else {
+            String::default()
+        };
+
+        write!(
+            out,
+            "1 0 obj\n<< /Type /Catalog{}\n/Pages 2 0 R >>\nendobj\n",
+            files,
+        )?;
 
         // Write the cross-reference table
-        let startxref = out.pos() + 1; // NOTE: apparently there's some 1-based indexing??
+        let startxref = out.pos();
         out.write_all(b"xref\n")?;
         writeln!(out, "0 {}", self.objects.len() + 1)?;
         out.write_all(b"0000000000 65535 f \n")?;
 
         for obj in &self.objects {
-            writeln!(out, "{:010} 00000 f ", obj.offset.unwrap())?;
+            writeln!(out, "{:010} 00000 n ", obj.offset.unwrap())?;
         }
 
         // Write the document trailer
         out.write_all(b"trailer\n")?;
-        writeln!(out, "<< /Size {}", self.objects.len())?;
+        writeln!(out, "<< /Size {}", self.objects.len() + 1)?;
         out.write_all(b"/Root 1 0 R >>\n")?;
 
         // Write the offset to the xref table
