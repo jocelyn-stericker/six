@@ -4,7 +4,7 @@ import { Action, Invertible } from "./actions";
 export function getInitialState(): State {
   return {
     song: {
-      v: "0.1.0",
+      v: 1,
       global: {
         title: "",
         author: "",

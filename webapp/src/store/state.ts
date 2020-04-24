@@ -42,7 +42,7 @@ export interface Part {
 }
 
 export interface Song {
-  v: "0.1.0";
+  v: 1;
   global: Global;
   part: Part;
 }

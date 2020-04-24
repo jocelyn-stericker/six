@@ -7,7 +7,6 @@ use sys_delete_orphans::sys_delete_orphans;
 use sys_print_meta::sys_print_meta;
 use sys_print_song::sys_print_song;
 
-use base64;
 use entity::{EntitiesRes, Entity, Join};
 use kurbo::{Affine, Point, Rect, Size, Vec2};
 use num_rational::Rational;
@@ -851,13 +850,17 @@ impl Render {
         }
     }
 
-    pub fn to_pdf(&self) -> String {
+    pub fn to_pdf(&self, embed_file: Option<String>) -> String {
         let song = &self.songs[&self.root.unwrap()];
 
         if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
             let mut pdf = Pdf::new();
             let scale = song.scale();
             pdf.add_page(Size::new(215.9, 279.4));
+            if let Some(embed_file) = embed_file {
+                pdf.add_file(&embed_file);
+            }
+
             pdf.write_stencil_map(
                 root,
                 Affine::translate(Vec2::new(0.0, 279.4)) * Affine::scale(scale) * Affine::FLIP_Y,

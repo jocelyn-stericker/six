@@ -1,6 +1,7 @@
 .about {
  color: #abd1c6;
- padding: 0 16px 8px;
+ margin: 16px auto 24px !important;
+ max-width: 1002px;
  margin: 0;
  border: none;
  font-size: 16px;

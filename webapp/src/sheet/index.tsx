@@ -118,7 +118,7 @@ const SheetMusicView = forwardRef(
     const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
 
     useImperativeHandle(ref, () => ({
-      toPDF: () => container.to_pdf(),
+      toPDF: (file?: string) => container.to_pdf(file ?? undefined),
     }));
 
     useLayoutEffect(() => {

@@ -86,7 +86,7 @@ impl Pdf {
                 },
             ],
             page_size: None,
-            compression: None, // Some(Compression::Fast),
+            compression: Some(Compression::Fast),
             fill_color: Vec::new(),
             file: None,
         }
@@ -258,7 +258,7 @@ impl Pdf {
         self.add_object(page_object, true, false);
     }
 
-    fn add_file(&mut self, file_str: &str) {
+    pub fn add_file(&mut self, file_str: &str) {
         let file_stream = if let Some(level) = self.compression {
             let compressed = deflate::deflate_bytes_zlib_conf(file_str.as_bytes(), level);
             let mut file = format!(
@@ -300,7 +300,6 @@ impl Pdf {
 
     pub fn into_binary(mut self) -> Vec<u8> {
         let mut binary = Vec::new();
-        self.add_file("6/8");
         self.write_to(&mut binary)
             .expect("Vec<u8> should not have IO issues.");
         binary

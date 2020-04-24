@@ -20,7 +20,6 @@ export default function App() {
       />
       <Meta appState={appState} dispatch={dispatch} />
       <div className="six-note-editor">
-        <h2>Notes</h2>
         <React.Suspense fallback={null}>
           <AppHotkeys
             onUndo={() => dispatch(undo())}

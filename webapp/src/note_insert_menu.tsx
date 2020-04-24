@@ -69,7 +69,7 @@ export default function NoteInsertMenu({
           userSelect: "none",
         }}
         onMouseUp={() => {
-          if (initialTime - Date.now() > 20) {
+          if (Date.now() - initialTime > 100) {
             onClose();
           }
         }}

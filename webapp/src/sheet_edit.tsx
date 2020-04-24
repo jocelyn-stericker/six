@@ -35,7 +35,7 @@ function SheetEdit({ appState, dispatch }: Props) {
   const hoverMatchesAny = false;
 
   let currTs = appState.song.global.between[0].ts;
-  let sheet = useRef<{ toPDF: () => string }>(null);
+  let sheet = useRef<{ toPDF: (embed?: string) => string }>(null);
 
   return (
     <div
@@ -235,7 +235,7 @@ function SheetEdit({ appState, dispatch }: Props) {
       </Sheet>
       <button
         onClick={() => {
-          const pdf = sheet.current?.toPDF();
+          const pdf = sheet.current?.toPDF(JSON.stringify(appState.song));
 
           const a = document.createElement("a");
           a.href = `data:application/pdf;base64,${pdf}`;
