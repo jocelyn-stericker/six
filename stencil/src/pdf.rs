@@ -298,7 +298,7 @@ impl Pdf {
         self.objects.len()
     }
 
-    pub fn into_binary(mut self) -> Vec<u8> {
+    pub fn into_binary(self) -> Vec<u8> {
         let mut binary = Vec::new();
         self.write_to(&mut binary)
             .expect("Vec<u8> should not have IO issues.");
@@ -351,7 +351,7 @@ impl Pdf {
         self.objects[0].offset = Some(out.pos());
         let files = if let Some(file) = self.file {
             format!(
-                "\n/Names << /EmbeddedFiles << /Names [ (sixeight.json) << /EF << /F {} 0 R] >> /F (sixeight.json) /Type F >> ] >> >>",
+                "\n/Names << /EmbeddedFiles << /Names [ (sixeight.json) << /EF << /F {} 0 R >> /F (sixeight.json) /Type /F >> ] >> >>",
                 file
             )
         } else {

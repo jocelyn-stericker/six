@@ -16,8 +16,10 @@
   },
   "dependencies": {
     "@blueprintjs/core": "3.24.0",
+    "browser-nativefs": "0.7.1",
     "classnames": "2.2.6",
     "normalize.css": "8.0.1",
+    "pdf-lib": "1.4.1",
     "react": "16.13.1",
     "react-dom": "16.13.1",
     "react-pie-menu": "0.2.5",
@@ -27,6 +29,7 @@
   },
   "devDependencies": {
     "@babel/core": "7.9.0",
+    "@babel/plugin-transform-runtime": "7.9.0",
     "@babel/preset-env": "7.9.0",
     "@babel/preset-react": "7.9.1",
     "@babel/preset-typescript": "7.9.0",

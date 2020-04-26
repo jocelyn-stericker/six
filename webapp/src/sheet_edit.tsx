@@ -1,4 +1,11 @@
-import React, { createRef, useMemo, useRef, useState } from "react";
+import React, {
+  createRef,
+  forwardRef,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import Sheet from "./sheet";
 import { Render } from "./sheet/reconciler";
@@ -16,7 +23,10 @@ interface Props {
   dispatch: (action: Action) => void;
 }
 
-function SheetEdit({ appState, dispatch }: Props) {
+const SheetEdit = forwardRef(function SheetEdit(
+  { appState, dispatch }: Props,
+  ref: React.Ref<{ saveAsPDF: () => void }>,
+) {
   const songRef = useRef<Render>(null);
   const barRefs = useMemo(
     () =>
@@ -36,6 +46,17 @@ function SheetEdit({ appState, dispatch }: Props) {
 
   let currTs = appState.song.global.between[0].ts;
   let sheet = useRef<{ toPDF: (embed?: string) => string }>(null);
+
+  useImperativeHandle(ref, () => ({
+    saveAsPDF: () => {
+      const pdf = sheet.current?.toPDF(JSON.stringify(appState.song));
+
+      const a = document.createElement("a");
+      a.href = `data:application/pdf;base64,${pdf}`;
+      a.download = "68.pdf";
+      a.click();
+    },
+  }));
 
   return (
     <div
@@ -233,20 +254,8 @@ function SheetEdit({ appState, dispatch }: Props) {
           </staff>
         </song>
       </Sheet>
-      <button
-        onClick={() => {
-          const pdf = sheet.current?.toPDF(JSON.stringify(appState.song));
-
-          const a = document.createElement("a");
-          a.href = `data:application/pdf;base64,${pdf}`;
-          a.download = "68.pdf";
-          a.click();
-        }}
-      >
-        Export PDF
-      </button>
     </div>
   );
-}
+});
 
 export default React.memo(SheetEdit);

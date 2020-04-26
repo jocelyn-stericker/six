@@ -304,5 +304,11 @@ export function reduce(state: State, action: Action): State {
     case "RESET": {
       return getInitialState();
     }
+    case "LOAD": {
+      return {
+        ...getInitialState(),
+        song: action.song,
+      };
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { Bar, Clef, Pitch, State, TiedNote } from "./state";
+import { Bar, Clef, Pitch, Song, State, TiedNote } from "./state";
 
 export interface AddNote {
   type: "ADD_NOTE";
@@ -213,6 +213,14 @@ export function reset(): Reset {
   return { type: "RESET" };
 }
 
+export interface Load {
+  type: "LOAD";
+  song: Song;
+}
+export function load(song: Song): Load {
+  return { type: "LOAD", song };
+}
+
 export type Invertible =
   | AddNote
   | RemoveNote
@@ -225,4 +233,6 @@ export type Invertible =
   | SetTitle
   | SetAuthor;
 
-export type Action = Invertible | Undo | Redo | Reset;
+export type NonInvertible = Undo | Redo | Reset | Load;
+
+export type Action = Invertible | NonInvertible;

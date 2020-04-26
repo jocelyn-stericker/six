@@ -1,19 +1,9 @@
 import React from "react";
 import "./about.css";
 
-export default function About({
-  title,
-  author,
-}: {
-  title: string;
-  author: string;
-}) {
+export default function About() {
   return (
     <div className="about">
-      <h1>
-        {title || "Your Lead Sheet"}
-        {author && ` by ${author}`}
-      </h1>
       <p>
         This is an early version of Six Eight, a lightweight lead sheet (chords
         + melody + lyrics) editor by{" "}
