@@ -60,7 +60,7 @@ export default function NoteInsertMenu({
     <ThemeProvider theme={theme}>
       <div
         style={{
-          position: "fixed",
+          position: "absolute",
           top: 0,
           left: 0,
           right: 0,

@@ -18,6 +18,8 @@ export default function NotePopover({ children, onDeleteNote }: Props) {
       }
       interactionKind="click"
       hasBackdrop={true}
+      captureDismiss={true}
+      minimal={true}
       content={
         <Menu large={true}>
           <MenuItem

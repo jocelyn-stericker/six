@@ -1,14 +1,8 @@
-import React, {
-  forwardRef,
-  useEffect,
-  useImperativeHandle,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { newRender, render } from "./reconciler";
+export { Clef } from "./reconciler";
 
-export type Render = import("./reconciler").Render;
+export type RustRenderApi = import("./reconciler").RustRenderApi;
 export { NoteValue, Barline } from "./reconciler";
 export const TYPE_RNC = 0;
 export const TYPE_BETWEEN_BARS = 1;
@@ -93,10 +87,7 @@ function StencilView({
   }
 }
 
-const SheetMusicView = forwardRef(function SheetMusicView(
-  props: Props,
-  ref: React.Ref<{ toPDF: () => string }>,
-) {
+export default function Renderer(props: Props) {
   // create/destroy Rust container
   const [container] = useState(newRender);
   useEffect(() => {
@@ -118,10 +109,6 @@ const SheetMusicView = forwardRef(function SheetMusicView(
   const [root, setRoot] = useState<number | null>(null);
   const [hoverInfo, setHoverInfo] = useState<HoverInfo | null>(null);
   const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
-
-  useImperativeHandle(ref, () => ({
-    toPDF: (file?: string) => container.to_pdf(file ?? undefined),
-  }));
 
   useLayoutEffect(() => {
     render(props.children, container);
@@ -303,6 +290,4 @@ const SheetMusicView = forwardRef(function SheetMusicView(
         })}
     </>
   );
-});
-
-export default SheetMusicView;
+}

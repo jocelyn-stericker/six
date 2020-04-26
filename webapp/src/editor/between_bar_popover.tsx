@@ -1,6 +1,7 @@
 import React from "react";
 import { Menu, MenuDivider, MenuItem, Popover } from "@blueprintjs/core";
-import { Clef } from "./store";
+
+import { Clef } from "../store";
 
 export interface Props {
   children: any;
@@ -53,8 +54,8 @@ export default function BetweenBarPopover({
             icon={"ts" as any}
             popoverProps={{
               interactionKind: "hover",
-              hoverCloseDelay: 350,
-              hoverOpenDelay: 350,
+              hoverCloseDelay: 0,
+              hoverOpenDelay: 0,
             }}
           >
             <li className="bp3-menu-header">
@@ -139,8 +140,8 @@ export default function BetweenBarPopover({
             icon={"bass" as any}
             popoverProps={{
               interactionKind: "hover",
-              hoverCloseDelay: 350,
-              hoverOpenDelay: 350,
+              hoverCloseDelay: 0,
+              hoverOpenDelay: 0,
             }}
           >
             <MenuItem
@@ -166,8 +167,8 @@ export default function BetweenBarPopover({
             icon={"ks" as any}
             popoverProps={{
               interactionKind: "hover",
-              hoverCloseDelay: 350,
-              hoverOpenDelay: 350,
+              hoverCloseDelay: 0,
+              hoverOpenDelay: 0,
             }}
           >
             <MenuItem

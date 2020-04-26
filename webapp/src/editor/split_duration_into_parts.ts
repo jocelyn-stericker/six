@@ -1,5 +1,5 @@
-import { Pitch, State, TiedNote } from "./store";
-import { Render } from "./sheet/reconciler";
+import { Pitch, State, TiedNote } from "../store";
+import { RustRenderApi } from "../renderer";
 
 export interface NoteAddPatch {
   barIdx: number;
@@ -20,7 +20,7 @@ function count(noteValue: number, dots: number) {
 }
 
 export default function splitDurationIntoParts(
-  render: Render | null,
+  render: RustRenderApi | null,
   appState: State,
   barEntity: number | null,
   barIdx: number,

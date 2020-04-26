@@ -1,7 +1,7 @@
 import { Song } from "./store";
 import { fileOpen } from "browser-nativefs";
 
-async function loadPdf(): Promise<{ error: string } | { song: Song }> {
+export async function loadPdf(): Promise<{ error: string } | { song: Song }> {
   const pdf = await fileOpen({
     description: "Six Eight PDF",
     extensions: ["pdf"],
@@ -51,4 +51,12 @@ async function loadPdf(): Promise<{ error: string } | { song: Song }> {
   }
 }
 
-export default loadPdf;
+export async function savePdf(
+  filename: string,
+  pdfBase64: string,
+): Promise<void> {
+  const a = document.createElement("a");
+  a.href = `data:application/pdf;base64,${pdfBase64}`;
+  a.download = `${filename}.pdf`;
+  a.click();
+}

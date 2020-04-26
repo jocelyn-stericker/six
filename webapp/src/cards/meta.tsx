@@ -18,10 +18,10 @@ import {
   setTitle,
   setTs,
   State,
-} from "./store";
+} from "../store";
 
 import "@blueprintjs/core/lib/css/blueprint.css";
-import "./blueprint/theme.css";
+import "../blueprint/theme.css";
 import "./meta.css";
 
 interface Props {

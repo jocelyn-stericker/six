@@ -14,11 +14,11 @@ interface RenderExtra {
   html: { [key: string]: any };
 }
 
-export type Render = _Render & RenderExtra;
+export type RustRenderApi = _Render & RenderExtra;
 
 export { Barline, Clef } from "../../rust_render_built/index";
 
-export function newRender(): Render {
+export function newRender(): RustRenderApi {
   return Object.assign(_Render.new(), {
     classNames: {} as { [key: string]: string },
     html: {} as { [key: string]: any },
@@ -42,7 +42,7 @@ export enum NoteValue {
 
 interface Instance {
   type: "song" | "staff" | "bar" | "between" | "rnc";
-  container: Render;
+  container: RustRenderApi;
   entity: number;
   meta: any;
 }
@@ -58,7 +58,7 @@ interface Stylable {
 
 export interface SongProps extends Stylable {
   key?: string | number | null | undefined;
-  ref?: Ref<Render>;
+  ref?: Ref<RustRenderApi>;
   freezeSpacing?: number | undefined;
   children: React.ReactNode;
   /** In mm */
@@ -130,7 +130,7 @@ function getTextWidth(fontSize: number, text: string) {
 
 function createInstance(
   spec: CreateInstanceParam,
-  container: Render,
+  container: RustRenderApi,
 ): Instance | null {
   let type: "song" | "staff" | "bar" | "between" | "rnc";
   let entity;
@@ -223,13 +223,13 @@ function appendChild(parent: Instance, child: Instance) {
 
 const Reconciler = ReactReconciler({
   supportsMutation: true,
-  createInstance(type, props, container: Render) {
+  createInstance(type, props, container: RustRenderApi) {
     // @ts-ignore
     return createInstance({ type, props }, container);
   },
   createTextInstance(
     _text,
-    _rootContainerInstance: Render,
+    _rootContainerInstance: RustRenderApi,
     _hostContext,
     _internalInstanceHandle,
   ) {
@@ -246,7 +246,7 @@ const Reconciler = ReactReconciler({
     appendChild(parent, child);
   },
 
-  removeChildFromContainer(_container: Render, child: Instance) {
+  removeChildFromContainer(_container: RustRenderApi, child: Instance) {
     child.container.root_clear(child.entity);
   },
   removeChild(parent: Instance, child: Instance) {
@@ -263,7 +263,7 @@ const Reconciler = ReactReconciler({
     // TODO: remove child entities from html/classNames
   },
   insertInContainerBefore(
-    _container: Render,
+    _container: RustRenderApi,
     _child: Instance,
     _before: Instance,
   ) {
@@ -290,7 +290,7 @@ const Reconciler = ReactReconciler({
     _type,
     _oldProps: any,
     _newProps: any,
-    _rootContainerInstance: Render,
+    _rootContainerInstance: RustRenderApi,
     _currentHostContext,
   ) {
     return {};
@@ -436,9 +436,9 @@ const Reconciler = ReactReconciler({
   },
 });
 
-const roots = new Map<Render, ReactReconciler.FiberRoot>();
+const roots = new Map<RustRenderApi, ReactReconciler.FiberRoot>();
 
-export function render(whatToRender: any, container: Render) {
+export function render(whatToRender: any, container: RustRenderApi) {
   let root = roots.get(container);
   if (!root) {
     root = Reconciler.createContainer(container, false, false);

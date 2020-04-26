@@ -7,9 +7,8 @@ import React, {
   useState,
 } from "react";
 
-import Sheet from "./sheet";
-import { Render } from "./sheet/reconciler";
-import { Action, addNote, removeNote, State } from "./store";
+import Sheet, { RustRenderApi } from "../renderer";
+import { Action, addNote, removeNote, State } from "../store";
 import splitDurationIntoParts, {
   NoteAddPatch,
 } from "./split_duration_into_parts";
@@ -25,9 +24,9 @@ interface Props {
 
 const SheetEdit = forwardRef(function SheetEdit(
   { appState, dispatch }: Props,
-  ref: React.Ref<{ saveAsPDF: () => void }>,
+  ref: React.Ref<{ getPDF: () => string }>,
 ) {
-  const songRef = useRef<Render>(null);
+  const songRef = useRef<RustRenderApi>(null);
   const barRefs = useMemo(
     () =>
       Array.from({ length: appState.song.part.bars.length }).map(() =>
@@ -45,16 +44,15 @@ const SheetEdit = forwardRef(function SheetEdit(
   const hoverMatchesAny = false;
 
   let currTs = appState.song.global.between[0].ts;
-  let sheet = useRef<{ toPDF: (embed?: string) => string }>(null);
 
   useImperativeHandle(ref, () => ({
-    saveAsPDF: () => {
-      const pdf = sheet.current?.toPDF(JSON.stringify(appState.song));
-
-      const a = document.createElement("a");
-      a.href = `data:application/pdf;base64,${pdf}`;
-      a.download = "68.pdf";
-      a.click();
+    /**
+     * Return the sheet music as a base64 PDF string (not including mimetype).
+     *
+     * Embeds the song as an embedded document.
+     */
+    getPDF: () => {
+      return songRef.current?.to_pdf(JSON.stringify(appState.song)) ?? "";
     },
   }));
 
@@ -107,7 +105,6 @@ const SheetEdit = forwardRef(function SheetEdit(
         </React.Suspense>
       )}
       <Sheet
-        ref={sheet}
         onHover={hoverInfo => {
           if (noteMutationClickPos) {
             return;
@@ -134,7 +131,11 @@ const SheetEdit = forwardRef(function SheetEdit(
         }}
         onMouseDown={(_, ev) => {
           if (preview) {
-            setNoteMutationClickPos([ev.clientX, ev.clientY]);
+            const rect = ev.currentTarget.getBoundingClientRect();
+            setNoteMutationClickPos([
+              ev.clientX - rect.left,
+              ev.clientY - rect.top,
+            ]);
           }
         }}
       >

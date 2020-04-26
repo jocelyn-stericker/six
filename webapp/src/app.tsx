@@ -1,19 +1,25 @@
-import React, { useReducer, useRef } from "react";
+import React, { useRef } from "react";
 
 import "normalize.css";
 import "./app.css";
 import { getInitialState, load, redo, reduce, reset, undo } from "./store";
-import About from "./about";
-import Meta from "./meta";
-import loadPdf from "./load_pdf";
+import About from "./cards/about";
+import Meta from "./cards/meta";
+import { loadPdf, savePdf } from "./file";
+import { useLocallyPersistedReducer } from "./localStorage";
 
-const AppHotkeys = React.lazy(() => import("./app_hotkeys"));
-const SheetEdit = React.lazy(() => import("./sheet_edit"));
+const Hotkeys = React.lazy(() => import("./hotkeys"));
+const SheetEdit = React.lazy(() => import("./editor"));
 const Navbar = React.lazy(() => import("./navbar"));
 
 export default function App() {
-  const [appState, dispatch] = useReducer(reduce, undefined, getInitialState);
-  const sheetEdit = useRef<{ saveAsPDF: () => void }>(null);
+  const [appState, dispatch] = useLocallyPersistedReducer(
+    reduce,
+    undefined,
+    "app",
+    getInitialState,
+  );
+  const sheetEdit = useRef<{ getPDF: () => string }>(null);
 
   return (
     <React.Fragment>
@@ -24,7 +30,12 @@ export default function App() {
       >
         <Navbar
           onTrash={() => dispatch(reset())}
-          onSave={() => sheetEdit.current?.saveAsPDF()}
+          onSave={() => {
+            savePdf(
+              `${appState.song.global.title || "Untitled"}.sixeight`,
+              sheetEdit.current?.getPDF() ?? "",
+            );
+          }}
           onOpen={() => {
             loadPdf().then(result => {
               if ("error" in result) {
@@ -40,7 +51,7 @@ export default function App() {
       <Meta appState={appState} dispatch={dispatch} />
       <div className="six-note-editor">
         <React.Suspense fallback={null}>
-          <AppHotkeys
+          <Hotkeys
             onUndo={() => dispatch(undo())}
             onRedo={() => dispatch(redo())}
           />

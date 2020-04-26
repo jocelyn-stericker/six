@@ -9,8 +9,8 @@ import {
   setKs,
   setTs,
   State,
-} from "./store";
-import { Barline, Clef } from "./sheet/reconciler";
+} from "../store";
+import { Barline, Clef } from "../renderer";
 
 const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
 

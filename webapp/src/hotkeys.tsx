@@ -1,19 +1,19 @@
 import React from "react";
-import { Hotkey, Hotkeys, HotkeysTarget } from "@blueprintjs/core";
+import { Hotkeys as BPHotkeys, Hotkey, HotkeysTarget } from "@blueprintjs/core";
 
 export interface Props {
   onUndo: () => void;
   onRedo: () => void;
 }
 
-class AppHotkeys extends React.Component<Props> {
+class Hotkeys extends React.Component<Props> {
   render() {
     return <div />;
   }
 
   renderHotkeys() {
     return (
-      <Hotkeys>
+      <BPHotkeys>
         <Hotkey
           global={true}
           combo="mod + z"
@@ -26,9 +26,9 @@ class AppHotkeys extends React.Component<Props> {
           label="Redo"
           onKeyDown={this.props.onRedo}
         />
-      </Hotkeys>
+      </BPHotkeys>
     );
   }
 }
 
-export default HotkeysTarget(AppHotkeys);
+export default HotkeysTarget(Hotkeys);
