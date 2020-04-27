@@ -3316,5 +3316,43 @@ mod bar_tests {
                 }),
             ]
         );
+        assert_eq!(
+            four_four.beaming(
+                Rational::new(1, 4),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
+                    leaving: 0,
+                }),
+            ]
+        );
+        assert_eq!(
+            four_four.beaming(
+                Rational::new(1, 4),
+                vec![
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 2,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
     }
 }

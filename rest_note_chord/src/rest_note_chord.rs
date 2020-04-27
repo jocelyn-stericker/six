@@ -4,7 +4,7 @@ use stencil::Stencil;
 
 use crate::context::Context;
 use entity::{Entity, Join};
-use pitch::Pitch;
+use pitch::{NoteModifier, Pitch};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -47,13 +47,14 @@ impl RestNoteChord {
     }
 
     pub fn print(&self, context: &Context, has_beam: bool) -> (Stencil, Option<Point>) {
-        let mut stencil;
+        let mut stencil = Stencil::default();
         let head_right;
         let mut attachment_for_beam = None;
+        let pitch_y;
 
         match self.pitch {
             PitchKind::Pitch(pitch) => {
-                let pitch_y = pitch.y(context.clef);
+                pitch_y = pitch.y(context.clef);
                 let is_up = pitch_y > 0.0 || has_beam;
                 let (head, mut attachment) = match (self.duration.duration_display_base(), is_up) {
                     (Some(NoteValue::Maxima), _)
@@ -85,12 +86,29 @@ impl RestNoteChord {
                     attachment = None;
                 }
 
+                // TODO(joshuan): accidentals should be their own entity.
+                if context
+                    .accidentals
+                    .get(&(pitch.name(), pitch.octave()))
+                    .cloned()
+                    != pitch.modifier()
+                {
+                    let accidentals = match pitch.modifier() {
+                        None => Stencil::natural(),
+                        Some(NoteModifier::SemiUp) => Stencil::sharp(),
+                        Some(NoteModifier::SemiDown) => Stencil::flat(),
+                    };
+                    let x1 = accidentals.rect().x1;
+                    stencil =
+                        stencil.and(accidentals.with_translation(Vec2::new(-x1 - 20.0, pitch_y)));
+                }
+
                 head_right = head.rect().x1;
 
                 // TODO(joshuan): Determine direction elsewhere. Be clever with middle stems.
                 if let Some(attachment) = attachment {
                     if is_up {
-                        stencil = head.with_translation(Vec2::new(0.0, pitch_y));
+                        stencil = stencil.and(head.with_translation(Vec2::new(0.0, pitch_y)));
                         let flag = match self.duration.duration_display_base() {
                             Some(NoteValue::Eighth) => Some(Stencil::flag_up_8()),
                             Some(NoteValue::Sixteenth) => Some(Stencil::flag_up_16()),
@@ -128,7 +146,7 @@ impl RestNoteChord {
                             _ => None,
                         };
 
-                        stencil = head.with_translation(Vec2::new(0.0, pitch_y));
+                        stencil = stencil.and(head.with_translation(Vec2::new(0.0, pitch_y)));
 
                         let bottom = (attachment.y + pitch_y + 875.0).max(0.0);
                         let stem = Stencil::stem_line(
@@ -147,7 +165,7 @@ impl RestNoteChord {
                         }
                     }
                 } else {
-                    stencil = head.with_translation(Vec2::new(0.0, pitch_y));
+                    stencil = stencil.and(head.with_translation(Vec2::new(0.0, pitch_y)));
                 }
 
                 // TODO(joshuan): Leger lines should be their own entities.
@@ -173,6 +191,7 @@ impl RestNoteChord {
                 }
             }
             PitchKind::Unpitched => {
+                pitch_y = 0.0;
                 let (head, attachment) = match self.duration.duration_display_base() {
                     Some(NoteValue::Maxima)
                     | Some(NoteValue::Longa)
@@ -221,6 +240,7 @@ impl RestNoteChord {
                 }
             }
             PitchKind::Rest => {
+                pitch_y = 0.0;
                 stencil = match self.duration.duration_display_base() {
                     Some(NoteValue::Maxima) => Stencil::rest_maxima(),
                     Some(NoteValue::Longa) => Stencil::rest_longa(),
@@ -250,7 +270,14 @@ impl RestNoteChord {
                 }
                 dot_stencil = dot_stencil.and_right(Stencil::augmentation_dot());
             }
-            stencil = stencil.and(dot_stencil.with_translation(Vec2::new(head_right, -125.0)));
+            stencil = stencil.and(dot_stencil.with_translation(Vec2::new(
+                head_right,
+                if (pitch_y as i64) % 250 == 0 {
+                    pitch_y - 125.0
+                } else {
+                    pitch_y
+                },
+            )));
         }
 
         (stencil, attachment_for_beam)

@@ -56,15 +56,40 @@ impl Beam {
         let mut stencil = Stencil::default();
 
         let mut level = 0;
-        // TODO(joshuan): Half beam
         for (i, attachment) in self.0.iter().enumerate() {
+            // Backwards fractional.
+            for l in level..attachment.entering {
+                let next_level = self.0.get(i + 1).map(|l| l.entering).unwrap_or(0);
+                if next_level <= l {
+                    let start_x = attachment.stem_start.x - 295.0;
+                    let start_y = attachment.extreme_y;
+                    stencil = stencil.and(Stencil::beam(
+                        Line::new(
+                            Point::new(start_x, start_y + 187.5 * (l as f64)),
+                            Point::new(
+                                attachment.stem_start.x,
+                                attachment.extreme_y + 187.5 * (l as f64),
+                            ),
+                        ),
+                        level as isize,
+                    ));
+                }
+            }
+
+            // Whole or forwards fractional.
             for l in level..attachment.leaving {
                 let mut end_x = attachment.stem_start.x;
                 let mut end_y = attachment.extreme_y;
+                let mut fractional = true;
                 for maybe_end in self.0.iter().skip(i + 1) {
-                    if maybe_end.entering < l {
+                    if maybe_end.entering <= l {
+                        if fractional {
+                            end_x += 295.0;
+                        }
+
                         break;
                     }
+                    fractional = false;
                     end_x = maybe_end.stem_start.x;
                     end_y = maybe_end.extreme_y;
                 }
