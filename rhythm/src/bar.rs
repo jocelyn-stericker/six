@@ -679,6 +679,7 @@ impl Bar {
         // TODO: For now, we're going to assume beaming follows the same rules as long-note
         // splitting. This isn't true, but it's a start.
         let mut beams = Vec::with_capacity(durations.len());
+        // (first in beam, t)
         let mut split_befores = Vec::with_capacity(durations.len());
         let long_note_split = self.metre_split_note(
             t0,
@@ -714,7 +715,7 @@ impl Bar {
                             .map(|val| val.beam_count())
                             .unwrap_or(0),
                     );
-                    split_befores.push(first_in_beam);
+                    split_befores.push((first_in_beam, t_candidate));
                     first_in_beam = false;
                 }
                 t_candidate += candidate.duration();
@@ -725,7 +726,7 @@ impl Bar {
 
         let mut beaming = Vec::with_capacity(durations.len());
 
-        for (i, (&beam, &split_before)) in beams.iter().zip(&split_befores).enumerate() {
+        for (i, (&beam, &(split_before, t))) in beams.iter().zip(&split_befores).enumerate() {
             beaming.push(if beam == 0 {
                 None
             } else {
@@ -736,7 +737,11 @@ impl Bar {
                     0
                 };
 
-                let split_after = split_befores.get(i + 1).copied().unwrap_or(true);
+                let split_after = split_befores
+                    .get(i + 1)
+                    .copied()
+                    .map(|c| c.0)
+                    .unwrap_or(true);
                 let next = if !split_after {
                     beams.get(i + 1).copied().unwrap_or(0)
                 } else {
@@ -745,6 +750,20 @@ impl Bar {
 
                 if prev == 0 && next == 0 {
                     None
+                } else if beam > prev && beam > next {
+                    // TODO: point towards division it belongs in, not just beat
+                    // TODO: special rules for 3/8, 6/8, etc. p.157
+                    if prev > 0 && self.metre().on_division(t).is_none() || next == 0 {
+                        Some(RhythmicBeaming {
+                            entering: beam,
+                            leaving: next,
+                        })
+                    } else {
+                        Some(RhythmicBeaming {
+                            entering: prev,
+                            leaving: beam,
+                        })
+                    }
                 } else {
                     Some(RhythmicBeaming {
                         entering: if prev > 0 { beam } else { 0 },
@@ -3316,6 +3335,13 @@ mod bar_tests {
                 }),
             ]
         );
+    }
+
+    #[test]
+    fn beaming_basic_four_four_fractional() {
+        let four_four = Bar::new(Metre::new(4, 4));
+
+        // Fractional
         assert_eq!(
             four_four.beaming(
                 Rational::new(1, 4),
@@ -3350,6 +3376,35 @@ mod bar_tests {
                 }),
                 Some(RhythmicBeaming {
                     entering: 1,
+                    leaving: 0,
+                }),
+            ]
+        );
+        assert_eq!(
+            four_four.beaming(
+                Rational::new(0, 4),
+                vec![
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                    Duration::new(NoteValue::Eighth, 0, None),
+                    Duration::new(NoteValue::Sixteenth, 0, None),
+                ]
+            ),
+            vec![
+                Some(RhythmicBeaming {
+                    entering: 0,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 1,
+                    leaving: 1,
+                }),
+                Some(RhythmicBeaming {
+                    entering: 2,
                     leaving: 0,
                 }),
             ]
