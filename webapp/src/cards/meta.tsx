@@ -10,11 +10,13 @@ import {
 } from "@blueprintjs/core";
 import {
   Action,
+  clearPickupSkip,
   Clef,
   setAuthor,
   setBarCount,
   setClef,
   setKs,
+  setPickupSkip,
   setTitle,
   setTs,
   State,
@@ -163,6 +165,69 @@ export default function Meta({ appState, dispatch }: Props) {
             <Radio label="12/8" value="12/8" />
           </RadioGroup>
         </FormGroup>
+        <div style={{ height: 8 }} />
+        <FormGroup
+          label={`Does the first bar have ${appState.song.global.between[0].ts[0]} beats?`}
+          labelFor="meta-pickup"
+        >
+          <HTMLSelect
+            value={appState.song.global.pickupSkip == null ? "full" : "pickup"}
+            onChange={ev => {
+              if (ev.currentTarget.value === "full") {
+                dispatch(clearPickupSkip(appState));
+              } else {
+                dispatch(setPickupSkip(appState, [1, 4]));
+              }
+            }}
+            options={[
+              { label: "Yes", value: "full" },
+              { label: "No", value: "pickup" },
+            ]}
+          />
+        </FormGroup>
+        {appState.song.global.pickupSkip != null && (
+          <>
+            <div style={{ height: 8 }} />
+            <FormGroup
+              label="How many beats does it have?"
+              labelFor="meta-pickup-beats"
+            >
+              <HTMLSelect
+                onChange={ev => {
+                  const [num, den] = ev.currentTarget.value
+                    .split("/")
+                    .map(ts => parseInt(ts));
+                  dispatch(setPickupSkip(appState, [num, den]));
+                }}
+                value={`${appState.song.global.pickupSkip[0]}/${appState.song.global.pickupSkip[1]}`}
+                options={[
+                  {
+                    label: "\u00bd",
+                    value: `${appState.song.global.between[0].ts[0] * 2 -
+                      1}/${appState.song.global.between[0].ts[1] * 2}`,
+                  },
+                  ...Array(appState.song.global.between[0].ts[0] - 1)
+                    .fill(null)
+                    .map((_, i) => [
+                      {
+                        label: String(i + 1),
+                        value: `${appState.song.global.between[0].ts[1] -
+                          i -
+                          1}/${appState.song.global.between[0].ts[1]}`,
+                      },
+                      {
+                        label: `${i + 1} \u00bd`,
+                        value: `${appState.song.global.between[0].ts[1] * 2 -
+                          (i * 2 + 1) -
+                          2}/${appState.song.global.between[0].ts[1] * 2}`,
+                      },
+                    ])
+                    .reduce((memo, item) => [...memo, ...item], []),
+                ]}
+              />
+            </FormGroup>
+          </>
+        )}
       </div>
     </React.Fragment>
   );

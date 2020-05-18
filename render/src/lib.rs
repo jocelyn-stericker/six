@@ -307,6 +307,20 @@ impl Render {
         }
     }
 
+    pub fn bar_set_skip(&mut self, entity: usize, num: isize, den: isize) {
+        let entity = Entity::new(entity);
+        if let Some(bar) = self.bars.get_mut(&entity) {
+            bar.set_pickup_skip(Rational::new(num, den));
+        }
+    }
+
+    pub fn bar_clear_skip(&mut self, entity: usize) {
+        let entity = Entity::new(entity);
+        if let Some(bar) = self.bars.get_mut(&entity) {
+            bar.clear_pickup_skip();
+        }
+    }
+
     /// Create a RestNoteChord, without attaching it to a bar.
     pub fn rnc_create(
         &mut self,

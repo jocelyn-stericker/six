@@ -171,6 +171,16 @@ const SheetEdit = forwardRef(function SheetEdit(
                         ? "six-bar-hover"
                         : "six-bar"
                     }
+                    skipNum={
+                      barIdx === 0
+                        ? appState.song.global.pickupSkip?.[0]
+                        : undefined
+                    }
+                    skipDen={
+                      barIdx === 0
+                        ? appState.song.global.pickupSkip?.[1]
+                        : undefined
+                    }
                   >
                     {bar.notes.map(
                       (

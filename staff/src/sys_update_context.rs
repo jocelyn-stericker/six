@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{BetweenBars, Staff};
 use entity::{Entity, Join};
+use num_rational::Rational;
 use pitch::{key_signature_note_names, Clef, NoteModifier, NoteName};
 use rest_note_chord::{Context, PitchKind, RestNoteChord};
 use rhythm::Bar;
@@ -21,13 +22,20 @@ pub fn sys_update_context(
         let mut key = 0;
         let mut time = (4, 4);
         let mut def_accidentals: HashMap<(NoteName, i8), NoteModifier> = HashMap::new();
+        let mut start_beat = Rational::new(0, 1);
 
-        for child in children {
+        for (i, child) in children.iter().enumerate() {
+            // HACK: get correct correct pickup start
+            if let Some(bar) = children.get(i + 1).and_then(|c| bars.get(c)) {
+                start_beat = bar.skip();
+            }
+
             if let Some(context) = contexts.get_mut(child) {
                 context.bar = idx;
                 context.clef = clef;
                 context.key = key;
                 context.time = time;
+                context.beat = start_beat;
                 context.accidentals = def_accidentals.clone();
             }
             if let Some(bar) = bars.get(child) {

@@ -18,6 +18,7 @@ export interface Global {
   title: string;
   author: string;
   between: [Between, ...Array<Partial<Between> | undefined>];
+  pickupSkip: [number, number] | undefined;
 }
 
 export type TiedNote = Array<{

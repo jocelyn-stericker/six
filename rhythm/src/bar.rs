@@ -17,6 +17,11 @@ pub enum Lifetime {
     /// This should be considered empty space, and can be replaced without explicit user intent.
     AutomaticRest,
 
+    /// This is a rest that is hidden.
+    ///
+    /// Used, for example, in pickup beats.
+    HiddenRest,
+
     /// The user is hovering over a space and this is a preview.
     ///
     /// Moving the cursor will remove this note or rest.
@@ -50,9 +55,16 @@ impl Lifetime {
         }
     }
 
+    pub fn is_hidden(&self) -> bool {
+        match self {
+            Lifetime::HiddenRest => true,
+            _ => false,
+        }
+    }
+
     fn to_option(self) -> Option<Entity> {
         match self {
-            Lifetime::AutomaticRest => None,
+            Lifetime::AutomaticRest | Lifetime::HiddenRest => None,
             Lifetime::Temporary(e) | Lifetime::Explicit(e) => Some(e),
         }
     }
@@ -78,6 +90,9 @@ pub struct Bar {
 
     /// Automatically-generated ("managed") rests, managed by sys_update_rnc_timing.
     managed: Vec<Entity>,
+
+    // For pickup bars, the number of beats that are skipped.
+    skip: Rational,
 }
 
 impl Bar {
@@ -87,6 +102,7 @@ impl Bar {
             metre,
             rhythm: vec![],
             managed: vec![],
+            skip: Rational::zero(),
         }
     }
 
@@ -100,6 +116,10 @@ impl Bar {
 
     pub fn rhythm(&self) -> &Vec<(Duration, Lifetime)> {
         &self.rhythm
+    }
+
+    pub fn skip(&self) -> Rational {
+        self.skip
     }
 
     /// Replace whole rests with segment-length rests.
@@ -568,6 +588,25 @@ impl Bar {
         ret
     }
 
+    pub fn set_pickup_skip(&mut self, t: Rational) {
+        self.clear_pickup_skip();
+        self.skip = t;
+        self.splice(
+            Rational::zero(),
+            vec![(Duration::exact(t, None), Lifetime::HiddenRest)],
+        );
+    }
+
+    pub fn clear_pickup_skip(&mut self) {
+        if self.skip.is_positive() {
+            self.splice(
+                Rational::zero(),
+                vec![(Duration::exact(self.skip, None), Lifetime::AutomaticRest)],
+            );
+        }
+        self.skip = Rational::zero();
+    }
+
     /// Determine how a note at a given position time be spelled, rhythmically.
     pub fn split_note(&self, t: Rational, duration: Duration) -> Vec<Duration> {
         self.metre_split_note(t, duration, true)
@@ -848,16 +887,19 @@ impl Bar {
 
         self.rhythm
             .iter()
-            .map(|(rhy, entity)| {
-                let data = (
-                    *rhy,
-                    start,
-                    entity
-                        .to_option()
-                        .unwrap_or_else(|| *managed.next().unwrap()),
-                    entity.is_automatic(),
-                );
-
+            .filter_map(|(rhy, entity)| {
+                let data = if entity.is_hidden() {
+                    None
+                } else {
+                    Some((
+                        *rhy,
+                        start,
+                        entity
+                            .to_option()
+                            .unwrap_or_else(|| *managed.next().unwrap()),
+                        entity.is_automatic(),
+                    ))
+                };
                 start += rhy.duration();
 
                 data

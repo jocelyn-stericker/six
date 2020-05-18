@@ -81,6 +81,8 @@ export interface BarProps extends Stylable {
   ref?: Ref<number>;
   numer: number;
   denom: number;
+  skipNum?: number | undefined;
+  skipDen?: number | undefined;
   children?: any;
 }
 
@@ -107,14 +109,20 @@ export interface RncProps extends Stylable {
   pitchModifier?: number;
 }
 
-// TODO: dedupe with JSX.IntrinsicElements
 type CreateInstanceParam =
   | { type: "song"; props: SongProps }
   | { type: "staff"; props: StaffProps }
   | { type: "bar"; props: BarProps }
   | { type: "between"; props: BetweenBarsProps }
-  | { type: "rnc"; props: RncProps }
-  | { type: never; props: never };
+  | { type: "rnc"; props: RncProps };
+
+type TypedInstrinsicProps = {
+  song: SongProps;
+  staff: StaffProps;
+  bar: BarProps;
+  between: BetweenBarsProps;
+  rnc: RncProps;
+};
 
 let context = document.createElement("canvas").getContext("2d", {});
 
@@ -154,8 +162,12 @@ function createInstance(
     type = "staff";
     entity = container.staff_create();
   } else if (spec.type === "bar") {
-    (type = "bar"),
-      (entity = container.bar_create(spec.props.numer, spec.props.denom));
+    type = "bar";
+    entity = container.bar_create(spec.props.numer, spec.props.denom);
+
+    if (spec.props.skipDen != null && spec.props.skipNum != null) {
+      container.bar_set_skip(entity, spec.props.skipNum, spec.props.skipDen);
+    }
   } else if (spec.type === "between") {
     type = "between";
     entity = container.between_bars_create(
@@ -298,99 +310,128 @@ const Reconciler = ReactReconciler({
   commitUpdate(
     instance: Instance,
     _updatePayload: any,
-    type,
-    oldProps: any,
-    newProps: any,
+    type: keyof TypedInstrinsicProps,
+    oldProps: TypedInstrinsicProps[typeof type],
+    newProps: TypedInstrinsicProps[typeof type],
     _finishedWork,
   ) {
-    if (type === "song" && oldProps.freezeSpacing !== newProps.freezeSpacing) {
-      instance.container.song_set_freeze_spacing(
-        instance.entity,
-        newProps.freezeSpacing,
-      );
+    function is<T extends keyof TypedInstrinsicProps>(
+      type: string,
+      matches: T,
+      _props1: unknown,
+    ): _props1 is TypedInstrinsicProps[T] {
+      return type === matches;
     }
 
-    if (
-      type === "song" &&
-      (oldProps.width !== newProps.width || oldProps.height !== newProps.height)
-    ) {
-      instance.container.song_set_size(
-        instance.entity,
-        newProps.width,
-        newProps.height,
-      );
-    }
+    if (is(type, "song", oldProps) && is(type, "song", newProps)) {
+      if (oldProps.freezeSpacing !== newProps.freezeSpacing) {
+        instance.container.song_set_freeze_spacing(
+          instance.entity,
+          newProps.freezeSpacing,
+        );
+      }
 
-    if (type === "song" && oldProps.title !== newProps.title) {
-      const title = newProps.title || "Untitled";
-      instance.container.song_set_title(
-        instance.entity,
-        title,
-        getTextWidth(7, title),
-      );
-    }
+      if (
+        oldProps.width !== newProps.width ||
+        oldProps.height !== newProps.height
+      ) {
+        instance.container.song_set_size(
+          instance.entity,
+          newProps.width,
+          newProps.height,
+        );
+      }
 
-    if (type === "song" && oldProps.author !== newProps.author) {
-      const author = newProps.author || "Anonymous";
-      instance.container.song_set_author(
-        instance.entity,
-        author,
-        getTextWidth(5, author),
-      );
-    }
+      if (type === "song" && oldProps.title !== newProps.title) {
+        const title = newProps.title || "Untitled";
+        instance.container.song_set_title(
+          instance.entity,
+          title,
+          getTextWidth(7, title),
+        );
+      }
 
-    if (
-      type === "rnc" &&
-      (oldProps.startNum !== newProps.startNum ||
-        oldProps.startDen !== newProps.startDen ||
-        oldProps.noteValue !== newProps.noteValue ||
-        oldProps.dots !== newProps.dots)
-    ) {
-      instance.container.rnc_update_time(
-        instance.entity,
-        newProps.noteValue,
-        newProps.dots,
-        newProps.startNum,
-        newProps.startDen,
-        newProps.isTemporary,
-      );
-    }
-
-    if (
-      type === "rnc" &&
-      (oldProps.isNote !== newProps.isNote || oldProps.pitch !== newProps.pitch)
-    ) {
-      if (newProps.isNote) {
-        if (newProps.pitch == null) {
-          instance.container.rnc_set_unpitched(instance.entity);
-        } else {
-          instance.container.rnc_set_pitch(
-            instance.entity,
-            newProps.pitch,
-            newProps.pitchModifier ?? 0,
-          );
-        }
-      } else {
-        instance.container.rnc_set_rest(instance.entity);
+      if (oldProps.author !== newProps.author) {
+        const author = newProps.author || "Anonymous";
+        instance.container.song_set_author(
+          instance.entity,
+          author,
+          getTextWidth(5, author),
+        );
       }
     }
 
-    if (
-      type === "between" &&
-      (oldProps.clef !== newProps.clef ||
+    if (is(type, "rnc", oldProps) && is(type, "rnc", newProps)) {
+      if (
+        oldProps.startNum !== newProps.startNum ||
+        oldProps.startDen !== newProps.startDen ||
+        oldProps.noteValue !== newProps.noteValue ||
+        oldProps.dots !== newProps.dots
+      ) {
+        instance.container.rnc_update_time(
+          instance.entity,
+          newProps.noteValue,
+          newProps.dots,
+          newProps.startNum,
+          newProps.startDen,
+          newProps.isTemporary,
+        );
+      }
+
+      if (
+        oldProps.isNote !== newProps.isNote ||
+        oldProps.pitch !== newProps.pitch
+      ) {
+        if (newProps.isNote) {
+          if (newProps.pitch == null) {
+            instance.container.rnc_set_unpitched(instance.entity);
+          } else {
+            instance.container.rnc_set_pitch(
+              instance.entity,
+              newProps.pitch,
+              newProps.pitchModifier ?? 0,
+            );
+          }
+        } else {
+          instance.container.rnc_set_rest(instance.entity);
+        }
+      }
+    }
+
+    if (is(type, "bar", oldProps) && is(type, "bar", newProps)) {
+      if (
+        oldProps.skipNum !== newProps.skipNum ||
+        oldProps.skipDen !== newProps.skipDen
+      ) {
+        if (newProps.skipNum != null && newProps.skipDen != null) {
+          instance.container.bar_set_skip(
+            instance.entity,
+            newProps.skipNum,
+            newProps.skipDen,
+          );
+        } else {
+          instance.container.bar_clear_skip(instance.entity);
+        }
+      }
+    }
+
+    if (is(type, "between", oldProps) && is(type, "between", newProps)) {
+      if (
+        oldProps.clef !== newProps.clef ||
         oldProps.tsNum !== newProps.tsNum ||
         oldProps.tsDen !== newProps.tsDen ||
         oldProps.ks !== newProps.ks ||
-        oldProps.barline !== newProps.barline)
-    ) {
-      instance.container.between_bars_update(
-        instance.entity,
-        newProps.barline,
-        newProps.clef,
-        newProps.tsNum,
-        newProps.tsDen,
-        newProps.ks,
-      );
+        oldProps.barline !== newProps.barline
+      ) {
+        instance.container.between_bars_update(
+          instance.entity,
+          newProps.barline,
+          newProps.clef,
+          newProps.tsNum,
+          newProps.tsDen,
+          newProps.ks,
+        );
+      }
     }
 
     if (oldProps.className !== newProps.className) {

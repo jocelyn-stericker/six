@@ -192,6 +192,29 @@ export function setAuthor(appState: State, author: string): SetAuthor {
   };
 }
 
+export interface SetPickupSkip {
+  type: "SET_PICKUP";
+  pickupSkip: [number, number] | undefined;
+  prevPickupSkip: [number, number] | undefined;
+}
+export function setPickupSkip(
+  appState: State,
+  pickupSkip: [number, number],
+): SetPickupSkip {
+  return {
+    type: "SET_PICKUP",
+    pickupSkip,
+    prevPickupSkip: appState.song.global.pickupSkip,
+  };
+}
+export function clearPickupSkip(appState: State): SetPickupSkip {
+  return {
+    type: "SET_PICKUP",
+    pickupSkip: undefined,
+    prevPickupSkip: appState.song.global.pickupSkip,
+  };
+}
+
 export interface Undo {
   type: "UNDO";
 }
@@ -231,7 +254,8 @@ export type Invertible =
   | RemoveBar
   | SetBarCount
   | SetTitle
-  | SetAuthor;
+  | SetAuthor
+  | SetPickupSkip;
 
 export type NonInvertible = Undo | Redo | Reset | Load;
 

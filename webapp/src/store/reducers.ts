@@ -15,6 +15,7 @@ export function getInitialState(): State {
             clef: "g",
           },
         ],
+        pickupSkip: undefined,
       },
       part: {
         bars: Array(9)
@@ -165,6 +166,10 @@ function apply(state: State, action: Invertible) {
       state.song.global.author = action.author;
       break;
     }
+    case "SET_PICKUP": {
+      state.song.global.pickupSkip = action.pickupSkip;
+      break;
+    }
   }
 }
 
@@ -241,6 +246,12 @@ function invert(action: Invertible): Invertible {
         prevClef: action.clef,
         beforeBar: action.beforeBar,
       };
+    case "SET_PICKUP":
+      return {
+        type: "SET_PICKUP",
+        pickupSkip: action.prevPickupSkip,
+        prevPickupSkip: action.pickupSkip,
+      };
   }
 }
 
@@ -255,6 +266,7 @@ export function reduce(state: State, action: Action): State {
     case "ADD_BAR":
     case "REMOVE_BAR":
     case "SET_BAR_COUNT":
+    case "SET_PICKUP":
       apply(state, action);
       state.undoStack.push(action);
       state.redoStack = [];
