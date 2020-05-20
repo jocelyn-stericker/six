@@ -1,0 +1,21 @@
+@import "../colours";
+
+.note {
+  fill: black;
+}
+
+.bar {
+  fill: black;
+  transition: fill 100ms ease-in-out;
+}
+
+.barHover {
+  fill: $paragraph;
+  transition: fill 100ms ease-in-out;
+}
+
+.noteHoverPreview {
+  fill: $illTertiary;
+  stroke: $illTertiary;
+  stroke-width: 25;
+}

@@ -8,6 +8,9 @@ import {
   Radio,
   RadioGroup,
 } from "@blueprintjs/core";
+import "@blueprintjs/core/lib/css/blueprint.css";
+import cx from "classnames";
+
 import {
   Action,
   clearPickupSkip,
@@ -22,9 +25,8 @@ import {
   State,
 } from "../store";
 
-import "@blueprintjs/core/lib/css/blueprint.css";
-import "../blueprint/theme.css";
-import "./meta.css";
+import "../blueprint/theme.scss";
+import css from "./meta.module.scss";
 
 interface Props {
   appState: State;
@@ -39,9 +41,13 @@ export default function Meta({ appState, dispatch }: Props) {
   const maxBars = 20;
   return (
     <React.Fragment>
-      <div className="meta bp3-dark">
+      <div className={cx(css.meta, "bp3-dark")}>
         <h2>About this Song</h2>
-        <FormGroup label="Title" labelFor="meta-title" className="meta-group">
+        <FormGroup
+          label="Title"
+          labelFor="meta-title"
+          className={css.metaGroup}
+        >
           <InputGroup
             id="meta-title"
             placeholder="Untitled"
@@ -53,7 +59,11 @@ export default function Meta({ appState, dispatch }: Props) {
             }}
           />
         </FormGroup>
-        <FormGroup label="Author" labelFor="meta-author" className="meta-group">
+        <FormGroup
+          label="Author"
+          labelFor="meta-author"
+          className={css.metaGroup}
+        >
           <InputGroup
             id="meta-author"
             placeholder="Anonymous"
@@ -80,7 +90,7 @@ export default function Meta({ appState, dispatch }: Props) {
           />
         </FormGroup>
       </div>
-      <div className="meta bp3-dark">
+      <div className={cx(css.meta, "bp3-dark")}>
         <h2>First Bar</h2>
         <FormGroup label="Clef">
           <RadioGroup
@@ -103,7 +113,7 @@ export default function Meta({ appState, dispatch }: Props) {
         <FormGroup
           label="Key Signature"
           labelFor="meta-ks"
-          className="meta-group"
+          className={css.metaGroup}
         >
           <HTMLSelect
             disabled={appState.song.global.between[0].clef === "percussion"}
@@ -147,7 +157,7 @@ export default function Meta({ appState, dispatch }: Props) {
               dispatch(setTs(appState, { beforeBar: 0, ts: [num, den] }));
             }}
             selectedValue={`${appState.song.global.between[0].ts[0]}/${appState.song.global.between[0].ts[1]}`}
-            className="meta-ts-select"
+            className={css.metaTsSelect}
           >
             <Radio label="4/4" value="4/4" />
             <Radio label="2/2" value="2/2" />

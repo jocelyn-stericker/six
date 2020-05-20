@@ -1,5 +1,8 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { newRender, render } from "./reconciler";
+
+import css from "./index.module.scss";
+
 export { Clef } from "./reconciler";
 
 export type RustRenderApi = import("./reconciler").RustRenderApi;
@@ -171,7 +174,7 @@ export default function Renderer(props: Props) {
   return (
     <>
       <svg
-        className="six-sheet"
+        className={css.sheet}
         viewBox={`0 0 ${pageSize.width} ${pageSize.height}`}
         width="100%"
         ref={svg}

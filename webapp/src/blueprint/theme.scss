@@ -1,14 +1,16 @@
+@import "../colours";
+
 body .bp3-tooltip .bp3-popover-content {
-    background: #004643;
-    color: #abd1c6;
+  background: $bg;
+  color: $paragraph;
 }
 
 body .bp3-tooltip .bp3-popover-arrow-fill,
 body .bp3-tooltip .bp3-popover-arrow-border {
-    fill: #004643;
+  fill: $bg;
 }
 
 body .bp3-dark .bp3-menu {
-    background: #004643;
-    color: #abd1c6;
+  background: $bg;
+  color: $paragraph;
 }

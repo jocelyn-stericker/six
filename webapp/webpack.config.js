@@ -19,8 +19,34 @@ module.exports = {
         use: [{ loader: "file-loader" }],
       },
       {
-        test: /\.css$/i,
-        use: ["style-loader", "css-loader"],
+        test: /\.((c|sa|sc)ss)$/i,
+        exclude: /module\.((c|sa|sc)ss)$/i,
+
+        use: [
+          "style-loader",
+          {
+            loader: "css-loader",
+            options: { importLoaders: 1 },
+          },
+          {
+            loader: "sass-loader",
+          },
+        ],
+      },
+      {
+        test: /\.((c|sa|sc)ss)$/i,
+        include: /module\.((c|sa|sc)ss)$/i,
+
+        use: [
+          "style-loader",
+          {
+            loader: "css-loader",
+            options: { modules: true, importLoaders: 1 },
+          },
+          {
+            loader: "sass-loader",
+          },
+        ],
       },
       {
         test: /\.m?[jt]sx?$/,

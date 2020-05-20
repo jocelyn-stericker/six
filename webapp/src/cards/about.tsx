@@ -1,9 +1,9 @@
 import React from "react";
-import "./about.css";
+import css from "./about.module.scss";
 
 export default function About() {
   return (
-    <div className="about">
+    <div className={css.about}>
       <p>
         This is an early version of Six Eight, a lightweight lead sheet (chords
         + melody + lyrics) editor by{" "}

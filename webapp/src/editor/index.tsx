@@ -13,6 +13,7 @@ import splitDurationIntoParts, {
   NoteAddPatch,
 } from "./split_duration_into_parts";
 import Between from "./between";
+import css from "./index.module.scss";
 
 const NotePopover = React.lazy(() => import("./note_popover"));
 const NoteInsertMenu = React.lazy(() => import("./note_insert_menu"));
@@ -168,8 +169,8 @@ const SheetEdit = forwardRef(function SheetEdit(
                     denom={currTs[1]}
                     className={
                       preview && preview.barIdx === barIdx
-                        ? "six-bar-hover"
-                        : "six-bar"
+                        ? css.barHover
+                        : css.bar
                     }
                     skipNum={
                       barIdx === 0
@@ -191,7 +192,7 @@ const SheetEdit = forwardRef(function SheetEdit(
                           {divisions.map(
                             ({ noteValue, dots, startTime }, jdx) => (
                               <rnc
-                                className="six-real-note"
+                                className={css.note}
                                 key={jdx}
                                 noteValue={noteValue}
                                 dots={dots}
@@ -239,7 +240,7 @@ const SheetEdit = forwardRef(function SheetEdit(
                       preview.divisions.map((div, idx) => (
                         <rnc
                           key={idx}
-                          className="six-note-to-add"
+                          className={css.noteHoverPreview}
                           noteValue={div.noteValue}
                           dots={div.dots}
                           startNum={div.startTime[0]}

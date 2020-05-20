@@ -1,0 +1,79 @@
+@import "../colours";
+
+.meta {
+  color: $paragraph;
+  margin: 16px auto 24px;
+  padding: 0 16px 16px;
+  font-size: 16px;
+  border: 1px solid $paragraph;
+  max-width: 1002px;
+  border-radius: 3px;
+}
+
+.meta h1,
+.meta h2,
+.meta h3,
+.meta h4,
+.meta h5 {
+  color: $headline;
+}
+
+.metaGroup {
+  max-width: 400px;
+}
+
+.meta input {
+  background: $bg;
+  color: $headline;
+  border: 1px solid $paragraph;
+  outline-color: $illTertiary;
+}
+
+.meta :global(input.bp3-input:focus) {
+  outline-color: $illTertiary;
+  box-shadow: 0 0 0 1px $illTertiary, 0 0 0 3px $illTertiary,
+    inset 0 1px 1px $illTertiary;
+}
+
+.meta :global(.bp3-numeric-input .bp3-button-group) {
+  border: 1px solid $paragraph;
+  border-left: none;
+}
+
+.meta :global(.bp3-numeric-input button.bp3-button),
+.meta :global(.bp3-numeric-input button.bp3-button:hover) {
+  box-shadow: none;
+  background: none;
+}
+
+.meta :global(.bp3-numeric-input button.bp3-button:hover) svg {
+  color: $illTertiary;
+}
+
+.meta input::placeholder {
+  color: $paragraph;
+  opacity: 0.5;
+}
+
+.meta p {
+  margin-bottom: 10px;
+}
+
+.meta a {
+  color: $button;
+  text-decoration: underline;
+}
+
+.metaTsSelect {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.metaTsSelect label {
+  margin-right: 12px;
+}
+
+.metaTsSelect :global(.bp3-divider) {
+  margin-right: 16px;
+  border-color: $paragraph;
+}

@@ -1,0 +1,27 @@
+@import "../colours";
+
+.about {
+  color: $paragraph;
+  margin: 16px auto 24px !important;
+  max-width: 1002px;
+  margin: 0;
+  border: none;
+  font-size: 16px;
+}
+
+.about h1,
+.about h2,
+.about h3,
+.about h4,
+.about h5 {
+  color: $headline;
+}
+
+.about p {
+  margin-bottom: 10px;
+}
+
+.about a {
+  color: $button;
+  text-decoration: underline;
+}

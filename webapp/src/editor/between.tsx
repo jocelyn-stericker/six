@@ -11,6 +11,7 @@ import {
   State,
 } from "../store";
 import { Barline, Clef } from "../renderer";
+import css from "./between.module.scss";
 
 const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
 
@@ -52,7 +53,7 @@ export default function Between({
       tsNum={between?.ts?.[0]}
       tsDen={between?.ts?.[1]}
       ks={between?.ks}
-      className="between-bars"
+      className={css.betweenBars}
       html={({ width, height }) => (
         <React.Suspense fallback={null}>
           <BetweenBarPopover
@@ -92,7 +93,7 @@ export default function Between({
             }
           >
             <div
-              className="between-edit"
+              className={css.betweenEdit}
               style={{
                 width,
                 height,

@@ -1,0 +1,7 @@
+.sheet {
+  touch-action: manipulation;
+}
+
+.sheet > g {
+  pointer-events: none;
+}
