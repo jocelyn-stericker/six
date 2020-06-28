@@ -5,5 +5,6 @@ declare namespace JSX {
     bar: import("./reconciler").BarProps;
     rnc: import("./reconciler").RncProps;
     between: import("./reconciler").BetweenBarsProps;
+    cursor: import("./reconciler").CursorProps;
   }
 }

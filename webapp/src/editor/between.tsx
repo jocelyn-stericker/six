@@ -10,7 +10,7 @@ import {
   setTs,
   State,
 } from "../store";
-import { Barline, Clef } from "../renderer";
+import { Barline, Clef } from "../scene";
 import css from "./between.module.scss";
 
 const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));

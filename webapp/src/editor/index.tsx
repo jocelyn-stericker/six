@@ -1,29 +1,33 @@
 import React, {
   createRef,
   forwardRef,
+  useCallback,
+  useEffect,
   useImperativeHandle,
   useMemo,
   useRef,
   useState,
 } from "react";
 
-import Sheet, { RustRenderApi } from "../renderer";
-import { Action, addNote, removeNote, State } from "../store";
+import Scene, { RustRenderApi } from "../scene";
+import { Action, addNote, removeNote, State, undo } from "../store";
 import splitDurationIntoParts, {
   NoteAddPatch,
 } from "./split_duration_into_parts";
+import EditorHotkeys from "./hotkeys";
 import Between from "./between";
+import Keyboard, { KeyboardRef } from "./keyboard";
 import css from "./index.module.scss";
+import appCss from "../app.module.scss";
 
 const NotePopover = React.lazy(() => import("./note_popover"));
-const NoteInsertMenu = React.lazy(() => import("./note_insert_menu"));
 
 interface Props {
   appState: State;
   dispatch: (action: Action) => void;
 }
 
-const SheetEdit = forwardRef(function SheetEdit(
+const Editor = forwardRef(function Editor(
   { appState, dispatch }: Props,
   ref: React.Ref<{ getPDF: () => string }>,
 ) {
@@ -36,13 +40,20 @@ const SheetEdit = forwardRef(function SheetEdit(
     [appState.song.part.bars.length],
   );
 
-  const [preview, setPreview] = useState<NoteAddPatch | null>(null);
-  const [numChanges, setNumChanges] = useState(0);
-  const [noteMutationClickPos, setNoteMutationClickPos] = useState<
-    [number, number] | null
-  >(null);
+  const [time, setTime] = useState<[number, number, number] | null>([0, 0, 1]);
+  const [duration, setDuration] = useState(4);
 
-  const hoverMatchesAny = false;
+  const pickup = appState.song.global.pickupSkip;
+  const [focused, setFocused] = useState(false);
+
+  if (
+    pickup &&
+    time &&
+    time[0] === 0 &&
+    time[1] / time[2] < pickup[0] / pickup[1]
+  ) {
+    setTime([0, pickup[0], pickup[1]]);
+  }
 
   let currTs = appState.song.global.between[0].ts;
 
@@ -57,217 +68,336 @@ const SheetEdit = forwardRef(function SheetEdit(
     },
   }));
 
-  return (
-    <div
-      style={{ position: "relative" }}
-      onMouseOut={() => {
-        if (!noteMutationClickPos) {
-          setPreview(null);
-        }
-      }}
-    >
-      {noteMutationClickPos && preview && (
-        <React.Suspense fallback={null}>
-          <NoteInsertMenu
-            pos={noteMutationClickPos}
-            pitchModifier={preview.pitch.modifier ?? null}
-            onClose={() => {
-              setPreview(null);
-              setNoteMutationClickPos(null);
-            }}
-            onAddNote={(duration, modifier) => {
-              let insertion = splitDurationIntoParts(
-                songRef.current,
-                appState,
-                barRefs[preview.barIdx].current,
-                preview.barIdx,
-                [preview.startTime[0], preview.startTime[1]],
-                duration,
-                preview.pitch,
-              );
-              setPreview(null);
-              if (insertion) {
-                dispatch(
-                  addNote({
-                    barIdx: insertion.barIdx,
-                    startTime: insertion.startTime,
-                    divisions: insertion.divisions,
-                    pitch: {
-                      base: preview.pitch.base,
-                      modifier,
-                    },
-                  }),
-                );
-              }
-              setNoteMutationClickPos(null);
-              setNumChanges(numChanges + 1);
-            }}
-          />
-        </React.Suspense>
-      )}
-      <Sheet
-        onHover={hoverInfo => {
-          if (noteMutationClickPos) {
-            return;
-          }
-          if (
-            hoverInfo.bar == null ||
-            hoverInfo.time == null ||
-            hoverInfo.pitch == null
-          ) {
-            setPreview(null);
-            return;
-          }
-          setPreview(
-            splitDurationIntoParts(
-              songRef.current,
-              appState,
-              barRefs[hoverInfo.bar].current,
-              hoverInfo.bar,
-              hoverInfo.time,
-              [1, 4],
-              hoverInfo.pitch,
-            ),
-          );
-        }}
-        onMouseDown={(_, ev) => {
-          if (preview) {
-            const rect = ev.currentTarget.getBoundingClientRect();
-            setNoteMutationClickPos([
-              ev.clientX - rect.left,
-              ev.clientY - rect.top,
-            ]);
-          }
-        }}
-      >
-        <song
-          freezeSpacing={preview == null ? undefined : numChanges}
-          ref={songRef}
-          width={215.9}
-          height={279.4}
-          title={appState.song.global.title}
-          author={appState.song.global.author}
-        >
-          <staff>
-            <Between
-              appState={appState}
-              dispatch={ev => {
-                setNumChanges(numChanges + 1);
-                dispatch(ev);
-              }}
-              beforeBar={0}
-            />
-            {appState.song.part.bars.map((bar, barIdx) => {
-              currTs = appState.song.global.between[barIdx]?.ts ?? currTs;
+  const preview: NoteAddPatch | null = useMemo(() => {
+    // Generate temporary preview taking into account cursor position.
+    if (songRef.current && time) {
+      const bar = barRefs[time[0]];
+      if (!bar) {
+        setTime([0, 0, 1]);
+        return null;
+      }
 
-              // TODO: have stable keys even when adding/removing bars.
-              return (
-                <React.Fragment key={`${currTs[0]}_${currTs[1]}_${barIdx}`}>
-                  <bar
-                    ref={barRefs[barIdx]}
-                    numer={currTs[0]}
-                    denom={currTs[1]}
-                    className={
-                      preview && preview.barIdx === barIdx
-                        ? css.barHover
-                        : css.bar
-                    }
-                    skipNum={
-                      barIdx === 0
-                        ? appState.song.global.pickupSkip?.[0]
-                        : undefined
-                    }
-                    skipDen={
-                      barIdx === 0
-                        ? appState.song.global.pickupSkip?.[1]
-                        : undefined
-                    }
-                  >
-                    {bar.notes.map(
-                      (
-                        { divisions, startTime: tiedStartTime, pitch },
-                        divisionIdx,
-                      ) => (
-                        <React.Fragment key={divisionIdx}>
-                          {divisions.map(
-                            ({ noteValue, dots, startTime }, jdx) => (
-                              <rnc
-                                className={css.note}
-                                key={jdx}
-                                noteValue={noteValue}
-                                dots={dots}
-                                startNum={startTime[0]}
-                                startDen={startTime[1]}
-                                isNote={true}
-                                isTemporary={false}
-                                pitch={pitch.base}
-                                pitchModifier={pitch.modifier}
-                                html={({ width, height }) => (
-                                  <React.Suspense fallback={null}>
-                                    <NotePopover
-                                      onDeleteNote={() => {
-                                        setNumChanges(numChanges + 1);
-                                        dispatch(
-                                          removeNote({
-                                            barIdx,
-                                            startTime: tiedStartTime,
-                                            divisions,
-                                            pitch,
-                                          }),
-                                        );
-                                      }}
-                                    >
-                                      <div
-                                        onMouseOver={() => setPreview(null)}
-                                        style={{
-                                          width,
-                                          height,
-                                          cursor: "pointer",
-                                        }}
-                                      />
-                                    </NotePopover>
-                                  </React.Suspense>
+      const patch = splitDurationIntoParts(
+        songRef.current,
+        appState,
+        bar.current,
+        time[0],
+        [time[1], time[2]],
+        [1, duration],
+      );
+      return patch;
+    } else {
+      return null;
+    }
+  }, [time, songRef, appState, barRefs, duration]);
+
+  const staff = useRef<number>(null);
+
+  const addTime = useCallback(
+    (add: [number, number]) => {
+      if (staff.current && time) {
+        const newTime = songRef.current?.staff_time_cursor_add(
+          staff.current,
+          time[0],
+          time[1],
+          time[2],
+          add[0],
+          add[1],
+        );
+        if (newTime) {
+          setTime([newTime[0], newTime[1], newTime[2]]);
+        }
+      }
+    },
+    [time, songRef],
+  );
+
+  const keyboard = useRef<KeyboardRef>(null);
+
+  const handleTimeBack = useCallback(() => {
+    keyboard.current?.onPhysicalKeyPress("back");
+    setTimeout(() => {
+      addTime([-1, 8]);
+    }, 0);
+  }, [addTime]);
+
+  const handleTimeForward = useCallback(() => {
+    keyboard.current?.onPhysicalKeyPress("forward");
+    setTimeout(() => {
+      addTime([1, 8]);
+    }, 0);
+  }, [addTime]);
+
+  const handleOctaveUp = useCallback(() => {
+    keyboard.current?.onPhysicalKeyPress("up");
+    console.log("up");
+  }, []);
+
+  const handleOctaveDown = useCallback(() => {
+    keyboard.current?.onPhysicalKeyPress("down");
+    console.log("down");
+  }, []);
+
+  const editorDiv = useRef<HTMLDivElement>(null);
+
+  const handleFocusOut = useCallback(
+    _ev => {
+      setFocused(false);
+    },
+    [editorDiv, setTime],
+  );
+
+  const handleFocusIn = useCallback(() => {
+    if (time == null || preview == null) {
+      setTime([0, 0, 1]);
+    }
+    setFocused(true);
+  }, [time, preview, setTime]);
+
+  const handleNote = (base: string, mod: number) => {
+    keyboard.current?.onPhysicalKeyPress(base, mod);
+    const api = songRef.current;
+    if (!time || !api) {
+      return;
+    }
+
+    const durationFraction: [number, number] = [1, duration];
+    let insertion = splitDurationIntoParts(
+      api,
+      appState,
+      barRefs[time[0]].current,
+      time[0],
+      [time[1], time[2]],
+      durationFraction,
+    );
+    const midi = ({
+      C: 60,
+      D: 62,
+      E: 64,
+      F: 65,
+      G: 67,
+      A: 69,
+      B: 71,
+    } as { [key: string]: number })[base];
+
+    // We may have added less than durationFraction (e.g., if we're at the end of a bar, or before a note)
+    let actualFraction = insertion?.divisions
+      .map(d => api.util_duration_to_frac(d.noteValue, d.dots))
+      .reduce(
+        (memo, total): [number, number] => {
+          const frac = api.util_frac_add(memo[0], memo[1], total[0], total[1]);
+          return [frac[0], frac[1]];
+        },
+        [0, 1] as [number, number],
+      );
+
+    if (insertion && actualFraction) {
+      dispatch(
+        addNote({
+          barIdx: insertion.barIdx,
+          startTime: insertion.startTime,
+          divisions: insertion.divisions,
+          pitch: {
+            base: midi,
+            modifier: mod,
+          },
+        }),
+      );
+      addTime(actualFraction);
+    }
+  };
+
+  // React does not support focusout/focusin: https://github.com/facebook/react/issues/6410
+  useEffect(() => {
+    let x = editorDiv.current;
+    x?.addEventListener("focusout", handleFocusOut);
+    x?.addEventListener("focusin", handleFocusIn);
+    return () => {
+      x?.removeEventListener("focusout", handleFocusOut);
+      x?.removeEventListener("focusin", handleFocusIn);
+    };
+  }, [editorDiv, handleFocusOut, handleFocusIn]);
+
+  const [cursor, setCursor] = useState("default");
+
+  return (
+    <EditorHotkeys
+      onLeft={handleTimeBack}
+      onRight={handleTimeForward}
+      onUp={handleOctaveUp}
+      onDown={handleOctaveDown}
+      onNote={handleNote}
+      onDuration={setDuration}
+    >
+      <div className={appCss.editor} ref={editorDiv}>
+        <Keyboard
+          ref={keyboard}
+          onLeft={handleTimeBack}
+          onRight={handleTimeForward}
+          onUp={handleOctaveUp}
+          onDown={handleOctaveDown}
+          onDuration={setDuration}
+          duration={duration}
+          onUndo={() => {
+            dispatch(undo());
+          }}
+          onNote={handleNote}
+        />
+        <div style={{ position: "relative", cursor }}>
+          <Scene
+            onHover={hoverInfo => {
+              if ("bar" in hoverInfo && cursor !== "text") {
+                setCursor("text");
+              } else if (!("bar" in hoverInfo) && cursor === "text") {
+                setCursor("default");
+              }
+            }}
+            onMouseDown={(hoverInfo, _ev) => {
+              if (
+                hoverInfo &&
+                hoverInfo.bar != null &&
+                hoverInfo.time != null &&
+                hoverInfo.pitch != null
+              ) {
+                setTime([hoverInfo.bar, hoverInfo.time[0], hoverInfo.time[1]]);
+              }
+            }}
+          >
+            <song
+              freezeSpacing={preview ? appState.numChanges : undefined}
+              ref={songRef}
+              width={215.9}
+              height={279.4}
+              title={appState.song.global.title}
+              author={appState.song.global.author}
+            >
+              <staff ref={staff}>
+                <Between
+                  appState={appState}
+                  dispatch={ev => {
+                    dispatch(ev);
+                  }}
+                  beforeBar={0}
+                />
+                {appState.song.part.bars.map((bar, barIdx) => {
+                  currTs = appState.song.global.between[barIdx]?.ts ?? currTs;
+
+                  // TODO: have stable keys even when adding/removing bars.
+                  return (
+                    <React.Fragment key={`${currTs[0]}_${currTs[1]}_${barIdx}`}>
+                      <bar
+                        ref={barRefs[barIdx]}
+                        numer={currTs[0]}
+                        denom={currTs[1]}
+                        className={css.bar}
+                        skipNum={
+                          barIdx === 0
+                            ? appState.song.global.pickupSkip?.[0]
+                            : undefined
+                        }
+                        skipDen={
+                          barIdx === 0
+                            ? appState.song.global.pickupSkip?.[1]
+                            : undefined
+                        }
+                      >
+                        {bar.notes.map(
+                          (
+                            { divisions, startTime: tiedStartTime, pitch },
+                            divisionIdx,
+                          ) => (
+                            <React.Fragment key={divisionIdx}>
+                              {divisions.map(
+                                ({ noteValue, dots, startTime }, jdx) => (
+                                  <rnc
+                                    className={css.note}
+                                    key={jdx}
+                                    noteValue={noteValue}
+                                    dots={dots}
+                                    startNum={startTime[0]}
+                                    startDen={startTime[1]}
+                                    isNote={true}
+                                    isTemporary={false}
+                                    pitch={pitch.base}
+                                    pitchModifier={pitch.modifier}
+                                    html={({ width, height }) => (
+                                      <React.Suspense fallback={null}>
+                                        <NotePopover
+                                          onDeleteNote={() => {
+                                            dispatch(
+                                              removeNote({
+                                                barIdx,
+                                                startTime: tiedStartTime,
+                                                divisions,
+                                                pitch,
+                                              }),
+                                            );
+                                          }}
+                                        >
+                                          <div
+                                            style={{
+                                              width,
+                                              height,
+                                              cursor: "pointer",
+                                            }}
+                                          />
+                                        </NotePopover>
+                                      </React.Suspense>
+                                    )}
+                                  >
+                                    {focused &&
+                                      time &&
+                                      time[0] === barIdx &&
+                                      time[1] === startTime[0] &&
+                                      time[2] === startTime[1] && (
+                                        <cursor className={css.cursor} />
+                                      )}
+                                  </rnc>
+                                ),
+                              )}
+                            </React.Fragment>
+                          ),
+                        )}
+                        {preview &&
+                          preview.barIdx === barIdx &&
+                          preview.divisions.map((div, idx) => (
+                            <rnc
+                              key={idx}
+                              className={css.noteHoverPreview}
+                              noteValue={div.noteValue}
+                              dots={div.dots}
+                              startNum={div.startTime[0]}
+                              startDen={div.startTime[1]}
+                              isNote={false}
+                              isTemporary={true}
+                            >
+                              {focused &&
+                                time &&
+                                time[0] === barIdx &&
+                                time[1] === div.startTime[0] &&
+                                time[2] === div.startTime[1] && (
+                                  <cursor className={css.cursor} />
                                 )}
-                              />
-                            ),
-                          )}
-                        </React.Fragment>
-                      ),
-                    )}
-                    {!hoverMatchesAny &&
-                      preview &&
-                      preview.barIdx === barIdx &&
-                      preview.divisions.map((div, idx) => (
-                        <rnc
-                          key={idx}
-                          className={css.noteHoverPreview}
-                          noteValue={div.noteValue}
-                          dots={div.dots}
-                          startNum={div.startTime[0]}
-                          startDen={div.startTime[1]}
-                          isNote={true}
-                          isTemporary={true}
-                          pitch={preview.pitch.base}
-                          pitchModifier={preview.pitch.modifier}
-                        />
-                      ))}
-                  </bar>
-                  <Between
-                    appState={appState}
-                    dispatch={ev => {
-                      setNumChanges(numChanges + 1);
-                      dispatch(ev);
-                    }}
-                    beforeBar={barIdx + 1}
-                  />
-                </React.Fragment>
-              );
-            })}
-          </staff>
-        </song>
-      </Sheet>
-    </div>
+                            </rnc>
+                          ))}
+                      </bar>
+                      <Between
+                        appState={appState}
+                        dispatch={ev => {
+                          dispatch(ev);
+                        }}
+                        beforeBar={barIdx + 1}
+                      />
+                    </React.Fragment>
+                  );
+                })}
+              </staff>
+            </song>
+          </Scene>
+        </div>
+      </div>
+    </EditorHotkeys>
   );
 });
 
-export default React.memo(SheetEdit);
+export default React.memo(Editor);

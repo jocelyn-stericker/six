@@ -3,9 +3,7 @@ use rhythm::{Duration, NoteValue};
 use stencil::Stencil;
 
 use crate::context::Context;
-use entity::{Entity, Join};
 use pitch::{NoteModifier, Pitch};
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum PitchKind {
@@ -281,21 +279,6 @@ impl RestNoteChord {
         }
 
         (stencil, attachment_for_beam)
-    }
-}
-
-pub fn sys_print_rnc(
-    rnc: &HashMap<Entity, RestNoteChord>,
-    contexts: &HashMap<Entity, Context>,
-    beam_for_rnc: &HashMap<Entity, Entity>,
-    attachments: &mut HashMap<Entity, Option<Point>>,
-    stencils: &mut HashMap<Entity, Stencil>,
-) {
-    for (id, (rnc, context, stencil)) in (rnc, contexts, stencils).join() {
-        let has_beam = beam_for_rnc.contains_key(&id);
-        let result = rnc.print(context, has_beam);
-        *stencil = result.0;
-        *attachments.entry(id).or_default() = result.1;
     }
 }
 

@@ -12,8 +12,9 @@ use kurbo::{Affine, Point, Rect, Size, Vec2};
 use num_rational::Rational;
 use pitch::{Clef, NoteModifier, Pitch};
 use rest_note_chord::{
-    sys_apply_warp, sys_draft_beaming, sys_print_beams, sys_print_rnc, sys_record_space_time_warp,
-    sys_space_beams, sys_update_rnc_timing, Beam, Context, PitchKind, RestNoteChord, SpaceTimeWarp,
+    sys_apply_warp, sys_draft_beaming, sys_print_beams, sys_print_cursors, sys_print_rnc,
+    sys_record_space_time_warp, sys_space_beams, sys_update_rnc_timing, Beam, Context, PitchKind,
+    RestNoteChord, SpaceTimeWarp,
 };
 use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing};
 use staff::{
@@ -21,6 +22,7 @@ use staff::{
     sys_update_context, Barline, BetweenBars, BreakIntoLineComponents, LineOfStaff, Staff,
 };
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use stencil::{sys_update_world_bboxes, Pdf, Stencil, StencilMap};
 use wasm_bindgen::prelude::*;
 
@@ -117,6 +119,7 @@ pub struct Render {
     ordered_children: HashMap<Entity, Vec<Entity>>,
     warps: HashMap<Entity, SpaceTimeWarp>,
     attachments: HashMap<Entity, Option<Point>>,
+    cursors: HashMap<Entity, ()>,
 }
 
 /// A DOM-based interface to Six Eight's ECS.
@@ -251,6 +254,73 @@ impl Render {
         entity.id()
     }
 
+    fn bar_by_index(&self, staff_children: &Vec<Entity>, idx: usize) -> Option<Entity> {
+        let mut i = 0;
+        for child in staff_children {
+            if self.bars.contains_key(child) {
+                if i == idx {
+                    return Some(*child);
+                }
+                i += 1;
+            }
+        }
+        None
+    }
+
+    pub fn staff_time_cursor_add(
+        &self,
+        entity: usize,
+        bar_idx: usize,
+        time_num: isize,
+        time_den: isize,
+        add_num: isize,
+        add_den: isize,
+    ) -> Option<Vec<isize>> {
+        let entity = Entity::new(entity);
+        let staff_bars = self.ordered_children.get(&entity)?;
+        let bar = self.bars.get(&self.bar_by_index(staff_bars, bar_idx)?)?;
+        let add = Rational::new(add_num, add_den);
+        let t = Rational::new(time_num, time_den) + add;
+        let mut t = if t < Rational::new(0, 1) {
+            let prev_bar = self
+                .bars
+                .get(&self.bar_by_index(staff_bars, bar_idx - 1)?)?;
+            let t = prev_bar.metre().duration() + t;
+            if t < Rational::new(0, 1) {
+                None
+            } else {
+                Some(((bar_idx - 1).try_into().unwrap(), t))
+            }
+        } else if t >= bar.metre().duration() {
+            let next_bar = self
+                .bars
+                .get(&self.bar_by_index(staff_bars, bar_idx + 1)?)?;
+            let t = t - bar.metre().duration();
+            if t >= next_bar.metre().duration() {
+                None
+            } else {
+                Some(((bar_idx + 1).try_into().unwrap(), t))
+            }
+        } else {
+            Some((bar_idx.try_into().unwrap(), t))
+        }?;
+
+        // Make sure we are not in the middle of a note.
+        for (dur, start, _, automatic) in bar.children() {
+            if !automatic {
+                if t.1 > start && t.1 < start + dur.duration() {
+                    if add > Rational::new(0, 1) {
+                        t = (t.0, start + dur.duration());
+                    } else {
+                        t = (t.0, start);
+                    }
+                }
+            }
+        }
+
+        Some(vec![t.0, *t.1.numer(), *t.1.denom()])
+    }
+
     /// Create a bar, without attaching it to a staff.
     ///
     /// `numer` and `denom` are the numerator and denominator of the time signature in this bar.
@@ -340,6 +410,7 @@ impl Render {
             entity,
             RestNoteChord::new(Duration::new(note_value, dots, None), PitchKind::Rest),
         );
+        self.ordered_children.insert(entity, vec![]);
         self.contexts.insert(
             entity,
             Context {
@@ -412,6 +483,15 @@ impl Render {
             }
             self.fixup_bar(parent_id);
         }
+    }
+
+    pub fn cursor_create(&mut self) -> usize {
+        let entity = self.entities.create();
+
+        self.cursors.insert(entity, ());
+        self.stencils.insert(entity, Stencil::default());
+
+        entity.id()
     }
 
     fn fixup_bar(&mut self, parent_id: Entity) {
@@ -575,6 +655,7 @@ impl Render {
                 &mut self.beams,
                 &mut self.beam_for_rnc,
                 &mut self.attachments,
+                &mut self.cursors,
             ],
         );
 
@@ -646,14 +727,16 @@ impl Render {
 
         sys_print_beams(&self.beams, &mut self.stencils);
 
+        sys_print_cursors(&self.cursors, &mut self.stencils);
+
         sys_print_staff(
             &mut self.line_of_staffs,
             &self.bars,
             &self.beam_for_rnc,
             &self.spacing,
             &self.stencils,
-            &mut self.stencil_maps,
             &self.ordered_children,
+            &mut self.stencil_maps,
         );
         sys_print_staff_lines(&self.line_of_staffs, &mut self.stencils);
 
@@ -849,6 +932,23 @@ impl Render {
         } else {
             vec![]
         }
+    }
+
+    pub fn util_duration_to_frac(&self, note_value: isize, dots: u8) -> Vec<isize> {
+        let note_value = NoteValue::new(note_value).unwrap();
+        let d = Duration::new(note_value, dots, None).duration();
+        vec![*d.numer(), *d.denom()]
+    }
+
+    pub fn util_frac_add(
+        &self,
+        a_num: isize,
+        a_den: isize,
+        b_num: isize,
+        b_den: isize,
+    ) -> Vec<isize> {
+        let f = Rational::new(a_num, a_den) + Rational::new(b_num, b_den);
+        vec![*f.numer(), *f.denom()]
     }
 
     pub fn print_for_demo(&mut self) -> String {

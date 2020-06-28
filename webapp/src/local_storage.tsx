@@ -12,10 +12,11 @@ export function useLocallyPersistedReducer<R extends Reducer<any, any>, I>(
   defaultState: I,
   storageKey: string,
   init: (arg: I) => ReducerState<R>,
+  loader: (x: string) => any,
 ): [ReducerState<R>, Dispatch<ReducerAction<R>>] {
   const hookVars = useReducer(reducer, defaultState, defaultState => {
     const string = localStorage.getItem(storageKey);
-    const persisted = string ? JSON.parse(string) : null;
+    const persisted = string ? loader(string) : null;
     if (persisted === null) {
       if (init === null) {
         return defaultState;

@@ -3,7 +3,7 @@ const CopyPlugin = require("copy-webpack-plugin");
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 const BundleAnalyzerPlugin = require("webpack-bundle-analyzer")
   .BundleAnalyzerPlugin;
-const { NormalModuleReplacementPlugin } = require("webpack");
+const { NormalModuleReplacementPlugin, DefinePlugin } = require("webpack");
 
 const dist = path.resolve(__dirname, "dist");
 
@@ -41,7 +41,12 @@ module.exports = {
           "style-loader",
           {
             loader: "css-loader",
-            options: { modules: true, importLoaders: 1 },
+            options: {
+              modules: {
+                localIdentName: "[path][name]__[local]--[hash:base64:5]",
+              },
+              importLoaders: 1,
+            },
           },
           {
             loader: "sass-loader",
@@ -89,6 +94,7 @@ module.exports = {
         path.resolve(__dirname, "..", "staff"),
         path.resolve(__dirname, "..", "stencil"),
       ],
+      // forceMode: "production",
     }),
 
     new NormalModuleReplacementPlugin(
@@ -100,6 +106,9 @@ module.exports = {
       /.*dom4.*/,
       path.resolve(__dirname, "src/blueprint/blank.js"),
     ),
+    new DefinePlugin({
+      "process.env.NODE_ENV": JSON.stringify("production"),
+    }),
 
     // new BundleAnalyzerPlugin()
   ].filter(a => !!a),

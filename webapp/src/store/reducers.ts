@@ -26,12 +26,14 @@ export function getInitialState(): State {
           })),
       },
     },
+    numChanges: 0,
     undoStack: [],
     redoStack: [],
   };
 }
 
 function apply(state: State, action: Invertible) {
+  state.numChanges += 1;
   switch (action.type) {
     case "REMOVE_NOTE": {
       const { barIdx, startTime } = action;
@@ -314,12 +316,16 @@ export function reduce(state: State, action: Action): State {
       }
       return { ...state };
     case "RESET": {
-      return getInitialState();
+      return {
+        ...getInitialState(),
+        numChanges: state.numChanges + 1,
+      };
     }
     case "LOAD": {
       return {
         ...getInitialState(),
         song: action.song,
+        numChanges: state.numChanges + 1 || 0,
       };
     }
   }

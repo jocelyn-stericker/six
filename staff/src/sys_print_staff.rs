@@ -13,30 +13,35 @@ pub fn sys_print_staff(
     beam_for_rnc: &HashMap<Entity, Entity>,
     spacing: &HashMap<Entity, RelativeRhythmicSpacing>,
     stencils: &HashMap<Entity, Stencil>,
-    stencil_maps: &mut HashMap<Entity, StencilMap>,
     children: &HashMap<Entity, Vec<Entity>>,
+    stencil_maps: &mut HashMap<Entity, StencilMap>,
 ) {
-    for (staff_entity, (staff, children)) in (line_of_staffs, children).join() {
+    for (staff_entity, (staff, staff_children)) in (line_of_staffs, children).join() {
         let mut staff_advance = STAFF_MARGIN;
         let mut staff_stencil = StencilMap::default();
 
         // Lines are behind contents.
         staff_stencil = staff_stencil.and(staff.staff_lines, None);
 
-        for child in children {
+        for child in staff_children {
             if let Some(bar) = bars.get(&child) {
                 let mut bar_stencil = StencilMap::default();
                 let start = 0f64;
                 let mut advance = start;
                 let mut beams = BTreeSet::new();
-                for (_, _, entity, _) in bar.children() {
-                    let relative_spacing = spacing[&entity];
+                for (_, _, rnc_id, _) in bar.children() {
+                    let relative_spacing = spacing[&rnc_id];
 
                     bar_stencil =
-                        bar_stencil.and(entity, Some(Vec2::new(relative_spacing.start_x, 0.0)));
+                        bar_stencil.and(rnc_id, Some(Vec2::new(relative_spacing.start_x, 0.0)));
                     advance = advance.max(relative_spacing.end_x);
-                    if let Some(beam) = beam_for_rnc.get(&entity) {
+                    if let Some(beam) = beam_for_rnc.get(&rnc_id) {
                         beams.insert(*beam);
+                    }
+
+                    for (rnc_child_id, _) in (children.get(&rnc_id), stencils).join() {
+                        bar_stencil = bar_stencil
+                            .and(rnc_child_id, Some(Vec2::new(relative_spacing.start_x, 0.0)));
                     }
                 }
                 for beam in &beams {

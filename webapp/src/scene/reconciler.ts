@@ -1,4 +1,4 @@
-/// <reference path="./intrinsic_elements.d.ts" /> #
+/// <reference path="./jsx_ext.d.ts" /> #
 
 import {
   Render as _Render,
@@ -41,7 +41,7 @@ export enum NoteValue {
 }
 
 interface Instance {
-  type: "song" | "staff" | "bar" | "between" | "rnc";
+  type: "song" | "staff" | "bar" | "between" | "rnc" | "cursor";
   container: RustRenderApi;
   entity: number;
   meta: any;
@@ -107,14 +107,18 @@ export interface RncProps extends Stylable {
   isTemporary: boolean;
   pitch?: number;
   pitchModifier?: number;
+  children?: any;
 }
+
+export interface CursorProps extends Stylable {}
 
 type CreateInstanceParam =
   | { type: "song"; props: SongProps }
   | { type: "staff"; props: StaffProps }
   | { type: "bar"; props: BarProps }
   | { type: "between"; props: BetweenBarsProps }
-  | { type: "rnc"; props: RncProps };
+  | { type: "rnc"; props: RncProps }
+  | { type: "cursor"; props: CursorProps };
 
 type TypedInstrinsicProps = {
   song: SongProps;
@@ -140,7 +144,7 @@ function createInstance(
   spec: CreateInstanceParam,
   container: RustRenderApi,
 ): Instance | null {
-  let type: "song" | "staff" | "bar" | "between" | "rnc";
+  let type: "song" | "staff" | "bar" | "between" | "rnc" | "cursor";
   let entity;
   let meta: any = null;
 
@@ -201,6 +205,9 @@ function createInstance(
     meta = {
       isTemporary: spec.props.isTemporary || false,
     };
+  } else if (spec.type === "cursor") {
+    type = "cursor";
+    entity = container.cursor_create();
   } else {
     // @ts-ignore
     throw new Error(`Invalid type in sheet music reconciler: <${spec.type} />`);

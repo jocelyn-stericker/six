@@ -1,0 +1,246 @@
+@import "../colours";
+
+.keyboard {
+  width: 100%;
+  max-width: 600px;
+  height: 200px;
+  background: white;
+  border: 1px solid $paragraph;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  touch-action: manipulation;
+  position: fixed;
+  bottom: -200px;
+  z-index: 100;
+  right: 0;
+  transition: bottom 200ms ease-in-out;
+
+  &.visible {
+    bottom: 0;
+  }
+}
+
+.smallRow {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+}
+
+.radioButton {
+  flex: 1;
+  background: #e9ecef;
+  border-radius: 4px;
+  fill: $buttonText;
+  position: relative;
+  cursor: pointer;
+}
+
+.radioButton.selected {
+  background: #ced4da;
+}
+
+.radio {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.button > .buttonContent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.radioButton > input:focus + .buttonContent,
+.actionButton:focus,
+.whiteKey:focus,
+.blackKey:focus {
+  box-shadow: 0 0 0 2px $button;
+}
+
+.radioButton > input:active + .buttonContent,
+.actionButton:active,
+.actionButton.triggered {
+  background-color: #adb5bd;
+}
+
+.whiteKey:active,
+.whiteKey.triggered {
+  background-color: $button;
+}
+
+.blackKey:active,
+.blackKey.triggered {
+  background-color: $illTertiary;
+}
+
+.button .buttonContent > svg {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: 4px;
+  top: 4px;
+  height: calc(100% - 8px);
+  margin: auto;
+  display: block;
+}
+
+.button.biggerKey {
+  flex: 1.5;
+}
+
+.radioButtonShortcut {
+  position: absolute;
+  bottom: 0;
+  right: 2px;
+  color: #adb5db;
+  font-size: 8px;
+}
+
+.buttonGap {
+  width: 2px;
+}
+
+.radioButtonIcon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+}
+
+.pianokeys {
+  margin-top: 4px;
+  flex: 3;
+  margin: 8px 0;
+  position: relative;
+}
+
+.whiteKeys {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+}
+
+.whiteKey {
+  background: #e9ecef;
+  border-radius: 4px;
+  margin-top: 20px;
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  border: none;
+  margin: 0;
+}
+
+.flex2 {
+  flex: 2;
+}
+
+.flex9 {
+  flex: 9;
+}
+
+.flex10 {
+  flex: 10;
+}
+
+.flex11 {
+  flex: 11;
+}
+
+.flex12 {
+  flex: 12;
+}
+
+.flex17 {
+  flex: 17;
+}
+
+.flex22 {
+  flex: 24;
+}
+
+.blackKeys {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+}
+
+.blackKey {
+  background: $illStroke;
+  border-radius: 1px;
+  margin-bottom: 40px;
+  position: relative;
+  cursor: pointer;
+  z-index: 1;
+  border: none;
+  padding: 0;
+}
+
+.whiteKeyShortcut {
+  position: absolute;
+  bottom: 0;
+  right: 2px;
+  color: #adb5db;
+  font-size: 10px;
+}
+
+.blackKeyShortcut {
+  position: absolute;
+  bottom: 0;
+  right: 2px;
+  color: $illMain;
+  font-size: 10px;
+}
+
+.mnemonic {
+  font-weight: bolder;
+}
+
+.flexKey {
+  display: flex;
+}
+
+.textKeyContent {
+  margin: auto;
+  font-family: monospace;
+  text-align: center;
+}
+
+.space {
+  pointer-events: none;
+  height: 0;
+}
+
+.actionButton {
+  padding: 0;
+  border: none;
+  margin: 0;
+  font-size: inherit;
+  white-space: nowrap;
+  user-select: none;
+  flex: 1;
+  background: #e9ecef;
+  border-radius: 4px;
+  fill: $buttonText;
+  position: relative;
+  cursor: pointer;
+}
+
+.backspace {
+  font-size: 9px;
+}

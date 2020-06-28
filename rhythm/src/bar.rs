@@ -622,7 +622,12 @@ impl Bar {
             return vec![];
         }
 
-        let t_end = t + duration.duration();
+        if t < self.skip() {
+            return vec![];
+        }
+
+        let t_end = (t + duration.duration()).min(self.metre.duration());
+        duration = Duration::exact(t_end - t, None);
 
         let mut existing_note_start = Rational::new(0, 1);
         if with_rhythm {

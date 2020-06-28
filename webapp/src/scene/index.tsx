@@ -57,7 +57,9 @@ function StencilView({
   classNames: { [key: string]: string };
 }) {
   const stencil = stencils[id];
-  if (typeof stencil === "string") {
+  if (!stencil) {
+    return null;
+  } else if (typeof stencil === "string") {
     return (
       <g
         className={classNames[id] || undefined}
@@ -90,7 +92,7 @@ function StencilView({
   }
 }
 
-export default function Renderer(props: Props) {
+export default function Scene(props: Props) {
   // create/destroy Rust container
   const [container] = useState(newRender);
   useEffect(() => {
@@ -181,6 +183,7 @@ export default function Renderer(props: Props) {
         onMouseDownCapture={makeMouseHandler(props.onMouseDown)}
         onMouseUpCapture={makeMouseHandler(props.onMouseUp)}
         onClick={makeMouseHandler(props.onClick)}
+        tabIndex={0}
         onMouseMove={ev => {
           if (!svg || !svg.current || !stencilMeta) {
             return;
@@ -218,6 +221,7 @@ export default function Renderer(props: Props) {
               props.onHover(formattedHoverInfo);
             }
           } else {
+            setHoverInfo(null);
             props.onHover({});
           }
 

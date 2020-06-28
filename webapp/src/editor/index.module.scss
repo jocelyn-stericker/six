@@ -7,6 +7,7 @@
 .bar {
   fill: black;
   transition: fill 100ms ease-in-out;
+  cursor: text;
 }
 
 .barHover {
@@ -18,4 +19,14 @@
   fill: $illTertiary;
   stroke: $illTertiary;
   stroke-width: 25;
+}
+
+.cursor {
+  animation: flash 1s linear infinite;
+}
+
+@keyframes flash {
+  50% {
+    opacity: 0;
+  }
 }

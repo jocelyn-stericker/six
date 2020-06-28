@@ -79,6 +79,26 @@ impl Join for &HashSet<Entity> {
     }
 }
 
+impl Join for &Vec<Entity> {
+    type Value = ();
+
+    fn join(self) -> HashMap<Entity, ()> {
+        self.iter().map(|a| (*a, ())).collect()
+    }
+}
+
+impl<A: Join<Value = AT>, AT> Join for Option<A> {
+    type Value = (AT,);
+
+    fn join(self) -> HashMap<Entity, (AT,)> {
+        if let Some(items) = self {
+            items.join().into_iter().map(|(k, v)| (k, (v,))).collect()
+        } else {
+            Default::default()
+        }
+    }
+}
+
 // Trivial.
 impl<A: Join<Value = AT>, AT> Join for (A,) {
     type Value = (AT,);

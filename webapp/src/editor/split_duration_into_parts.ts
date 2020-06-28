@@ -1,14 +1,13 @@
-import { Pitch, State, TiedNote } from "../store";
-import { RustRenderApi } from "../renderer";
+import { State, TiedNote } from "../store";
+import { RustRenderApi } from "../scene";
 
 export interface NoteAddPatch {
   barIdx: number;
   startTime: [number, number];
   divisions: TiedNote;
-  pitch: Pitch;
 }
 
-function count(noteValue: number, dots: number) {
+export function count(noteValue: number, dots: number) {
   let base = Math.pow(2, noteValue);
   let total = base;
   for (let i = 0; i < dots; ++i) {
@@ -26,7 +25,6 @@ export default function splitDurationIntoParts(
   barIdx: number,
   time: [number, number] | null,
   insertionDuration: [number, number],
-  pitch: Pitch,
 ): NoteAddPatch | null {
   if (!render) {
     return null;
@@ -84,6 +82,5 @@ export default function splitDurationIntoParts(
     barIdx,
     startTime: [time[0], time[1]],
     divisions,
-    pitch,
   };
 }

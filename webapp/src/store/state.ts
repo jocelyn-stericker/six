@@ -50,6 +50,7 @@ export interface Song {
 
 export interface State {
   song: Song;
+  numChanges: number;
   undoStack: Array<Invertible>;
   redoStack: Array<Invertible>;
 }

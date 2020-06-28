@@ -1,0 +1,14 @@
+@import "../colours";
+
+.sheet {
+  touch-action: manipulation;
+  background: white;
+  border-radius: 3px;
+  &:focus-within {
+    box-shadow: 0 0 0 3px $illTertiary;
+  }
+}
+
+.sheet > g {
+  pointer-events: none;
+}
