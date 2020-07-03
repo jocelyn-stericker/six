@@ -16,7 +16,7 @@ use rest_note_chord::{
     sys_record_space_time_warp, sys_space_beams, sys_update_rnc_timing, Beam, Context, PitchKind,
     RestNoteChord, SpaceTimeWarp,
 };
-use rhythm::{Bar, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing};
+use rhythm::{Bar, BarChild, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing};
 use staff::{
     sys_break_into_lines, sys_print_between_bars, sys_print_staff, sys_print_staff_lines,
     sys_update_context, Barline, BetweenBars, BreakIntoLineComponents, LineOfStaff, Staff,
@@ -305,15 +305,27 @@ impl Render {
             Some((bar_idx.try_into().unwrap(), t))
         }?;
 
+        let bar = self
+            .bars
+            .get(&self.bar_by_index(staff_bars, t.0 as usize)?)?;
+
         // Make sure we are not in the middle of a note.
-        for (dur, start, _, automatic) in bar.children() {
-            if !automatic {
-                if t.1 > start && t.1 < start + dur.duration() {
-                    if add > Rational::new(0, 1) {
-                        t = (t.0, start + dur.duration());
-                    } else {
-                        t = (t.0, start);
-                    }
+        for BarChild {
+            duration,
+            start,
+            lifetime,
+            stencil,
+        } in bar.children()
+        {
+            if !lifetime.is_temporary()
+                && !self.rncs.get(&stencil).unwrap().pitch.is_rest()
+                && t.1 > start
+                && t.1 < start + duration.duration()
+            {
+                if add >= Rational::new(0, 1) {
+                    t = (t.0, start + duration.duration());
+                } else {
+                    t = (t.0, start);
                 }
             }
         }
@@ -849,10 +861,10 @@ impl Render {
                     .map(|c| {
                         (
                             self.world_bbox
-                                .get(&c.2)
+                                .get(&c.stencil)
                                 .map(|rect| rect.x0)
                                 .unwrap_or_default(),
-                            c.1,
+                            c.start,
                         )
                     })
                     .collect();

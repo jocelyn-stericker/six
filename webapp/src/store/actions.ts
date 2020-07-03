@@ -6,6 +6,8 @@ export interface AddNote {
   startTime: [number, number];
   divisions: TiedNote;
   pitch: Pitch;
+  afterBarIdx: number;
+  afterTime: [number, number];
 }
 export function addNote(insertion: Omit<AddNote, "type">): AddNote {
   return {
@@ -20,11 +22,13 @@ export interface RemoveNote {
   startTime: [number, number];
   divisions: TiedNote;
   pitch: Pitch;
+  beforeBarIdx: number;
+  beforeTime: [number, number];
 }
-export function removeNote(insertion: Omit<AddNote, "type">): RemoveNote {
+export function removeNote(removal: Omit<RemoveNote, "type">): RemoveNote {
   return {
     type: "REMOVE_NOTE",
-    ...insertion,
+    ...removal,
   };
 }
 
@@ -157,12 +161,20 @@ export interface SetBarCount {
   type: "SET_BAR_COUNT";
   count: number;
   prevCount: number;
+  beforeBarIdx: number;
+  beforeTime: [number, number];
+  afterBarIdx: number;
+  afterTime: [number, number];
 }
 export function setBarCount(appState: State, count: number): SetBarCount {
   return {
     type: "SET_BAR_COUNT",
     count,
     prevCount: appState.song.part.bars.length,
+    beforeBarIdx: appState.cursorBarIdx,
+    beforeTime: appState.cursorTime,
+    afterBarIdx: count - 1,
+    afterTime: [0, 1],
   };
 }
 
@@ -244,6 +256,19 @@ export function load(song: Song): Load {
   return { type: "LOAD", song };
 }
 
+export interface MoveCursor {
+  type: "MOVE_CURSOR";
+  barIdx: number;
+  time: [number, number];
+}
+export function moveCursor(barIdx: number, time: [number, number]): MoveCursor {
+  return {
+    type: "MOVE_CURSOR",
+    barIdx,
+    time,
+  };
+}
+
 export type Invertible =
   | AddNote
   | RemoveNote
@@ -257,6 +282,6 @@ export type Invertible =
   | SetAuthor
   | SetPickupSkip;
 
-export type NonInvertible = Undo | Redo | Reset | Load;
+export type NonInvertible = MoveCursor | Undo | Redo | Reset | Load;
 
 export type Action = Invertible | NonInvertible;

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::context::Context;
 use crate::{PitchKind, RestNoteChord};
 use entity::{EntitiesRes, Entity};
-use rhythm::{Bar, RelativeRhythmicSpacing};
+use rhythm::{Bar, BarChild, RelativeRhythmicSpacing};
 use stencil::Stencil;
 
 pub fn sys_update_rnc_timing(
@@ -32,18 +32,24 @@ pub fn sys_update_rnc_timing(
             render.remove(&entity);
         }
 
-        for (duration, context, entity, is_managed) in bar.children() {
-            if let Some(rnc) = rnc.get_mut(&entity) {
+        for BarChild {
+            duration,
+            start,
+            stencil,
+            lifetime,
+        } in bar.children()
+        {
+            if let Some(rnc) = rnc.get_mut(&stencil) {
                 rnc.duration = duration;
-                if is_managed {
+                if lifetime.is_automatic() {
                     rnc.natural_duration = duration;
                 }
             }
-            if let Some(context_data) = contexts.get_mut(&entity) {
+            if let Some(context_data) = contexts.get_mut(&stencil) {
                 context_data.bar = bar_context.bar;
-                context_data.beat = context;
-                if is_managed {
-                    context_data.natural_beat = context;
+                context_data.beat = start;
+                if lifetime.is_automatic() {
+                    context_data.natural_beat = start;
                 }
             }
         }

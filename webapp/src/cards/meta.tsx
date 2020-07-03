@@ -38,7 +38,7 @@ export default function Meta({ appState, dispatch }: Props) {
     (memo, bar, idx) => (bar.notes.length > 0 ? idx + 1 : memo),
     1,
   );
-  const maxBars = 20;
+  const maxBars = 200;
   return (
     <React.Fragment>
       <div className={cx(css.meta, "bp3-dark")}>

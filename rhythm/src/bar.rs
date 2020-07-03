@@ -76,6 +76,14 @@ impl Default for Lifetime {
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct BarChild {
+    pub duration: Duration,
+    pub start: Rational,
+    pub lifetime: Lifetime,
+    pub stencil: Entity,
+}
+
 #[derive(Clone, Debug)]
 /// The rhythm and metre of a voice in a single bar.
 pub struct Bar {
@@ -877,33 +885,33 @@ impl Bar {
     }
 
     /// Rest/note/chords (RNCs)
-    pub fn children(&self) -> Vec<(Duration, Rational, Entity, bool)> {
+    pub fn children(&self) -> Vec<BarChild> {
         let mut managed = self.managed().iter();
         let mut start = Rational::zero();
 
         if self.whole_rest() {
-            return vec![(
-                Duration::new_whole_rest(self.metre.duration()),
+            return vec![BarChild {
+                duration: Duration::new_whole_rest(self.metre.duration()),
                 start,
-                *managed.next().unwrap(),
-                true,
-            )];
+                lifetime: Lifetime::AutomaticRest,
+                stencil: *managed.next().unwrap(),
+            }];
         }
 
         self.rhythm
             .iter()
-            .filter_map(|(rhy, entity)| {
-                let data = if entity.is_hidden() {
+            .filter_map(|(rhy, lifetime)| {
+                let data = if lifetime.is_hidden() {
                     None
                 } else {
-                    Some((
-                        *rhy,
+                    Some(BarChild {
+                        duration: *rhy,
                         start,
-                        entity
+                        lifetime: *lifetime,
+                        stencil: lifetime
                             .to_option()
                             .unwrap_or_else(|| *managed.next().unwrap()),
-                        entity.is_automatic(),
-                    ))
+                    })
                 };
                 start += rhy.duration();
 

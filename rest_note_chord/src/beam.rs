@@ -1,7 +1,7 @@
 use entity::{EntitiesRes, Entity};
 use kurbo::{Line, Point};
 use num_rational::Rational;
-use rhythm::{Bar, Duration, RelativeRhythmicSpacing, RhythmicBeaming};
+use rhythm::{Bar, BarChild, Duration, RelativeRhythmicSpacing, RhythmicBeaming};
 use std::collections::BTreeSet;
 use std::collections::HashMap;
 use stencil::Stencil;
@@ -132,8 +132,15 @@ pub fn sys_draft_beaming(
         let mut current_candidate: Option<(Rational, Vec<(Duration, Entity)>)> = None;
         // We reuse these if we have more beams, and delete them otherwise.
         let mut available_beam_entities = BTreeSet::new();
-        for (duration, start, entity, is_automatic) in bar.children() {
-            if !is_automatic
+        for BarChild {
+            duration,
+            start,
+            lifetime,
+            stencil,
+        } in bar.children()
+        {
+            if !lifetime.is_temporary()
+                && !lifetime.is_automatic()
                 && duration
                     .duration_display_base()
                     .map(|b| b.beam_count())
@@ -141,14 +148,14 @@ pub fn sys_draft_beaming(
                     > 0
             {
                 if let Some(current_candidate) = &mut current_candidate {
-                    current_candidate.1.push((duration, entity));
+                    current_candidate.1.push((duration, stencil));
                 } else {
-                    current_candidate = Some((start, vec![(duration, entity)]));
+                    current_candidate = Some((start, vec![(duration, stencil)]));
                 }
             } else if let Some(current_candidate) = current_candidate.take() {
                 candidates.push(current_candidate);
             }
-            if let Some(beam) = beam_for_rnc.get(&entity) {
+            if let Some(beam) = beam_for_rnc.get(&stencil) {
                 available_beam_entities.insert(*beam);
             }
         }
@@ -213,14 +220,14 @@ pub fn sys_space_beams(
         let mut prev_beam = None;
         let mut idx_in_beam = 0;
 
-        for (_, _, rnc, _) in bar.children() {
+        for BarChild { stencil, .. } in bar.children() {
             if let (Some(beam_id), Some(ref mut beam), Some(spacing), Some(Some(attachment))) = (
-                beam_for_rnc.get(&rnc).copied(),
+                beam_for_rnc.get(&stencil).copied(),
                 beam_for_rnc
-                    .get(&rnc)
+                    .get(&stencil)
                     .and_then(|beam_id| beams.get_mut(beam_id)),
-                spacing.get(&rnc),
-                attachments.get(&rnc),
+                spacing.get(&stencil),
+                attachments.get(&stencil),
             ) {
                 if Some(beam_id) != prev_beam {
                     idx_in_beam = 0;

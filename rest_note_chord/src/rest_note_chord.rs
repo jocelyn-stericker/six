@@ -12,6 +12,12 @@ pub enum PitchKind {
     Pitch(Pitch),
 }
 
+impl PitchKind {
+    pub fn is_rest(self) -> bool {
+        self == PitchKind::Rest
+    }
+}
+
 /// A Rest, Note, or Chord.
 ///
 /// There are two kinds of RNCs:

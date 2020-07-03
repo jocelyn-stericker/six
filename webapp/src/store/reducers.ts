@@ -27,6 +27,8 @@ export function getInitialState(): State {
       },
     },
     numChanges: 0,
+    cursorBarIdx: 0,
+    cursorTime: [0, 1],
     undoStack: [],
     redoStack: [],
   };
@@ -46,10 +48,19 @@ function apply(state: State, action: Invertible) {
           notes.startTime[0] !== startTime[0] ||
           notes.startTime[1] !== startTime[1],
       );
+      state.cursorBarIdx = barIdx;
+      state.cursorTime = startTime;
       break;
     }
     case "ADD_NOTE": {
-      const { barIdx, startTime, divisions, pitch } = action;
+      const {
+        barIdx,
+        startTime,
+        divisions,
+        pitch,
+        afterTime,
+        afterBarIdx,
+      } = action;
       const barObj = state.song.part.bars[barIdx];
       if (!barObj) {
         return;
@@ -59,6 +70,8 @@ function apply(state: State, action: Invertible) {
         divisions,
         pitch,
       });
+      state.cursorBarIdx = afterBarIdx;
+      state.cursorTime = afterTime;
       break;
     }
     case "ADD_BAR": {
@@ -92,6 +105,8 @@ function apply(state: State, action: Invertible) {
         state.song.part.bars.pop();
       }
       state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
+      state.cursorBarIdx = action.afterBarIdx;
+      state.cursorTime = action.afterTime;
       break;
     }
     case "SET_CLEF": {
@@ -184,6 +199,8 @@ function invert(action: Invertible): Invertible {
         startTime: action.startTime,
         divisions: action.divisions,
         pitch: action.pitch,
+        afterBarIdx: action.beforeBarIdx,
+        afterTime: action.beforeTime,
       };
     case "ADD_NOTE":
       return {
@@ -192,6 +209,8 @@ function invert(action: Invertible): Invertible {
         startTime: action.startTime,
         divisions: action.divisions,
         pitch: action.pitch,
+        beforeBarIdx: action.afterBarIdx,
+        beforeTime: action.afterTime,
       };
     case "SET_TS":
       return {
@@ -228,6 +247,10 @@ function invert(action: Invertible): Invertible {
         type: "SET_BAR_COUNT",
         count: action.prevCount,
         prevCount: action.count,
+        beforeBarIdx: action.afterBarIdx,
+        beforeTime: action.afterTime,
+        afterBarIdx: action.beforeBarIdx,
+        afterTime: action.beforeTime,
       };
     case "SET_AUTHOR":
       return {
@@ -321,11 +344,20 @@ export function reduce(state: State, action: Action): State {
         numChanges: state.numChanges + 1,
       };
     }
+    case "MOVE_CURSOR": {
+      return {
+        ...state,
+        cursorTime: action.time,
+        cursorBarIdx: action.barIdx,
+      };
+    }
     case "LOAD": {
+      const { pickupSkip } = action.song.global;
       return {
         ...getInitialState(),
         song: action.song,
         numChanges: state.numChanges + 1 || 0,
+        cursorTime: pickupSkip ? [pickupSkip[0], pickupSkip[1]] : [0, 1],
       };
     }
   }

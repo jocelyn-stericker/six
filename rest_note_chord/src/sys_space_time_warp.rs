@@ -2,7 +2,7 @@ use num_rational::Rational;
 use std::collections::HashMap;
 
 use entity::{Entity, Join};
-use rhythm::{Bar, RelativeRhythmicSpacing};
+use rhythm::{Bar, BarChild, RelativeRhythmicSpacing};
 
 /// A map from time to position.
 ///
@@ -35,8 +35,8 @@ pub fn sys_record_space_time_warp(
     for (bar_id, bar) in bars {
         let mut warp = Vec::new();
         let mut max_x = 0.0;
-        for (_, start, entity, _) in bar.children() {
-            if let Some(spacing) = rel_spacings.get(&entity) {
+        for BarChild { start, stencil, .. } in bar.children() {
+            if let Some(spacing) = rel_spacings.get(&stencil) {
                 warp.push((start, spacing.start_x));
                 max_x = spacing.end_x.max(max_x);
             }
@@ -53,8 +53,14 @@ pub fn sys_apply_warp(
     warps: &HashMap<Entity, SpaceTimeWarp>,
 ) {
     for (_bar_id, (bar, warp)) in (bars, warps).join() {
-        for (duration, start, entity, _) in bar.children() {
-            if let Some(rel_spacing) = rel_spacings.get_mut(&entity) {
+        for BarChild {
+            duration,
+            start,
+            stencil,
+            ..
+        } in bar.children()
+        {
+            if let Some(rel_spacing) = rel_spacings.get_mut(&stencil) {
                 rel_spacing.start_x = warp.t_to_x(start);
                 rel_spacing.end_x = warp.t_to_x(start + duration.duration());
             }

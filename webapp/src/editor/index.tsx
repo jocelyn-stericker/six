@@ -4,13 +4,22 @@ import React, {
   useCallback,
   useEffect,
   useImperativeHandle,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 
 import Scene, { RustRenderApi } from "../scene";
-import { Action, addNote, removeNote, State, undo } from "../store";
+import {
+  Action,
+  addNote,
+  moveCursor,
+  removeNote,
+  setBarCount,
+  State,
+  undo,
+} from "../store";
 import splitDurationIntoParts, {
   NoteAddPatch,
 } from "./split_duration_into_parts";
@@ -31,6 +40,10 @@ const Editor = forwardRef(function Editor(
   { appState, dispatch }: Props,
   ref: React.Ref<{ getPDF: () => string }>,
 ) {
+  const { cursorTime, cursorBarIdx } = appState;
+  const pickup = appState.song.global.pickupSkip;
+  let currTs = appState.song.global.between[0].ts;
+
   const songRef = useRef<RustRenderApi>(null);
   const barRefs = useMemo(
     () =>
@@ -40,22 +53,21 @@ const Editor = forwardRef(function Editor(
     [appState.song.part.bars.length],
   );
 
-  const [time, setTime] = useState<[number, number, number] | null>([0, 0, 1]);
   const [duration, setDuration] = useState(4);
 
-  const pickup = appState.song.global.pickupSkip;
   const [focused, setFocused] = useState(false);
 
   if (
     pickup &&
-    time &&
-    time[0] === 0 &&
-    time[1] / time[2] < pickup[0] / pickup[1]
+    cursorBarIdx === 0 &&
+    cursorTime[0] / cursorTime[1] < pickup[0] / pickup[1]
   ) {
-    setTime([0, pickup[0], pickup[1]]);
+    dispatch(moveCursor(0, pickup));
   }
 
-  let currTs = appState.song.global.between[0].ts;
+  if (cursorBarIdx >= appState.song.part.bars.length) {
+    dispatch(moveCursor(0, [0, 1]));
+  }
 
   useImperativeHandle(ref, () => ({
     /**
@@ -68,12 +80,14 @@ const Editor = forwardRef(function Editor(
     },
   }));
 
+  const [validAppState, setValidAppState] = useState(appState);
+
   const preview: NoteAddPatch | null = useMemo(() => {
     // Generate temporary preview taking into account cursor position.
-    if (songRef.current && time) {
-      const bar = barRefs[time[0]];
+    if (songRef.current && focused && appState === validAppState) {
+      const bar = barRefs[cursorBarIdx];
       if (!bar) {
-        setTime([0, 0, 1]);
+        dispatch(moveCursor(cursorBarIdx, [cursorTime[0], cursorTime[1]]));
         return null;
       }
 
@@ -81,35 +95,64 @@ const Editor = forwardRef(function Editor(
         songRef.current,
         appState,
         bar.current,
-        time[0],
-        [time[1], time[2]],
+        cursorBarIdx,
+        cursorTime,
         [1, duration],
       );
       return patch;
     } else {
       return null;
     }
-  }, [time, songRef, appState, barRefs, duration]);
+  }, [
+    dispatch,
+    focused,
+    cursorTime,
+    cursorBarIdx,
+    songRef,
+    appState,
+    barRefs,
+    duration,
+    validAppState,
+  ]);
+
+  useLayoutEffect(() => {
+    setValidAppState(appState);
+  }, [setValidAppState, appState]);
 
   const staff = useRef<number>(null);
 
   const addTime = useCallback(
     (add: [number, number]) => {
-      if (staff.current && time) {
-        const newTime = songRef.current?.staff_time_cursor_add(
+      return (
+        staff.current &&
+        songRef.current?.staff_time_cursor_add(
           staff.current,
-          time[0],
-          time[1],
-          time[2],
+          cursorBarIdx,
+          cursorTime[0],
+          cursorTime[1],
           add[0],
           add[1],
-        );
-        if (newTime) {
-          setTime([newTime[0], newTime[1], newTime[2]]);
-        }
-      }
+        )
+      );
     },
-    [time, songRef],
+    [cursorBarIdx, cursorTime, songRef],
+  );
+
+  const closestNoteBoundaryTo = useCallback(
+    (barIdx: number, t: [number, number]) => {
+      return (
+        staff.current &&
+        songRef.current?.staff_time_cursor_add(
+          staff.current,
+          barIdx,
+          t[0],
+          t[1],
+          0,
+          1,
+        )
+      );
+    },
+    [songRef],
   );
 
   const keyboard = useRef<KeyboardRef>(null);
@@ -117,16 +160,24 @@ const Editor = forwardRef(function Editor(
   const handleTimeBack = useCallback(() => {
     keyboard.current?.onPhysicalKeyPress("back");
     setTimeout(() => {
-      addTime([-1, 8]);
+      const t = addTime([-1, Math.max(duration, 8)]);
+      if (t) {
+        dispatch(moveCursor(t[0], [t[1], t[2]]));
+      }
     }, 0);
-  }, [addTime]);
+  }, [addTime, dispatch, duration]);
 
   const handleTimeForward = useCallback(() => {
     keyboard.current?.onPhysicalKeyPress("forward");
     setTimeout(() => {
-      addTime([1, 8]);
+      let t = addTime([1, Math.max(duration, 8)]);
+      if (t) {
+        dispatch(moveCursor(t[0], [t[1], t[2]]));
+      } else {
+        dispatch(setBarCount(appState, appState.song.part.bars.length + 1));
+      }
     }, 0);
-  }, [addTime]);
+  }, [addTime, dispatch, duration, appState]);
 
   const handleOctaveUp = useCallback(() => {
     keyboard.current?.onPhysicalKeyPress("up");
@@ -144,20 +195,17 @@ const Editor = forwardRef(function Editor(
     _ev => {
       setFocused(false);
     },
-    [editorDiv, setTime],
+    [setFocused],
   );
 
   const handleFocusIn = useCallback(() => {
-    if (time == null || preview == null) {
-      setTime([0, 0, 1]);
-    }
     setFocused(true);
-  }, [time, preview, setTime]);
+  }, [setFocused]);
 
   const handleNote = (base: string, mod: number) => {
     keyboard.current?.onPhysicalKeyPress(base, mod);
     const api = songRef.current;
-    if (!time || !api) {
+    if (!api) {
       return;
     }
 
@@ -165,9 +213,9 @@ const Editor = forwardRef(function Editor(
     let insertion = splitDurationIntoParts(
       api,
       appState,
-      barRefs[time[0]].current,
-      time[0],
-      [time[1], time[2]],
+      barRefs[cursorBarIdx].current,
+      cursorBarIdx,
+      [cursorTime[0], cursorTime[1]],
       durationFraction,
     );
     const midi = ({
@@ -192,18 +240,22 @@ const Editor = forwardRef(function Editor(
       );
 
     if (insertion && actualFraction) {
-      dispatch(
-        addNote({
-          barIdx: insertion.barIdx,
-          startTime: insertion.startTime,
-          divisions: insertion.divisions,
-          pitch: {
-            base: midi,
-            modifier: mod,
-          },
-        }),
-      );
-      addTime(actualFraction);
+      const t = addTime(actualFraction);
+      if (t) {
+        dispatch(
+          addNote({
+            barIdx: insertion.barIdx,
+            startTime: insertion.startTime,
+            divisions: insertion.divisions,
+            pitch: {
+              base: midi,
+              modifier: mod,
+            },
+            afterBarIdx: t[0],
+            afterTime: [t[1], t[2]],
+          }),
+        );
+      }
     }
   };
 
@@ -245,6 +297,7 @@ const Editor = forwardRef(function Editor(
         />
         <div style={{ position: "relative", cursor }}>
           <Scene
+            transient={appState !== validAppState}
             onHover={hoverInfo => {
               if ("bar" in hoverInfo && cursor !== "text") {
                 setCursor("text");
@@ -259,7 +312,10 @@ const Editor = forwardRef(function Editor(
                 hoverInfo.time != null &&
                 hoverInfo.pitch != null
               ) {
-                setTime([hoverInfo.bar, hoverInfo.time[0], hoverInfo.time[1]]);
+                const t = closestNoteBoundaryTo(hoverInfo.bar, hoverInfo.time);
+                if (t) {
+                  dispatch(moveCursor(t[0], [t[1], t[2]]));
+                }
               }
             }}
           >
@@ -346,10 +402,9 @@ const Editor = forwardRef(function Editor(
                                     )}
                                   >
                                     {focused &&
-                                      time &&
-                                      time[0] === barIdx &&
-                                      time[1] === startTime[0] &&
-                                      time[2] === startTime[1] && (
+                                      cursorBarIdx === barIdx &&
+                                      cursorTime[0] === startTime[0] &&
+                                      cursorTime[1] === startTime[1] && (
                                         <cursor className={css.cursor} />
                                       )}
                                   </rnc>
@@ -372,10 +427,9 @@ const Editor = forwardRef(function Editor(
                               isTemporary={true}
                             >
                               {focused &&
-                                time &&
-                                time[0] === barIdx &&
-                                time[1] === div.startTime[0] &&
-                                time[2] === div.startTime[1] && (
+                                cursorBarIdx === barIdx &&
+                                cursorTime[0] === div.startTime[0] &&
+                                cursorTime[1] === div.startTime[1] && (
                                   <cursor className={css.cursor} />
                                 )}
                             </rnc>

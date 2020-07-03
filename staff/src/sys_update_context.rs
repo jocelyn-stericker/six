@@ -5,7 +5,7 @@ use entity::{Entity, Join};
 use num_rational::Rational;
 use pitch::{key_signature_note_names, Clef, NoteModifier, NoteName};
 use rest_note_chord::{Context, PitchKind, RestNoteChord};
-use rhythm::Bar;
+use rhythm::{Bar, BarChild};
 
 /// Adds bar numbers to children of Staffs (BetweenBars and Bars).
 pub fn sys_update_context(
@@ -40,9 +40,9 @@ pub fn sys_update_context(
             }
             if let Some(bar) = bars.get(child) {
                 let mut accidentals = def_accidentals.clone();
-                for (_, _, grandchild, _) in bar.children() {
+                for BarChild { stencil, .. } in bar.children() {
                     if let (Some(context), Some(rnc)) =
-                        (contexts.get_mut(&grandchild), rncs.get(&grandchild))
+                        (contexts.get_mut(&stencil), rncs.get(&stencil))
                     {
                         context.bar = idx;
                         context.clef = clef;

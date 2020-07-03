@@ -4,7 +4,7 @@ use crate::sys_break_into_lines::STAFF_MARGIN;
 use crate::LineOfStaff;
 use entity::{Entity, Join};
 use kurbo::{Rect, Vec2};
-use rhythm::{Bar, RelativeRhythmicSpacing};
+use rhythm::{Bar, BarChild, RelativeRhythmicSpacing};
 use stencil::{Stencil, StencilMap};
 
 pub fn sys_print_staff(
@@ -29,17 +29,17 @@ pub fn sys_print_staff(
                 let start = 0f64;
                 let mut advance = start;
                 let mut beams = BTreeSet::new();
-                for (_, _, rnc_id, _) in bar.children() {
-                    let relative_spacing = spacing[&rnc_id];
+                for BarChild { stencil, .. } in bar.children() {
+                    let relative_spacing = spacing[&stencil];
 
                     bar_stencil =
-                        bar_stencil.and(rnc_id, Some(Vec2::new(relative_spacing.start_x, 0.0)));
+                        bar_stencil.and(stencil, Some(Vec2::new(relative_spacing.start_x, 0.0)));
                     advance = advance.max(relative_spacing.end_x);
-                    if let Some(beam) = beam_for_rnc.get(&rnc_id) {
+                    if let Some(beam) = beam_for_rnc.get(&stencil) {
                         beams.insert(*beam);
                     }
 
-                    for (rnc_child_id, _) in (children.get(&rnc_id), stencils).join() {
+                    for (rnc_child_id, _) in (children.get(&stencil), stencils).join() {
                         bar_stencil = bar_stencil
                             .and(rnc_child_id, Some(Vec2::new(relative_spacing.start_x, 0.0)));
                     }

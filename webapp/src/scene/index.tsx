@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { newRender, render } from "./reconciler";
 
+import StencilView, { StencilMeta, StencilOrStencilMap } from "./stencil_view";
+import { newRender, render } from "./reconciler";
 import css from "./index.module.scss";
 
 export { Clef } from "./reconciler";
@@ -20,76 +21,13 @@ export interface HoverInfo {
 }
 
 interface Props {
+  transient?: boolean;
   children: any;
   onMouseDown?: (info: null | HoverInfo, ev: React.MouseEvent) => void;
   onMouseUp?: (info: null | HoverInfo, ev: React.MouseEvent) => void;
   onClick?: (info: null | HoverInfo, ev: React.MouseEvent) => void;
   onMouseMove?: (ev: React.MouseEvent) => void;
   onHover: (info: HoverInfo) => void;
-}
-
-/** [entity, x, y, scale] */
-type StencilMapItem = [number, number, number];
-type StencilOrStencilMap = string | Array<StencilMapItem>;
-/** [x, y, x2, y2, barIdx, timeFracNum, timeFracDen, kind] */
-type StencilMeta = [
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-  number,
-];
-
-function StencilView({
-  id,
-  stencils,
-  stencilMeta,
-  transform,
-  classNames,
-}: {
-  id: number;
-  stencils: { [key: string]: StencilOrStencilMap };
-  stencilMeta: { [key: string]: StencilMeta };
-  transform?: string;
-  classNames: { [key: string]: string };
-}) {
-  const stencil = stencils[id];
-  if (!stencil) {
-    return null;
-  } else if (typeof stencil === "string") {
-    return (
-      <g
-        className={classNames[id] || undefined}
-        transform={transform}
-        data-entity-id={id}
-        dangerouslySetInnerHTML={{ __html: stencil }}
-      />
-    );
-  } else {
-    return (
-      <g
-        transform={transform}
-        data-entity-id={id}
-        className={classNames[id] || undefined}
-      >
-        {stencil.map(([childId, x, y]) => (
-          <StencilView
-            key={childId}
-            id={childId}
-            stencils={stencils}
-            stencilMeta={stencilMeta}
-            classNames={classNames}
-            transform={
-              typeof x === "number" ? `translate(${x}, ${y})` : undefined
-            }
-          />
-        ))}
-      </g>
-    );
-  }
 }
 
 export default function Scene(props: Props) {
@@ -118,6 +56,11 @@ export default function Scene(props: Props) {
   useLayoutEffect(() => {
     render(props.children, container);
     container.exec();
+
+    if (props.transient) {
+      return;
+    }
+
     let stencilPairs = container.stencils().split("\n");
     let stencilMapPairs = container.stencil_maps().split("\n");
     let stencilMetaPairs = container.get_stencil_bboxes().split("\n");
@@ -155,7 +98,7 @@ export default function Scene(props: Props) {
       width: (root && container.get_song_width(root)) || 0,
       height: (root && container.get_song_height(root)) || 0,
     });
-  }, [container, props.children]);
+  }, [container, props.children, props.transient]);
 
   const svg = useRef<SVGSVGElement>(null);
 

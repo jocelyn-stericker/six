@@ -2,7 +2,7 @@ use num_rational::Rational;
 
 use crate::{BetweenBars, LineOfStaff, Staff};
 use entity::{EntitiesRes, Entity, Join};
-use rhythm::{Bar, Duration, RelativeRhythmicSpacing};
+use rhythm::{Bar, BarChild, Duration, RelativeRhythmicSpacing};
 use std::collections::HashMap;
 use stencil::Stencil;
 
@@ -90,8 +90,11 @@ impl PartialSolution {
             mid: entity,
             end: entity,
         });
-        for (duration, _, entity, _) in bar.children() {
-            let stencil = &stencils[&entity];
+        for BarChild {
+            duration, stencil, ..
+        } in bar.children()
+        {
+            let stencil = &stencils[&stencil];
             self.shortest = self.shortest.min(duration.duration());
             self.children
                 .push(ItemMeta::Note(duration, entity, stencil.rect().x1));
@@ -204,15 +207,21 @@ impl PartialSolution {
         for maybe_bar in &self.entities {
             if let Some(bar) = bars.get(&maybe_bar.mid) {
                 let mut advance = 200f64;
-                for (dur, t, entity, _) in bar.children() {
-                    let mut my_spacing = RelativeRhythmicSpacing::new(self.shortest, &dur);
-                    my_spacing.t = t;
+                for BarChild {
+                    duration,
+                    start,
+                    stencil,
+                    ..
+                } in bar.children()
+                {
+                    let mut my_spacing = RelativeRhythmicSpacing::new(self.shortest, &duration);
+                    my_spacing.t = start;
                     my_spacing.start_x = advance;
                     my_spacing.end_x = advance + advance_step * my_spacing.relative();
 
                     advance = my_spacing.end_x;
 
-                    spacing.insert(entity, my_spacing);
+                    spacing.insert(stencil, my_spacing);
                 }
             }
         }
