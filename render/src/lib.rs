@@ -7,16 +7,16 @@ use sys_delete_orphans::sys_delete_orphans;
 use sys_print_meta::sys_print_meta;
 use sys_print_song::sys_print_song;
 
-use entity::{EntitiesRes, Entity, Join};
+use chord::{
+    sys_apply_warp, sys_draft_beaming, sys_print_beams, sys_print_chord, sys_print_cursors,
+    sys_record_space_time_warp, sys_space_beams, sys_update_chord_timing, Beam, Chord, Context,
+    PitchKind, SpaceTimeWarp,
+};
 use kurbo::{Affine, Point, Rect, Size, Vec2};
 use num_rational::Rational;
 use pitch::{Clef, NoteModifier, Pitch};
-use rest_note_chord::{
-    sys_apply_warp, sys_draft_beaming, sys_print_beams, sys_print_cursors, sys_print_rnc,
-    sys_record_space_time_warp, sys_space_beams, sys_update_rnc_timing, Beam, Context, PitchKind,
-    RestNoteChord, SpaceTimeWarp,
-};
-use rhythm::{Bar, BarChild, Duration, Lifetime, Metre, NoteValue, RelativeRhythmicSpacing};
+use rhythm::{Bar, BarChild, Duration, Lifetime, Metre, NoteValue, Spacing};
+use specs::{Component, Entities, Entity, HashMapStorage, NullStorage, VecStorage};
 use staff::{
     sys_break_into_lines, sys_print_between_bars, sys_print_staff, sys_print_staff_lines,
     sys_update_context, Barline, BetweenBars, BreakIntoLineComponents, LineOfStaff, Staff,
@@ -26,100 +26,29 @@ use std::convert::TryInto;
 use stencil::{sys_update_world_bboxes, Pdf, Stencil, StencilMap};
 use wasm_bindgen::prelude::*;
 
-#[derive(Debug)]
-pub struct Song {
-    freeze_spacing: Option<isize>,
-    prev_freeze_spacing: Option<isize>,
-
-    /// In mm
-    width: f64,
-
-    /// In mm
-    height: f64,
-
-    /// Convert from staff-size (1 unit is 1 staff) to paper-size (1 unit is 1 mm)
-    ///
-    /// Behind Bars, p483.
-    ///
-    /// Rastal sizes vary from 0 to 8, where 0 is large and 8 is small.
-    ///  - 0 and 1 are used for educational music.
-    ///  - 2 is not generally used, but is sometimes used for piano music/songs.
-    ///  - 3-4 are commonly used for single-staff-parts, piano music, and songs.
-    ///  - 5 is less commonly used for single-staff-parts, piano music, and songs.
-    ///  - 6-7 are used for choral music, cue saves, or ossia.
-    ///  - 8 is used for full scores.
-    rastal_size: u8,
-
-    title: String,
-    title_width: f64,
-    title_stencil: Option<Entity>,
-
-    author: String,
-    author_width: f64,
-    author_stencil: Option<Entity>,
-}
-
-impl Default for Song {
-    fn default() -> Song {
-        Song {
-            freeze_spacing: None,
-            prev_freeze_spacing: None,
-
-            width: 0f64,
-            height: 0f64,
-            rastal_size: 3,
-            title: String::default(),
-            title_width: 0f64,
-            title_stencil: None,
-            author: String::default(),
-            author_width: 0f64,
-            author_stencil: None,
-        }
-    }
-}
-
-impl Song {
-    pub fn scale(&self) -> f64 {
-        match self.rastal_size {
-            0 => 9.2 / 1000.0,
-            1 => 7.9 / 1000.0,
-            2 => 7.4 / 1000.0,
-            3 => 7.0 / 1000.0,
-            4 => 6.5 / 1000.0,
-            5 => 6.0 / 1000.0,
-            6 => 5.5 / 1000.0,
-            7 => 4.8 / 1000.0,
-            8 => 3.7 / 1000.0,
-            _ => panic!("Expected rastal size <= 8"),
-        }
-    }
-}
-
 #[wasm_bindgen]
 #[derive(Debug, Default)]
 pub struct Render {
-    entities: EntitiesRes,
-
-    root: Option<Entity>,
-    parents: HashMap<Entity, Entity>,
-
-    songs: HashMap<Entity, Song>,
-    staffs: HashMap<Entity, Staff>,
-    line_of_staffs: HashMap<Entity, LineOfStaff>,
-    bars: HashMap<Entity, Bar>,
-    between_bars: HashMap<Entity, BetweenBars>,
-    rncs: HashMap<Entity, RestNoteChord>,
-    beams: HashMap<Entity, Beam>,
-    beam_for_rnc: HashMap<Entity, Entity>,
-    stencils: HashMap<Entity, Stencil>,
-    stencil_maps: HashMap<Entity, StencilMap>,
-    world_bbox: HashMap<Entity, Rect>,
-    contexts: HashMap<Entity, Context>,
-    spacing: HashMap<Entity, RelativeRhythmicSpacing>,
-    ordered_children: HashMap<Entity, Vec<Entity>>,
-    warps: HashMap<Entity, SpaceTimeWarp>,
-    attachments: HashMap<Entity, Option<Point>>,
-    cursors: HashMap<Entity, ()>,
+    entities: Entities,
+    // root: Option<Entity>,
+    // parents: HashMap<Entity, Entity>,
+    // songs: HashMap<Entity, Song>,
+    // staffs: HashMap<Entity, Staff>,
+    // line_of_staffs: HashMap<Entity, LineOfStaff>,
+    // bars: HashMap<Entity, Bar>,
+    // between_bars: HashMap<Entity, BetweenBars>,
+    // chords: HashMap<Entity, Chord>,
+    // beams: HashMap<Entity, Beam>,
+    // beam_for_chord: HashMap<Entity, Entity>,
+    // stencils: HashMap<Entity, Stencil>,
+    // stencil_maps: HashMap<Entity, StencilMap>,
+    // world_bbox: HashMap<Entity, Rect>,
+    // contexts: HashMap<Entity, Context>,
+    // spacing: HashMap<Entity, Spacing>,
+    // ordered_children: HashMap<Entity, Vec<Entity>>,
+    // warps: HashMap<Entity, SpaceTimeWarp>,
+    // attachments: HashMap<Entity, Option<Point>>,
+    // cursors: HashMap<Entity, ()>,
 }
 
 /// A DOM-based interface to Six Eight's ECS.
@@ -318,7 +247,7 @@ impl Render {
         } in bar.children()
         {
             if !lifetime.is_temporary()
-                && !self.rncs.get(&stencil).unwrap().pitch.is_rest()
+                && !self.chords.get(&stencil).unwrap().pitch.is_rest()
                 && t.1 > start
                 && t.1 < start + duration.duration()
             {
@@ -346,7 +275,7 @@ impl Render {
         entity.id()
     }
 
-    /// Inserts a RestNoteChord into a bar.
+    /// Inserts a Chord into a bar.
     ///
     /// Note that children of bars are not ordered, instead children have a `start` property.
     pub fn bar_insert(&mut self, bar: usize, child: usize, is_temporary: bool) {
@@ -358,11 +287,12 @@ impl Render {
         }
 
         if let Some(bar) = self.bars.get_mut(&bar_id) {
-            if let (Some(rnc), Some(start)) = (self.rncs.get(&child), self.contexts.get(&child)) {
+            if let (Some(chord), Some(start)) = (self.chords.get(&child), self.contexts.get(&child))
+            {
                 bar.splice(
                     start.beat,
                     vec![(
-                        rnc.duration(),
+                        chord.duration(),
                         if is_temporary {
                             Lifetime::Temporary(child)
                         } else {
@@ -375,7 +305,7 @@ impl Render {
         }
     }
 
-    /// Remove a RestNoteChord from a bar.
+    /// Remove a Chord from a bar.
     ///
     /// Note that children of bars are not ordered, instead children have a `start` property.
     pub fn bar_remove(&mut self, bar: usize, child: usize) {
@@ -403,8 +333,8 @@ impl Render {
         }
     }
 
-    /// Create a RestNoteChord, without attaching it to a bar.
-    pub fn rnc_create(
+    /// Create a Chord, without attaching it to a bar.
+    pub fn chord_create(
         &mut self,
         note_value: isize,
         dots: u8,
@@ -416,11 +346,10 @@ impl Render {
 
         let entity = self.entities.create();
 
-        self.spacing
-            .insert(entity, RelativeRhythmicSpacing::default());
-        self.rncs.insert(
+        self.spacing.insert(entity, Spacing::default());
+        self.chords.insert(
             entity,
-            RestNoteChord::new(Duration::new(note_value, dots, None), PitchKind::Rest),
+            Chord::new(Duration::new(note_value, dots, None), PitchKind::Rest),
         );
         self.ordered_children.insert(entity, vec![]);
         self.contexts.insert(
@@ -436,32 +365,32 @@ impl Render {
         entity.id()
     }
 
-    pub fn rnc_set_rest(&mut self, rnc_id: usize) {
-        let rnc_id = Entity::new(rnc_id);
-        if let Some(rnc) = self.rncs.get_mut(&rnc_id) {
-            rnc.pitch = PitchKind::Rest;
+    pub fn chord_set_rest(&mut self, chord_id: usize) {
+        let chord_id = Entity::new(chord_id);
+        if let Some(chord) = self.chords.get_mut(&chord_id) {
+            chord.pitch = PitchKind::Rest;
         }
     }
 
-    pub fn rnc_set_unpitched(&mut self, rnc_id: usize) {
-        let rnc_id = Entity::new(rnc_id);
-        if let Some(rnc) = self.rncs.get_mut(&rnc_id) {
-            rnc.pitch = PitchKind::Unpitched;
+    pub fn chord_set_unpitched(&mut self, chord_id: usize) {
+        let chord_id = Entity::new(chord_id);
+        if let Some(chord) = self.chords.get_mut(&chord_id) {
+            chord.pitch = PitchKind::Unpitched;
         }
     }
 
-    pub fn rnc_set_pitch(&mut self, rnc_id: usize, midi: u8, modifier: i8) {
-        let rnc_id = Entity::new(rnc_id);
-        if let Some(rnc) = self.rncs.get_mut(&rnc_id) {
-            rnc.pitch = PitchKind::Pitch(
+    pub fn chord_set_pitch(&mut self, chord_id: usize, midi: u8, modifier: i8) {
+        let chord_id = Entity::new(chord_id);
+        if let Some(chord) = self.chords.get_mut(&chord_id) {
+            chord.pitch = PitchKind::Pitch(
                 Pitch::from_base_midi(midi, NoteModifier::from_raw(modifier)).unwrap_or_default(),
             );
         }
     }
 
-    pub fn rnc_update_time(
+    pub fn chord_update_time(
         &mut self,
-        rnc_id: usize,
+        chord_id: usize,
         note_value: isize,
         dots: u8,
         start_numer: isize,
@@ -469,26 +398,26 @@ impl Render {
         is_temporary: bool,
     ) {
         let note_value = NoteValue::new(note_value).unwrap();
-        let rnc_id = Entity::new(rnc_id);
-        if let Some(parent_id) = self.parents.get(&rnc_id).copied() {
-            if let (Some(rnc), Some(bar), Some(start)) = (
-                self.rncs.get_mut(&rnc_id),
+        let chord_id = Entity::new(chord_id);
+        if let Some(parent_id) = self.parents.get(&chord_id).copied() {
+            if let (Some(chord), Some(bar), Some(start)) = (
+                self.chords.get_mut(&chord_id),
                 self.bars.get_mut(&parent_id),
-                self.contexts.get_mut(&rnc_id),
+                self.contexts.get_mut(&chord_id),
             ) {
-                bar.remove(rnc_id);
+                bar.remove(chord_id);
                 start.beat = Rational::new(start_numer, start_denom);
                 start.natural_beat = start.beat;
-                rnc.duration = Duration::new(note_value, dots, None);
-                rnc.natural_duration = rnc.duration;
+                chord.duration = Duration::new(note_value, dots, None);
+                chord.natural_duration = chord.duration;
                 bar.splice(
                     start.beat,
                     vec![(
-                        rnc.duration(),
+                        chord.duration(),
                         if is_temporary {
-                            Lifetime::Temporary(rnc_id)
+                            Lifetime::Temporary(chord_id)
                         } else {
-                            Lifetime::Explicit(rnc_id)
+                            Lifetime::Explicit(chord_id)
                         },
                     )],
                 );
@@ -509,16 +438,16 @@ impl Render {
     fn fixup_bar(&mut self, parent_id: Entity) {
         // Fix previously overlapping notes.
         if let Some(bar) = self.bars.get_mut(&parent_id) {
-            for (other_rnc_id, (rnc, parent, start)) in
-                (&mut self.rncs, &self.parents, &mut self.contexts).join()
+            for (other_chord_id, (chord, parent, start)) in
+                (&mut self.chords, &self.parents, &mut self.contexts).join()
             {
-                if (rnc.natural_duration != rnc.duration || start.natural_beat != start.beat)
+                if (chord.natural_duration != chord.duration || start.natural_beat != start.beat)
                     && *parent == parent_id
                 {
-                    rnc.duration = rnc.natural_duration;
+                    chord.duration = chord.natural_duration;
                     start.beat = start.natural_beat;
-                    if let Some(lifetime) = bar.remove(other_rnc_id) {
-                        bar.splice(start.beat, vec![(rnc.duration(), lifetime)]);
+                    if let Some(lifetime) = bar.remove(other_chord_id) {
+                        bar.splice(start.beat, vec![(chord.duration(), lifetime)]);
                     }
                 }
             }
@@ -613,7 +542,7 @@ impl Render {
                 .keys()
                 .copied()
                 .collect::<HashSet<Entity>>(),
-            self.rncs.keys().copied().collect::<HashSet<Entity>>(),
+            self.chords.keys().copied().collect::<HashSet<Entity>>(),
             self.stencils.keys().copied().collect::<HashSet<Entity>>(),
             self.stencil_maps
                 .keys()
@@ -657,7 +586,7 @@ impl Render {
                 &mut self.staffs,
                 &mut self.bars,
                 &mut self.between_bars,
-                &mut self.rncs,
+                &mut self.chords,
                 &mut self.contexts,
                 &mut self.stencils,
                 &mut self.stencil_maps,
@@ -665,15 +594,15 @@ impl Render {
                 &mut self.ordered_children,
                 &mut self.warps,
                 &mut self.beams,
-                &mut self.beam_for_rnc,
+                &mut self.beam_for_chord,
                 &mut self.attachments,
                 &mut self.cursors,
             ],
         );
 
-        sys_update_rnc_timing(
+        sys_update_chord_timing(
             &self.entities,
-            &mut self.rncs,
+            &mut self.chords,
             &mut self.contexts,
             &mut self.bars,
             &mut self.spacing,
@@ -685,7 +614,7 @@ impl Render {
             &self.entities,
             &self.bars,
             &mut self.parents,
-            &mut self.beam_for_rnc,
+            &mut self.beam_for_chord,
             &mut self.beams,
         );
 
@@ -694,14 +623,14 @@ impl Render {
             &self.ordered_children,
             &self.bars,
             &self.between_bars,
-            &self.rncs,
+            &self.chords,
             &mut self.contexts,
         );
 
-        sys_print_rnc(
-            &self.rncs,
+        sys_print_chord(
+            &self.chords,
             &self.contexts,
-            &self.beam_for_rnc,
+            &self.beam_for_chord,
             &mut self.attachments,
             &mut self.stencils,
         );
@@ -732,7 +661,7 @@ impl Render {
         sys_space_beams(
             &self.bars,
             &self.spacing,
-            &self.beam_for_rnc,
+            &self.beam_for_chord,
             &self.attachments,
             &mut self.beams,
         );
@@ -744,7 +673,7 @@ impl Render {
         sys_print_staff(
             &mut self.line_of_staffs,
             &self.bars,
-            &self.beam_for_rnc,
+            &self.beam_for_chord,
             &self.spacing,
             &self.stencils,
             &self.ordered_children,
@@ -828,7 +757,7 @@ impl Render {
         for (entity, bbox) in &self.world_bbox {
             let start = self.contexts.get(entity);
             lines.push(entity.id().to_string());
-            let kind = if self.rncs.contains_key(entity) {
+            let kind = if self.chords.contains_key(entity) {
                 0
             } else if self.between_bars.contains_key(entity) {
                 1
@@ -1023,20 +952,20 @@ mod tests {
         let bar1 = render.bar_create(4, 4);
         render.child_append(staff, bar1);
 
-        let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
-        render.rnc_set_unpitched(rnc1);
+        let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
+        render.chord_set_unpitched(chord1);
 
-        render.bar_insert(bar1, rnc1, false);
+        render.bar_insert(bar1, chord1, false);
         let barline = render.between_bars_create(Some(Barline::Normal), None, None, None, Some(0));
         render.child_append(staff, barline);
 
         let bar2 = render.bar_create(4, 4);
         render.child_append(staff, bar2);
 
-        let rnc2 = render.rnc_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4);
-        render.rnc_set_unpitched(rnc2);
+        let chord2 = render.chord_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4);
+        render.chord_set_unpitched(chord2);
 
-        render.bar_insert(bar2, rnc2, false);
+        render.bar_insert(bar2, chord2, false);
 
         let final_barline =
             render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
@@ -1047,7 +976,7 @@ mod tests {
 
         render.exec();
 
-        render.rnc_update_time(rnc1, NoteValue::Eighth.log2() as isize, 0, 4, 16, false);
+        render.chord_update_time(chord1, NoteValue::Eighth.log2() as isize, 0, 4, 16, false);
 
         snapshot("./snapshots/hello_world.svg", &render.print_for_demo());
 
@@ -1061,7 +990,7 @@ mod tests {
         assert_eq!(render.line_of_staffs.len(), 0);
         assert_eq!(render.bars.len(), 0);
         assert_eq!(render.between_bars.len(), 0);
-        assert_eq!(render.rncs.len(), 0);
+        assert_eq!(render.chords.len(), 0);
         assert_eq!(render.stencils.len(), 0);
         assert_eq!(render.stencil_maps.len(), 0);
         assert_eq!(render.world_bbox.len(), 0);
@@ -1088,13 +1017,13 @@ mod tests {
         let bar1 = render.bar_create(4, 4);
         render.child_append(staff, bar1);
 
-        let rnc1 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 0, 1);
-        let rnc2 = render.rnc_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
+        let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 0, 1);
+        let chord2 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
 
-        render.rnc_set_pitch(rnc1, 60, 0);
-        render.bar_insert(bar1, rnc1, false);
-        render.rnc_set_pitch(rnc2, 60, 0);
-        render.bar_insert(bar1, rnc2, false);
+        render.chord_set_pitch(chord1, 60, 0);
+        render.bar_insert(bar1, chord1, false);
+        render.chord_set_pitch(chord2, 60, 0);
+        render.bar_insert(bar1, chord2, false);
 
         let final_barline =
             render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));

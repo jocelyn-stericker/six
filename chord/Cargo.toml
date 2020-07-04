@@ -1,16 +1,21 @@
 [package]
-name = "stencil"
+name = "chord"
 version = "0.1.0"
 authors = ["Joshua Netterfield <joshua@nettek.ca>"]
 edition = "2018"
 license = "AGPL-3.0-or-later"
-description = "A type which represents a rendered object, composed of a bezier path and a bounding box."
+description = "Render rest, notes, and chords"
 repository = "https://github.com/jnetterf/six"
 
 [dependencies]
+rhythm = {path = "../rhythm"}
+stencil = {path = "../stencil"}
+pitch = {path = "../pitch"}
 kurbo = "0.5.11"
-deflate = "0.8.4"
-base64 = "0.12.0"
+
+[dependencies.num-rational]
+version = "0.2.4"
+default-features = false
 
 [dependencies.specs]
 version = "0.16.1"

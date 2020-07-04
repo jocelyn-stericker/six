@@ -41,7 +41,7 @@ export enum NoteValue {
 }
 
 interface Instance {
-  type: "song" | "staff" | "bar" | "between" | "rnc" | "cursor";
+  type: "song" | "staff" | "bar" | "between" | "chord" | "cursor";
   container: RustRenderApi;
   entity: number;
   meta: any;
@@ -96,7 +96,7 @@ export interface BetweenBarsProps extends Stylable {
   barline?: Barline | undefined;
 }
 
-export interface RncProps extends Stylable {
+export interface ChordProps extends Stylable {
   key?: string | number | null | undefined;
   ref?: Ref<number>;
   noteValue: number;
@@ -117,7 +117,7 @@ type CreateInstanceParam =
   | { type: "staff"; props: StaffProps }
   | { type: "bar"; props: BarProps }
   | { type: "between"; props: BetweenBarsProps }
-  | { type: "rnc"; props: RncProps }
+  | { type: "chord"; props: ChordProps }
   | { type: "cursor"; props: CursorProps };
 
 type TypedInstrinsicProps = {
@@ -125,7 +125,7 @@ type TypedInstrinsicProps = {
   staff: StaffProps;
   bar: BarProps;
   between: BetweenBarsProps;
-  rnc: RncProps;
+  chord: ChordProps;
 };
 
 let context = document.createElement("canvas").getContext("2d", {});
@@ -144,7 +144,7 @@ function createInstance(
   spec: CreateInstanceParam,
   container: RustRenderApi,
 ): Instance | null {
-  let type: "song" | "staff" | "bar" | "between" | "rnc" | "cursor";
+  let type: "song" | "staff" | "bar" | "between" | "chord" | "cursor";
   let entity;
   let meta: any = null;
 
@@ -181,9 +181,9 @@ function createInstance(
       spec.props.tsDen || undefined,
       spec.props.ks,
     );
-  } else if (spec.type === "rnc") {
-    type = "rnc";
-    entity = container.rnc_create(
+  } else if (spec.type === "chord") {
+    type = "chord";
+    entity = container.chord_create(
       spec.props.noteValue,
       spec.props.dots,
       spec.props.startNum,
@@ -191,16 +191,16 @@ function createInstance(
     );
     if (spec.props.isNote) {
       if (spec.props.pitch == null) {
-        container.rnc_set_unpitched(entity);
+        container.chord_set_unpitched(entity);
       } else if (spec.props.pitch) {
-        container.rnc_set_pitch(
+        container.chord_set_pitch(
           entity,
           spec.props.pitch,
           spec.props.pitchModifier ?? 0,
         );
       }
     } else {
-      container.rnc_set_rest(entity);
+      container.chord_set_rest(entity);
     }
     meta = {
       isTemporary: spec.props.isTemporary || false,
@@ -368,14 +368,14 @@ const Reconciler = ReactReconciler({
       }
     }
 
-    if (is(type, "rnc", oldProps) && is(type, "rnc", newProps)) {
+    if (is(type, "chord", oldProps) && is(type, "chord", newProps)) {
       if (
         oldProps.startNum !== newProps.startNum ||
         oldProps.startDen !== newProps.startDen ||
         oldProps.noteValue !== newProps.noteValue ||
         oldProps.dots !== newProps.dots
       ) {
-        instance.container.rnc_update_time(
+        instance.container.chord_update_time(
           instance.entity,
           newProps.noteValue,
           newProps.dots,
@@ -391,16 +391,16 @@ const Reconciler = ReactReconciler({
       ) {
         if (newProps.isNote) {
           if (newProps.pitch == null) {
-            instance.container.rnc_set_unpitched(instance.entity);
+            instance.container.chord_set_unpitched(instance.entity);
           } else {
-            instance.container.rnc_set_pitch(
+            instance.container.chord_set_pitch(
               instance.entity,
               newProps.pitch,
               newProps.pitchModifier ?? 0,
             );
           }
         } else {
-          instance.container.rnc_set_rest(instance.entity);
+          instance.container.chord_set_rest(instance.entity);
         }
       }
     }

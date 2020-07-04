@@ -365,7 +365,7 @@ const Editor = forwardRef(function Editor(
                             <React.Fragment key={divisionIdx}>
                               {divisions.map(
                                 ({ noteValue, dots, startTime }, jdx) => (
-                                  <rnc
+                                  <chord
                                     className={css.note}
                                     key={jdx}
                                     noteValue={noteValue}
@@ -407,7 +407,7 @@ const Editor = forwardRef(function Editor(
                                       cursorTime[1] === startTime[1] && (
                                         <cursor className={css.cursor} />
                                       )}
-                                  </rnc>
+                                  </chord>
                                 ),
                               )}
                             </React.Fragment>
@@ -416,7 +416,7 @@ const Editor = forwardRef(function Editor(
                         {preview &&
                           preview.barIdx === barIdx &&
                           preview.divisions.map((div, idx) => (
-                            <rnc
+                            <chord
                               key={idx}
                               className={css.noteHoverPreview}
                               noteValue={div.noteValue}
@@ -432,7 +432,7 @@ const Editor = forwardRef(function Editor(
                                 cursorTime[1] === div.startTime[1] && (
                                   <cursor className={css.cursor} />
                                 )}
-                            </rnc>
+                            </chord>
                           ))}
                       </bar>
                       <Between

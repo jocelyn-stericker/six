@@ -11,9 +11,8 @@ repository = "https://github.com/jnetterf/six"
 crate-type = ["cdylib"]
 
 [dependencies]
-entity = { path = "../entity" }
 pitch = { path = "../pitch" }
-rest_note_chord = { path = "../rest_note_chord" }
+chord = { path = "../chord" }
 rhythm = { path = "../rhythm" }
 staff = { path = "../staff" }
 stencil = { path = "../stencil" }
@@ -23,4 +22,8 @@ base64 = "0.12.0"
 
 [dependencies.num-rational]
 version = "0.2.4"
+default-features = false
+
+[dependencies.specs]
+version = "0.16.1"
 default-features = false

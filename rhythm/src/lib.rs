@@ -1,11 +1,11 @@
-mod bar;
+mod bar_child;
+pub mod components;
 mod duration;
+mod lifetime;
 mod metre;
 mod rhythmic_beaming;
-mod spacing;
 
-pub use bar::{Bar, BarChild, Lifetime};
+pub use bar_child::BarChild;
 pub use duration::{Duration, NoteValue};
 pub use metre::{Metre, MetreSegment, Subdivision, Superdivision};
 pub use rhythmic_beaming::RhythmicBeaming;
-pub use spacing::RelativeRhythmicSpacing;

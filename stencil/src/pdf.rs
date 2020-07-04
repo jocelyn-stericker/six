@@ -1,10 +1,10 @@
 //! This is a heavily modified version of the pdfpdf crate by Benjamin Kimock <kimockb@gmail.com> (aka. saethlin)
 //! This is lightly adapted from https://github.com/servo/pathfinder/tree/master/export/src
 
-use crate::{CombineStencil, Stencil, StencilMap};
+use crate::components::{CombineStencil, Stencil, StencilMap};
 use deflate::Compression;
-use entity::Entity;
 use kurbo::{Affine, BezPath, PathEl, Point, Size};
+use specs::Entity;
 use std::collections::HashMap;
 use std::io::{self, Write};
 

@@ -3,10 +3,9 @@ overflow-checks = false     # Disable integer overflow checks.
 
 [workspace]
 members = [
-    "entity",
     "pitch",
     "render",
-    "rest_note_chord",
+    "chord",
     "rhythm",
     "staff",
     "stencil",

@@ -7,9 +7,6 @@ license = "AGPL-3.0-or-later"
 description = "Types and algorithms for spelling and managing rhythms and meter"
 repository = "https://github.com/jnetterf/six"
 
-[dependencies]
-entity = {path = "../entity"}
-
 [dependencies.num-rational]
 version = "0.2.4"
 default-features = false
@@ -21,3 +18,8 @@ default-features = false
 [dependencies.num-integer]
 version = "0.1.42"
 default-features = false
+
+[dependencies.specs]
+version = "0.16.1"
+default-features = false
+
