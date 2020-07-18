@@ -1,9 +1,9 @@
-use crate::BeamAttachement;
-use specs::{storage::BTreeStorage, Component};
+use crate::BeamAttachment;
+use specs::{Component, VecStorage};
 
 #[derive(Debug)]
-pub struct Beam(pub Vec<BeamAttachement>);
+pub struct Beam(pub Vec<BeamAttachment>);
 
 impl Component for Beam {
-    type Storage = BTreeStorage<Beam>;
+    type Storage = VecStorage<Beam>;
 }

@@ -1,57 +1,101 @@
 #![allow(clippy::blacklisted_name)]
 
-mod sys_delete_orphans;
-mod sys_print_meta;
-mod sys_print_song;
-use sys_delete_orphans::sys_delete_orphans;
-use sys_print_meta::sys_print_meta;
-use sys_print_song::sys_print_song;
+mod systems;
 
+use crate::systems::{DeleteOrphans, PrintMeta, PrintSong, UpdateKeepSpacing, UpdateWorldBbox};
 use chord::{
-    sys_apply_warp, sys_draft_beaming, sys_print_beams, sys_print_chord, sys_print_cursors,
-    sys_record_space_time_warp, sys_space_beams, sys_update_chord_timing, Beam, Chord, Context,
-    PitchKind, SpaceTimeWarp,
+    components::{Beam, BeamForChord, Chord, Context, FlagAttachment, SpaceTimeWarp},
+    resources::KeepSpacing,
+    systems::{
+        ApplySpaceTimeWarp, DraftBeam, PrintBeam, PrintChord, RecordSpaceTimeWarp, SpaceBeam,
+        UpdateTiming,
+    },
+    PitchKind,
 };
-use kurbo::{Affine, Point, Rect, Size, Vec2};
+use kurbo::{Affine, Size, Vec2};
 use num_rational::Rational;
 use pitch::{Clef, NoteModifier, Pitch};
-use rhythm::{Bar, BarChild, Duration, Lifetime, Metre, NoteValue, Spacing};
-use specs::{Component, Entities, Entity, HashMapStorage, NullStorage, VecStorage};
-use staff::{
-    sys_break_into_lines, sys_print_between_bars, sys_print_staff, sys_print_staff_lines,
-    sys_update_context, Barline, BetweenBars, BreakIntoLineComponents, LineOfStaff, Staff,
+use rhythm::{
+    components::{Bar, Spacing},
+    BarChild, Duration, Lifetime, Metre, NoteValue,
 };
-use std::collections::{HashMap, HashSet};
+use specs::{Builder, Entity, Join, RunNow, World, WorldExt};
+use staff::{
+    components::{BetweenBars, Children, Cursor, LineOfStaff, Song, Staff},
+    resources::Root,
+    systems::{
+        BreakIntoLines, PrintBetweenBar, PrintCursor, PrintStaff, PrintStaffLines, UpdateContext,
+    },
+    Barline,
+};
 use std::convert::TryInto;
-use stencil::{sys_update_world_bboxes, Pdf, Stencil, StencilMap};
+use stencil::{
+    components::{Parent, Stencil, StencilMap, WorldBbox},
+    Pdf,
+};
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen]
-#[derive(Debug, Default)]
-pub struct Render {
-    entities: Entities,
-    // root: Option<Entity>,
-    // parents: HashMap<Entity, Entity>,
-    // songs: HashMap<Entity, Song>,
-    // staffs: HashMap<Entity, Staff>,
-    // line_of_staffs: HashMap<Entity, LineOfStaff>,
-    // bars: HashMap<Entity, Bar>,
-    // between_bars: HashMap<Entity, BetweenBars>,
-    // chords: HashMap<Entity, Chord>,
-    // beams: HashMap<Entity, Beam>,
-    // beam_for_chord: HashMap<Entity, Entity>,
-    // stencils: HashMap<Entity, Stencil>,
-    // stencil_maps: HashMap<Entity, StencilMap>,
-    // world_bbox: HashMap<Entity, Rect>,
-    // contexts: HashMap<Entity, Context>,
-    // spacing: HashMap<Entity, Spacing>,
-    // ordered_children: HashMap<Entity, Vec<Entity>>,
-    // warps: HashMap<Entity, SpaceTimeWarp>,
-    // attachments: HashMap<Entity, Option<Point>>,
-    // cursors: HashMap<Entity, ()>,
+#[derive(Default)]
+struct Systems {
+    apply_space_time_warp: ApplySpaceTimeWarp,
+    draft_beam: DraftBeam,
+    print_beam: PrintBeam,
+    print_chord: PrintChord,
+    record_space_time_warp: RecordSpaceTimeWarp,
+    space_beam: SpaceBeam,
+    update_timing: UpdateTiming,
+    break_into_lines: BreakIntoLines,
+    print_between_bar: PrintBetweenBar,
+    print_staff: PrintStaff,
+    print_staff_lines: PrintStaffLines,
+    print_cursor: PrintCursor,
+    delete_orphans: DeleteOrphans,
+    print_meta: PrintMeta,
+    print_song: PrintSong,
+    update_keep_spacing: UpdateKeepSpacing,
+    update_world_bbox: UpdateWorldBbox,
+    update_context: UpdateContext,
 }
 
-/// A DOM-based interface to Six Eight's ECS.
+#[wasm_bindgen]
+pub struct Render {
+    world: World,
+
+    systems: Systems,
+}
+
+impl Default for Render {
+    fn default() -> Render {
+        let mut world = World::new();
+        world.insert(Root(None));
+        world.insert(KeepSpacing(false));
+        world.register::<Parent>();
+        world.register::<Song>();
+        world.register::<Staff>();
+        world.register::<LineOfStaff>();
+        world.register::<Bar>();
+        world.register::<BetweenBars>();
+        world.register::<Chord>();
+        world.register::<Beam>();
+        world.register::<BeamForChord>();
+        world.register::<Stencil>();
+        world.register::<StencilMap>();
+        world.register::<WorldBbox>();
+        world.register::<Context>();
+        world.register::<Spacing>();
+        world.register::<Children>();
+        world.register::<SpaceTimeWarp>();
+        world.register::<FlagAttachment>();
+        world.register::<Cursor>();
+
+        Self {
+            world,
+            systems: Default::default(),
+        }
+    }
+}
+
+// /// A DOM-based interface to Six Eight's ECS.
 #[wasm_bindgen]
 impl Render {
     pub fn new() -> Render {
@@ -59,19 +103,21 @@ impl Render {
     }
 
     /// Set the Song entity to be rendered.
-    pub fn root_set(&mut self, song: usize) {
-        if self.root.is_none() {
-            let song = Entity::new(song);
-            self.root = Some(song);
+    pub fn root_set(&mut self, song: u32) {
+        let song = self.world.entities().entity(song);
+        if let Some(root) = self.world.get_mut::<Root>() {
+            if root.0.is_none() {
+                *root = Root(Some(song));
+            }
         }
     }
 
     /// Clear the Song entity to be rendered.
-    pub fn root_clear(&mut self, song: usize) {
-        if let Some(root) = self.root {
-            let song = Entity::new(song);
-            if root == song {
-                self.root = None;
+    pub fn root_clear(&mut self, song: u32) {
+        let song = self.world.entities().entity(song);
+        if let Some(root) = self.world.get_mut::<Root>() {
+            if root.0 == Some(song) {
+                *root = Root(None);
             }
         }
     }
@@ -79,17 +125,20 @@ impl Render {
     /// Append `child` to the `parent` ordered container.
     ///
     /// If `child` already has a parent, nothing will happen.
-    pub fn child_append(&mut self, parent: usize, child: usize) {
-        let parent_id = Entity::new(parent);
-        let child = Entity::new(child);
+    pub fn child_append(&mut self, parent: u32, child: u32) {
+        let parent = self.world.entities().entity(parent);
+        let child = self.world.entities().entity(child);
 
-        if self.parents.contains_key(&child) {
+        let mut parents = self.world.write_component::<Parent>();
+        let mut children = self.world.write_component::<Children>();
+
+        if parents.contains(child) {
             return;
         }
 
-        if let Some(ordered_children) = self.ordered_children.get_mut(&parent_id) {
-            ordered_children.push(child);
-            self.parents.insert(child, parent_id);
+        if let Some(ordered_children) = children.get_mut(parent) {
+            ordered_children.0.push(child);
+            parents.insert(child, Parent(parent)).unwrap();
         }
     }
 
@@ -97,19 +146,22 @@ impl Render {
     ///
     /// If `child` already has a parent, or `before` is not a child of `parent`, nothing will
     /// happen.
-    pub fn child_insert_before(&mut self, parent: usize, before: usize, child: usize) {
-        let before = Entity::new(before);
-        let child = Entity::new(child);
-        let parent_id = Entity::new(parent);
+    pub fn child_insert_before(&mut self, parent: u32, before: u32, child: u32) {
+        let before = self.world.entities().entity(before);
+        let child = self.world.entities().entity(child);
+        let parent = self.world.entities().entity(parent);
 
-        if self.parents.contains_key(&child) {
+        let mut parents = self.world.write_component::<Parent>();
+        let mut children = self.world.write_component::<Children>();
+
+        if parents.contains(child) {
             return;
         }
 
-        if let Some(ordered_children) = self.ordered_children.get_mut(&parent_id) {
-            if let Some(idx) = ordered_children.iter().position(|&x| x == before) {
-                ordered_children.insert(idx, child);
-                self.parents.insert(child, parent_id);
+        if let Some(ordered_children) = children.get_mut(parent) {
+            if let Some(idx) = ordered_children.0.iter().position(|&x| x == before) {
+                ordered_children.0.insert(idx, child);
+                parents.insert(child, Parent(parent)).unwrap();
             }
         }
     }
@@ -117,103 +169,119 @@ impl Render {
     /// Remove `child` from the `parent` ordered container.
     ///
     /// If `child` is not a child of `parent`, nothing will happen.
-    pub fn child_remove(&mut self, parent: usize, entity: usize) {
-        let entity = Entity::new(entity);
-        let parent = Entity::new(parent);
+    pub fn child_remove(&mut self, parent: u32, exchild: u32) {
+        let parent = self.world.entities().entity(parent);
+        let exchild = self.world.entities().entity(exchild);
 
-        if let Some(ordered_children) = self.ordered_children.get_mut(&parent) {
-            if let Some(entity_idx) = ordered_children.iter().position(|&x| x == entity) {
-                ordered_children.remove(entity_idx);
-                self.parents.remove(&entity);
+        let mut parents = self.world.write_component::<Parent>();
+        let mut children = self.world.write_component::<Children>();
+
+        if let Some(ordered_children) = children.get_mut(parent) {
+            if let Some(entity_idx) = ordered_children.0.iter().position(|&x| x == exchild) {
+                ordered_children.0.remove(entity_idx);
+                parents.remove(exchild);
             }
         }
     }
 
     /// Create a song, without attaching it as the document root.
-    pub fn song_create(&mut self) -> usize {
-        let entity = self.entities.create();
-
-        self.songs.insert(entity, Song::default());
-        self.ordered_children.insert(entity, vec![]);
-        self.stencil_maps.insert(entity, StencilMap::default());
-
-        entity.id()
+    pub fn song_create(&mut self) -> u32 {
+        self.world
+            .create_entity()
+            .with(Song::default())
+            .with(Children::default())
+            .with(StencilMap::default())
+            .build()
+            .id()
     }
 
-    pub fn song_set_freeze_spacing(&mut self, entity: usize, freeze_spacing: Option<isize>) {
-        let entity = Entity::new(entity);
-        if let Some(song) = self.songs.get_mut(&entity) {
+    pub fn song_set_freeze_spacing(&mut self, song: u32, freeze_spacing: Option<isize>) {
+        let song = self.world.entities().entity(song);
+        let mut songs = self.world.write_component::<Song>();
+
+        if let Some(song) = songs.get_mut(song) {
             song.freeze_spacing = freeze_spacing;
         }
     }
 
-    pub fn song_set_size(&mut self, entity: usize, width: f64, height: f64) {
-        let entity = Entity::new(entity);
-        if let Some(song) = self.songs.get_mut(&entity) {
+    pub fn song_set_size(&mut self, song: u32, width: f64, height: f64) {
+        let song = self.world.entities().entity(song);
+        let mut songs = self.world.write_component::<Song>();
+
+        if let Some(song) = songs.get_mut(song) {
             song.width = width;
             song.height = height;
         }
     }
 
-    pub fn song_set_title(&mut self, entity: usize, title: &str, width: f64) {
-        let entity = Entity::new(entity);
-        if let Some(song) = self.songs.get_mut(&entity) {
+    pub fn song_set_title(&mut self, song: u32, title: &str, width: f64) {
+        let song = self.world.entities().entity(song);
+        let mut songs = self.world.write_component::<Song>();
+
+        if let Some(song) = songs.get_mut(song) {
             song.title = title.to_owned();
             song.title_width = width;
         }
     }
 
-    pub fn song_set_author(&mut self, entity: usize, author: &str, width: f64) {
-        let entity = Entity::new(entity);
-        if let Some(song) = self.songs.get_mut(&entity) {
+    pub fn song_set_author(&mut self, song: u32, author: &str, width: f64) {
+        let song = self.world.entities().entity(song);
+        let mut songs = self.world.write_component::<Song>();
+
+        if let Some(song) = songs.get_mut(song) {
             song.author = author.to_owned();
             song.author_width = width;
         }
     }
 
     /// Create a staff, without attaching it to a song.
-    pub fn staff_create(&mut self) -> usize {
-        let entity = self.entities.create();
-
-        self.staffs.insert(entity, Staff::default());
-
-        self.stencil_maps.insert(entity, StencilMap::default());
-        self.ordered_children.insert(entity, vec![]);
-
-        entity.id()
+    pub fn staff_create(&mut self) -> u32 {
+        self.world
+            .create_entity()
+            .with(Staff::default())
+            .with(StencilMap::default())
+            .with(Children::default())
+            .build()
+            .id()
     }
 
     fn bar_by_index(&self, staff_children: &Vec<Entity>, idx: usize) -> Option<Entity> {
+        let bars = self.world.read_component::<Bar>();
+
         let mut i = 0;
-        for child in staff_children {
-            if self.bars.contains_key(child) {
+        for &child in staff_children {
+            if bars.contains(child) {
                 if i == idx {
-                    return Some(*child);
+                    return Some(child);
                 }
                 i += 1;
             }
         }
+
         None
     }
 
     pub fn staff_time_cursor_add(
         &self,
-        entity: usize,
+        staff: u32,
         bar_idx: usize,
         time_num: isize,
         time_den: isize,
         add_num: isize,
         add_den: isize,
     ) -> Option<Vec<isize>> {
-        let entity = Entity::new(entity);
-        let staff_bars = self.ordered_children.get(&entity)?;
-        let bar = self.bars.get(&self.bar_by_index(staff_bars, bar_idx)?)?;
+        let staff = self.world.entities().entity(staff);
+
+        let children = self.world.read_component::<Children>();
+        let bars = self.world.read_component::<Bar>();
+        let chords = self.world.read_component::<Chord>();
+
+        let staff_bars = children.get(staff)?;
+        let bar = bars.get(self.bar_by_index(&staff_bars.0, bar_idx)?)?;
         let add = Rational::new(add_num, add_den);
         let t = Rational::new(time_num, time_den) + add;
         let mut t = if t < Rational::new(0, 1) {
-            let prev_bar = self
-                .bars
-                .get(&self.bar_by_index(staff_bars, bar_idx - 1)?)?;
+            let prev_bar = bars.get(self.bar_by_index(&staff_bars.0, bar_idx - 1)?)?;
             let t = prev_bar.metre().duration() + t;
             if t < Rational::new(0, 1) {
                 None
@@ -221,9 +289,7 @@ impl Render {
                 Some(((bar_idx - 1).try_into().unwrap(), t))
             }
         } else if t >= bar.metre().duration() {
-            let next_bar = self
-                .bars
-                .get(&self.bar_by_index(staff_bars, bar_idx + 1)?)?;
+            let next_bar = bars.get(self.bar_by_index(&staff_bars.0, bar_idx + 1)?)?;
             let t = t - bar.metre().duration();
             if t >= next_bar.metre().duration() {
                 None
@@ -234,9 +300,7 @@ impl Render {
             Some((bar_idx.try_into().unwrap(), t))
         }?;
 
-        let bar = self
-            .bars
-            .get(&self.bar_by_index(staff_bars, t.0 as usize)?)?;
+        let bar = bars.get(self.bar_by_index(&staff_bars.0, t.0 as usize)?)?;
 
         // Make sure we are not in the middle of a note.
         for BarChild {
@@ -247,7 +311,7 @@ impl Render {
         } in bar.children()
         {
             if !lifetime.is_temporary()
-                && !self.chords.get(&stencil).unwrap().pitch.is_rest()
+                && !chords.get(stencil).unwrap().pitch.is_rest()
                 && t.1 > start
                 && t.1 < start + duration.duration()
             {
@@ -265,30 +329,36 @@ impl Render {
     /// Create a bar, without attaching it to a staff.
     ///
     /// `numer` and `denom` are the numerator and denominator of the time signature in this bar.
-    pub fn bar_create(&mut self, numer: u8, denom: u8) -> usize {
-        let entity = self.entities.create();
-
-        self.bars.insert(entity, Bar::new(Metre::new(numer, denom)));
-        self.stencil_maps.insert(entity, StencilMap::default());
-        self.contexts.insert(entity, Context::default());
-
-        entity.id()
+    pub fn bar_create(&mut self, numer: u8, denom: u8) -> u32 {
+        self.world
+            .create_entity()
+            .with(Bar::new(Metre::new(numer, denom)))
+            .with(StencilMap::default())
+            .with(Context::default())
+            .build()
+            .id()
     }
 
     /// Inserts a Chord into a bar.
     ///
     /// Note that children of bars are not ordered, instead children have a `start` property.
-    pub fn bar_insert(&mut self, bar: usize, child: usize, is_temporary: bool) {
-        let child = Entity::new(child);
-        let bar_id = Entity::new(bar);
+    pub fn bar_insert(&mut self, bar: u32, child: u32, is_temporary: bool) {
+        let child = self.world.entities().entity(child);
+        let bar = self.world.entities().entity(bar);
 
-        if self.parents.contains_key(&child) {
+        let mut parents = self.world.write_component::<Parent>();
+        let mut bars = self.world.write_component::<Bar>();
+        let chords = self.world.read_component::<Chord>();
+        let contexts = self.world.read_component::<Context>();
+
+        if parents.contains(child) {
             return;
         }
 
-        if let Some(bar) = self.bars.get_mut(&bar_id) {
-            if let (Some(chord), Some(start)) = (self.chords.get(&child), self.contexts.get(&child))
-            {
+        let parent = Parent(bar);
+
+        if let Some(bar) = bars.get_mut(bar) {
+            if let (Some(chord), Some(start)) = (chords.get(child), contexts.get(child)) {
                 bar.splice(
                     start.beat,
                     vec![(
@@ -300,7 +370,7 @@ impl Render {
                         },
                     )],
                 );
-                self.parents.insert(child, bar_id);
+                parents.insert(child, parent).unwrap();
             }
         }
     }
@@ -308,27 +378,39 @@ impl Render {
     /// Remove a Chord from a bar.
     ///
     /// Note that children of bars are not ordered, instead children have a `start` property.
-    pub fn bar_remove(&mut self, bar: usize, child: usize) {
-        let bar_id = Entity::new(bar);
-        let child = Entity::new(child);
+    pub fn bar_remove(&mut self, bar: u32, child: u32) {
+        let bar = self.world.entities().entity(bar);
+        let child = self.world.entities().entity(child);
 
-        if let Some(bar) = self.bars.get_mut(&bar_id) {
-            bar.remove(child);
-            self.parents.remove(&child);
-            self.fixup_bar(bar_id);
+        {
+            let mut parents = self.world.write_component::<Parent>();
+            let mut bars = self.world.write_component::<Bar>();
+
+            if let Some(bar) = bars.get_mut(bar) {
+                bar.remove(child);
+                parents.remove(child);
+            } else {
+                return;
+            }
         }
+
+        self.fixup_bar(bar);
     }
 
-    pub fn bar_set_skip(&mut self, entity: usize, num: isize, den: isize) {
-        let entity = Entity::new(entity);
-        if let Some(bar) = self.bars.get_mut(&entity) {
+    pub fn bar_set_skip(&mut self, bar: u32, num: isize, den: isize) {
+        let bar = self.world.entities().entity(bar);
+        let mut bars = self.world.write_component::<Bar>();
+
+        if let Some(bar) = bars.get_mut(bar) {
             bar.set_pickup_skip(Rational::new(num, den));
         }
     }
 
-    pub fn bar_clear_skip(&mut self, entity: usize) {
-        let entity = Entity::new(entity);
-        if let Some(bar) = self.bars.get_mut(&entity) {
+    pub fn bar_clear_skip(&mut self, bar: u32) {
+        let bar = self.world.entities().entity(bar);
+        let mut bars = self.world.write_component::<Bar>();
+
+        if let Some(bar) = bars.get_mut(bar) {
             bar.clear_pickup_skip();
         }
     }
@@ -340,48 +422,53 @@ impl Render {
         dots: u8,
         start_numer: isize,
         start_denom: isize,
-    ) -> usize {
+    ) -> u32 {
         let note_value = NoteValue::new(note_value).unwrap();
         let start = Rational::new(start_numer, start_denom);
 
-        let entity = self.entities.create();
-
-        self.spacing.insert(entity, Spacing::default());
-        self.chords.insert(
-            entity,
-            Chord::new(Duration::new(note_value, dots, None), PitchKind::Rest),
-        );
-        self.ordered_children.insert(entity, vec![]);
-        self.contexts.insert(
-            entity,
-            Context {
+        self.world
+            .create_entity()
+            .with(Spacing::default())
+            .with(Chord::new(
+                Duration::new(note_value, dots, None),
+                PitchKind::Rest,
+            ))
+            .with(Spacing::default())
+            .with(Children::default())
+            .with(Context {
                 beat: start,
                 natural_beat: start,
                 ..Default::default()
-            },
-        );
-        self.stencils.insert(entity, Stencil::default());
-
-        entity.id()
+            })
+            .with(FlagAttachment::default())
+            .with(Stencil::default())
+            .build()
+            .id()
     }
 
-    pub fn chord_set_rest(&mut self, chord_id: usize) {
-        let chord_id = Entity::new(chord_id);
-        if let Some(chord) = self.chords.get_mut(&chord_id) {
+    pub fn chord_set_rest(&mut self, chord: u32) {
+        let chord = self.world.entities().entity(chord);
+        let mut chords = self.world.write_component::<Chord>();
+
+        if let Some(chord) = chords.get_mut(chord) {
             chord.pitch = PitchKind::Rest;
         }
     }
 
-    pub fn chord_set_unpitched(&mut self, chord_id: usize) {
-        let chord_id = Entity::new(chord_id);
-        if let Some(chord) = self.chords.get_mut(&chord_id) {
+    pub fn chord_set_unpitched(&mut self, chord: u32) {
+        let chord = self.world.entities().entity(chord);
+        let mut chords = self.world.write_component::<Chord>();
+
+        if let Some(chord) = chords.get_mut(chord) {
             chord.pitch = PitchKind::Unpitched;
         }
     }
 
-    pub fn chord_set_pitch(&mut self, chord_id: usize, midi: u8, modifier: i8) {
-        let chord_id = Entity::new(chord_id);
-        if let Some(chord) = self.chords.get_mut(&chord_id) {
+    pub fn chord_set_pitch(&mut self, chord: u32, midi: u8, modifier: i8) {
+        let chord = self.world.entities().entity(chord);
+        let mut chords = self.world.write_component::<Chord>();
+
+        if let Some(chord) = chords.get_mut(chord) {
             chord.pitch = PitchKind::Pitch(
                 Pitch::from_base_midi(midi, NoteModifier::from_raw(modifier)).unwrap_or_default(),
             );
@@ -390,7 +477,7 @@ impl Render {
 
     pub fn chord_update_time(
         &mut self,
-        chord_id: usize,
+        chord_ent: u32,
         note_value: isize,
         dots: u8,
         start_numer: isize,
@@ -398,14 +485,19 @@ impl Render {
         is_temporary: bool,
     ) {
         let note_value = NoteValue::new(note_value).unwrap();
-        let chord_id = Entity::new(chord_id);
-        if let Some(parent_id) = self.parents.get(&chord_id).copied() {
+        let chord_ent = self.world.entities().entity(chord_ent);
+        let mut chords = self.world.write_component::<Chord>();
+        let mut bars = self.world.write_component::<Bar>();
+        let mut contexts = self.world.write_component::<Context>();
+        let parents = self.world.read_component::<Parent>();
+
+        if let Some(parent) = parents.get(chord_ent).copied() {
             if let (Some(chord), Some(bar), Some(start)) = (
-                self.chords.get_mut(&chord_id),
-                self.bars.get_mut(&parent_id),
-                self.contexts.get_mut(&chord_id),
+                chords.get_mut(chord_ent),
+                bars.get_mut(parent.0),
+                contexts.get_mut(chord_ent),
             ) {
-                bar.remove(chord_id);
+                bar.remove(chord_ent);
                 start.beat = Rational::new(start_numer, start_denom);
                 start.natural_beat = start.beat;
                 chord.duration = Duration::new(note_value, dots, None);
@@ -415,34 +507,44 @@ impl Render {
                     vec![(
                         chord.duration(),
                         if is_temporary {
-                            Lifetime::Temporary(chord_id)
+                            Lifetime::Temporary(chord_ent)
                         } else {
-                            Lifetime::Explicit(chord_id)
+                            Lifetime::Explicit(chord_ent)
                         },
                     )],
                 );
             }
-            self.fixup_bar(parent_id);
+
+            drop(chords);
+            drop(bars);
+            drop(contexts);
+            drop(parents);
+            self.fixup_bar(parent.0);
         }
     }
 
-    pub fn cursor_create(&mut self) -> usize {
-        let entity = self.entities.create();
-
-        self.cursors.insert(entity, ());
-        self.stencils.insert(entity, Stencil::default());
-
-        entity.id()
+    pub fn cursor_create(&mut self) -> u32 {
+        self.world
+            .create_entity()
+            .with(Cursor {})
+            .with(Stencil::default())
+            .build()
+            .id()
     }
 
     fn fixup_bar(&mut self, parent_id: Entity) {
+        let parents = self.world.read_component::<Parent>();
+        let mut bars = self.world.write_component::<Bar>();
+        let mut chords = self.world.write_component::<Chord>();
+        let mut contexts = self.world.write_component::<Context>();
+
         // Fix previously overlapping notes.
-        if let Some(bar) = self.bars.get_mut(&parent_id) {
-            for (other_chord_id, (chord, parent, start)) in
-                (&mut self.chords, &self.parents, &mut self.contexts).join()
+        if let Some(bar) = bars.get_mut(parent_id) {
+            for (other_chord_id, chord, parent, start) in
+                (&self.world.entities(), &mut chords, &parents, &mut contexts).join()
             {
                 if (chord.natural_duration != chord.duration || start.natural_beat != start.beat)
-                    && *parent == parent_id
+                    && parent.0 == parent_id
                 {
                     chord.duration = chord.natural_duration;
                     start.beat = start.natural_beat;
@@ -464,8 +566,10 @@ impl Render {
         time_numer: Option<u8>,
         time_denom: Option<u8>,
         key: Option<i8>,
-    ) -> usize {
-        let entity = self.entities.create();
+    ) -> u32 {
+        let stencil_start = self.world.create_entity().with(Stencil::default()).build();
+        let stencil_middle = self.world.create_entity().with(Stencil::default()).build();
+        let stencil_end = self.world.create_entity().with(Stencil::default()).build();
 
         let time = if let (Some(time_numer), Some(time_denom)) = (time_numer, time_denom) {
             Some((time_numer, time_denom))
@@ -473,21 +577,11 @@ impl Render {
             None
         };
 
-        let stencil_start = self.entities.create();
-        self.stencils.insert(stencil_start, Stencil::default());
-        self.parents.insert(stencil_start, entity);
-
-        let stencil_middle = self.entities.create();
-        self.parents.insert(stencil_middle, entity);
-        self.stencils.insert(stencil_middle, Stencil::default());
-
-        let stencil_end = self.entities.create();
-        self.parents.insert(stencil_end, entity);
-        self.stencils.insert(stencil_end, Stencil::default());
-
-        self.between_bars.insert(
-            entity,
-            BetweenBars {
+        let between_bars = self
+            .world
+            .create_entity()
+            .with(Context::default())
+            .with(BetweenBars {
                 barline,
                 clef,
                 time,
@@ -495,23 +589,31 @@ impl Render {
                 stencil_start,
                 stencil_middle,
                 stencil_end,
-            },
-        );
-        self.contexts.insert(entity, Context::default());
+            })
+            .build();
 
-        entity.id()
+        let mut parents = self.world.write_component::<Parent>();
+
+        parents.insert(stencil_start, Parent(between_bars)).unwrap();
+        parents
+            .insert(stencil_middle, Parent(between_bars))
+            .unwrap();
+        parents.insert(stencil_end, Parent(between_bars)).unwrap();
+
+        between_bars.id()
     }
 
     pub fn between_bars_update(
         &mut self,
-        entity: usize,
+        between_bar: u32,
         barline: Option<Barline>,
         clef: Option<Clef>,
         time_numer: Option<u8>,
         time_denom: Option<u8>,
         key: Option<i8>,
     ) {
-        let entity = Entity::new(entity);
+        let between_bar = self.world.entities().entity(between_bar);
+        let mut between_bars = self.world.write_storage::<BetweenBars>();
 
         let time = if let (Some(time_numer), Some(time_denom)) = (time_numer, time_denom) {
             Some((time_numer, time_denom))
@@ -519,189 +621,72 @@ impl Render {
             None
         };
 
-        let bb = self.between_bars.remove(&entity).unwrap();
+        let bb = between_bars.remove(between_bar).unwrap();
 
-        self.between_bars.insert(
-            entity,
-            BetweenBars {
-                barline,
-                clef,
-                time,
-                key,
-                ..bb
-            },
-        );
-    }
-
-    fn entities(&self) -> HashSet<Entity> {
-        vec![
-            self.songs.keys().copied().collect::<HashSet<Entity>>(),
-            self.staffs.keys().copied().collect::<HashSet<Entity>>(),
-            self.bars.keys().copied().collect::<HashSet<Entity>>(),
-            self.between_bars
-                .keys()
-                .copied()
-                .collect::<HashSet<Entity>>(),
-            self.chords.keys().copied().collect::<HashSet<Entity>>(),
-            self.stencils.keys().copied().collect::<HashSet<Entity>>(),
-            self.stencil_maps
-                .keys()
-                .copied()
-                .collect::<HashSet<Entity>>(),
-            self.world_bbox.keys().copied().collect::<HashSet<Entity>>(),
-            self.contexts.keys().copied().collect::<HashSet<Entity>>(),
-            self.spacing.keys().copied().collect::<HashSet<Entity>>(),
-            self.ordered_children
-                .keys()
-                .copied()
-                .collect::<HashSet<Entity>>(),
-        ]
-        .into_iter()
-        .flatten()
-        .collect()
+        between_bars
+            .insert(
+                between_bar,
+                BetweenBars {
+                    barline,
+                    clef,
+                    time,
+                    key,
+                    ..bb
+                },
+            )
+            .unwrap();
     }
 
     /* Frame */
 
-    fn keep_spacing(&self) -> bool {
-        self.root
-            .and_then(|root| self.songs.get(&root))
-            .map(|root| {
-                root.freeze_spacing.is_some()
-                    && (root.freeze_spacing == root.prev_freeze_spacing
-                        || root.prev_freeze_spacing.is_none())
-            })
-            .unwrap_or(false)
-    }
-
     pub fn exec(&mut self) {
-        let entities = self.entities();
-        sys_delete_orphans(
-            self.root,
-            &mut self.parents,
-            &entities,
-            &mut [
-                &mut self.songs,
-                &mut self.line_of_staffs,
-                &mut self.staffs,
-                &mut self.bars,
-                &mut self.between_bars,
-                &mut self.chords,
-                &mut self.contexts,
-                &mut self.stencils,
-                &mut self.stencil_maps,
-                &mut self.spacing,
-                &mut self.ordered_children,
-                &mut self.warps,
-                &mut self.beams,
-                &mut self.beam_for_chord,
-                &mut self.attachments,
-                &mut self.cursors,
-            ],
-        );
+        self.systems.delete_orphans.run_now(&self.world);
+        self.world.maintain();
 
-        sys_update_chord_timing(
-            &self.entities,
-            &mut self.chords,
-            &mut self.contexts,
-            &mut self.bars,
-            &mut self.spacing,
-            &mut self.parents,
-            &mut self.stencils,
-        );
+        self.systems.update_keep_spacing.run_now(&self.world);
+        self.world.maintain();
+        self.systems.update_timing.run_now(&self.world);
+        self.world.maintain();
+        self.systems.draft_beam.run_now(&self.world);
+        self.world.maintain();
+        self.systems.update_context.run_now(&self.world);
+        self.world.maintain();
 
-        sys_draft_beaming(
-            &self.entities,
-            &self.bars,
-            &mut self.parents,
-            &mut self.beam_for_chord,
-            &mut self.beams,
-        );
+        self.systems.print_chord.run_now(&self.world);
+        self.world.maintain();
+        self.systems.print_between_bar.run_now(&self.world);
+        self.world.maintain();
 
-        sys_update_context(
-            &self.staffs,
-            &self.ordered_children,
-            &self.bars,
-            &self.between_bars,
-            &self.chords,
-            &mut self.contexts,
-        );
+        self.systems.apply_space_time_warp.run_now(&self.world);
+        self.world.maintain();
+        self.systems.break_into_lines.run_now(&self.world);
+        self.world.maintain();
+        self.systems.record_space_time_warp.run_now(&self.world);
+        self.world.maintain();
 
-        sys_print_chord(
-            &self.chords,
-            &self.contexts,
-            &self.beam_for_chord,
-            &mut self.attachments,
-            &mut self.stencils,
-        );
-        sys_print_between_bars(&self.between_bars, &self.contexts, &mut self.stencils);
+        self.systems.space_beam.run_now(&self.world);
+        self.world.maintain();
+        self.systems.print_beam.run_now(&self.world);
+        self.world.maintain();
+        self.systems.print_staff_lines.run_now(&self.world);
+        self.world.maintain();
+        self.systems.print_cursor.run_now(&self.world);
+        self.world.maintain();
 
-        if self.keep_spacing() {
-            sys_apply_warp(&self.bars, &mut self.spacing, &self.warps);
-        } else {
-            // TODO(joshuan): scale is fixed as rastal size 3.
-            sys_break_into_lines(BreakIntoLineComponents {
-                entities: &self.entities,
-                page_size: self
-                    .root
-                    .and_then(|root| self.songs.get(&root))
-                    .map(|root| (root.width / 7.0 * 1000.0, root.height / 7.0 * 1000.0)),
-                bars: &self.bars,
-                between_bars: &self.between_bars,
-                stencils: &self.stencils,
-                spacing: &mut self.spacing,
-                staffs: &mut self.staffs,
-                parents: &mut self.parents,
-                ordered_children: &mut self.ordered_children,
-                line_of_staffs: &mut self.line_of_staffs,
-            });
-            sys_record_space_time_warp(&self.bars, &self.spacing, &mut self.warps);
-        }
+        self.systems.print_staff.run_now(&self.world);
+        self.world.maintain();
+        self.systems.print_staff_lines.run_now(&self.world);
+        self.world.maintain();
+        self.systems.print_meta.run_now(&self.world);
+        self.world.maintain();
+        self.systems.print_song.run_now(&self.world);
+        self.world.maintain();
 
-        sys_space_beams(
-            &self.bars,
-            &self.spacing,
-            &self.beam_for_chord,
-            &self.attachments,
-            &mut self.beams,
-        );
+        self.systems.update_world_bbox.run_now(&self.world);
+        self.world.maintain();
 
-        sys_print_beams(&self.beams, &mut self.stencils);
-
-        sys_print_cursors(&self.cursors, &mut self.stencils);
-
-        sys_print_staff(
-            &mut self.line_of_staffs,
-            &self.bars,
-            &self.beam_for_chord,
-            &self.spacing,
-            &self.stencils,
-            &self.ordered_children,
-            &mut self.stencil_maps,
-        );
-        sys_print_staff_lines(&self.line_of_staffs, &mut self.stencils);
-
-        sys_print_meta(
-            &self.entities,
-            &mut self.parents,
-            &mut self.songs,
-            &mut self.stencils,
-        );
-
-        sys_print_song(
-            &self.songs,
-            &self.staffs,
-            &self.ordered_children,
-            &mut self.stencil_maps,
-        );
-        sys_update_world_bboxes(
-            &self.songs,
-            &self.stencils,
-            &self.stencil_maps,
-            &mut self.world_bbox,
-        );
-        if let Some(root) = self.root {
-            if let Some(root) = self.songs.get_mut(&root) {
+        if let Some(root) = self.world.read_resource::<Root>().0 {
+            if let Some(root) = self.world.write_component::<Song>().get_mut(root) {
                 root.prev_freeze_spacing = root.freeze_spacing;
             }
         }
@@ -709,7 +694,12 @@ impl Render {
 
     pub fn stencils(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
-        for (entity, stencil) in &self.stencils {
+        for (entity, stencil) in (
+            &self.world.entities(),
+            &self.world.read_component::<Stencil>(),
+        )
+            .join()
+        {
             lines.push(entity.id().to_string());
             lines.push(stencil.to_svg());
         }
@@ -718,58 +708,76 @@ impl Render {
 
     pub fn parents(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
-        for (parent, child) in &self.parents {
-            lines.push(parent.id().to_string());
+        for (child, parent) in (
+            &self.world.entities(),
+            &self.world.read_component::<Parent>(),
+        )
+            .join()
+        {
             lines.push(child.id().to_string());
+            lines.push(parent.0.id().to_string());
         }
         lines.join("\n")
     }
 
     pub fn stencil_maps(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
-        for (entity, stencil) in &self.stencil_maps {
+        for (entity, stencil) in (
+            &self.world.entities(),
+            &self.world.read_component::<StencilMap>(),
+        )
+            .join()
+        {
             lines.push(entity.id().to_string());
             lines.push(stencil.to_json());
         }
         lines.join("\n")
     }
 
-    pub fn get_root_id(&self) -> Option<usize> {
-        self.root.map(|root| root.id())
+    pub fn get_root_id(&self) -> Option<u32> {
+        self.world.read_resource::<Root>().0.map(|root| root.id())
     }
 
-    pub fn get_song_width(&self, song: usize) -> Option<f64> {
-        let song = Entity::new(song);
-        self.songs
-            .get(&song)
+    pub fn get_song_width(&self, song: u32) -> Option<f64> {
+        let song = self.world.entities().entity(song);
+        self.world
+            .read_component::<Song>()
+            .get(song)
             .map(|song| (song.width / song.scale()).round())
     }
 
-    pub fn get_song_height(&self, song: usize) -> Option<f64> {
-        let song = Entity::new(song);
-        self.songs
-            .get(&song)
+    pub fn get_song_height(&self, song: u32) -> Option<f64> {
+        let song = self.world.entities().entity(song);
+        self.world
+            .read_component::<Song>()
+            .get(song)
             .map(|song| (song.height / song.scale()).round())
     }
 
     pub fn get_stencil_bboxes(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
-        for (entity, bbox) in &self.world_bbox {
-            let start = self.contexts.get(entity);
+        for (entity, bbox) in (
+            &self.world.entities(),
+            &self.world.read_component::<WorldBbox>(),
+        )
+            .join()
+        {
+            let contexts = self.world.read_component::<Context>();
+            let start = contexts.get(entity);
             lines.push(entity.id().to_string());
-            let kind = if self.chords.contains_key(entity) {
+            let kind = if self.world.read_component::<Chord>().contains(entity) {
                 0
-            } else if self.between_bars.contains_key(entity) {
+            } else if self.world.read_component::<BetweenBars>().contains(entity) {
                 1
             } else {
                 -1
             };
             lines.push(format!(
                 "[{},{},{},{},{},{},{},{}]",
-                bbox.x0,
-                bbox.y0,
-                bbox.x1,
-                bbox.y1,
+                bbox.0.x0,
+                bbox.0.y0,
+                bbox.0.x1,
+                bbox.0.y1,
                 start.map(|s| s.bar as isize).unwrap_or(-1),
                 start.map(|s| *s.beat.numer()).unwrap_or(0),
                 start.map(|s| *s.beat.denom()).unwrap_or(1),
@@ -782,16 +790,23 @@ impl Render {
     /// Returns [bar, num, den, pitch_base, pitch_modifier]
     pub fn get_hover_info(&self, x: f64, y: f64) -> Option<Vec<isize>> {
         let quant = Rational::new(1, 8);
-        for (_id, (bbox, bar, context)) in (&self.world_bbox, &self.bars, &self.contexts).join() {
+        for (WorldBbox(bbox), bar, context) in (
+            &self.world.read_component::<WorldBbox>(),
+            &self.world.read_component::<Bar>(),
+            &self.world.read_component::<Context>(),
+        )
+            .join()
+        {
             if x >= bbox.x0 && x <= bbox.x1 && y >= bbox.y0 && y <= bbox.y1 {
                 let child_contexts: Vec<_> = bar
                     .children()
                     .into_iter()
                     .map(|c| {
                         (
-                            self.world_bbox
-                                .get(&c.stencil)
-                                .map(|rect| rect.x0)
+                            self.world
+                                .read_component::<WorldBbox>()
+                                .get(c.stencil)
+                                .map(|rect| rect.0.x0)
                                 .unwrap_or_default(),
                             c.start,
                         )
@@ -839,13 +854,15 @@ impl Render {
 
     pub fn split_note(
         &self,
-        bar: usize,
+        bar: u32,
         start_num: isize,
         start_den: isize,
         duration_num: isize,
         duration_den: isize,
     ) -> Vec<isize> {
-        if let Some(bar) = self.bars.get(&Entity::new(bar)) {
+        let bars = self.world.read_component::<Bar>();
+
+        if let Some(bar) = bars.get(self.world.entities().entity(bar)) {
             let mut start = Rational::new(start_num, start_den);
             let solution = bar.split_note(
                 start,
@@ -892,148 +909,148 @@ impl Render {
         vec![*f.numer(), *f.denom()]
     }
 
-    pub fn print_for_demo(&mut self) -> String {
-        self.exec();
+    // pub fn print_for_demo(&mut self) -> String {
+    //     self.exec();
 
-        let song = &self.songs[&self.root.unwrap()];
+    //     let song = &self.songs[&self.root.unwrap()];
 
-        if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
-            root.clone()
-                .to_svg_doc_for_testing(song.scale(), &self.stencil_maps, &self.stencils)
-        } else {
-            String::default()
+    //     if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
+    //         root.clone()
+    //             .to_svg_doc_for_testing(song.scale(), &self.stencil_maps, &self.stencils)
+    //     } else {
+    //         String::default()
+    //     }
+    // }
+
+    pub fn to_pdf(&self, embed_file: Option<String>) -> Option<String> {
+        let songs = self.world.read_component::<Song>();
+        let stencils = self.world.read_component::<Stencil>();
+        let stencil_maps = self.world.read_component::<StencilMap>();
+        let root = self.world.read_resource::<Root>().0?;
+        let song = songs.get(root)?;
+
+        let mut pdf = Pdf::new();
+        let scale = song.scale();
+        pdf.add_page(Size::new(215.9, 279.4));
+        if let Some(embed_file) = embed_file {
+            pdf.add_file(&embed_file);
         }
-    }
 
-    pub fn to_pdf(&self, embed_file: Option<String>) -> String {
-        let song = &self.songs[&self.root.unwrap()];
-
-        if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
-            let mut pdf = Pdf::new();
-            let scale = song.scale();
-            pdf.add_page(Size::new(215.9, 279.4));
-            if let Some(embed_file) = embed_file {
-                pdf.add_file(&embed_file);
-            }
-
-            pdf.write_stencil_map(
-                root,
-                Affine::translate(Vec2::new(0.0, 279.4)) * Affine::scale(scale) * Affine::FLIP_Y,
-                &self.stencils,
-                &self.stencil_maps,
-            );
-            base64::encode(pdf.into_binary())
-        } else {
-            String::default()
-        }
+        pdf.write_stencil_map(
+            stencil_maps.get(root)?,
+            Affine::translate(Vec2::new(0.0, 279.4)) * Affine::scale(scale) * Affine::FLIP_Y,
+            &stencils,
+            &stencil_maps,
+        );
+        Some(base64::encode(pdf.into_binary()))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        use rhythm::NoteValue;
-        use stencil::snapshot;
-
-        let mut render = Render::default();
-        let song = render.song_create();
-        render.song_set_size(song, 215.9, 279.4);
-        render.song_set_title(song, "Six Eight", 26.4f64);
-        render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
-
-        let staff = render.staff_create();
-        let clef =
-            render.between_bars_create(None, Some(Clef::Percussion), Some(4), Some(4), Some(0));
-        render.child_append(staff, clef);
-
-        let bar1 = render.bar_create(4, 4);
-        render.child_append(staff, bar1);
-
-        let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
-        render.chord_set_unpitched(chord1);
-
-        render.bar_insert(bar1, chord1, false);
-        let barline = render.between_bars_create(Some(Barline::Normal), None, None, None, Some(0));
-        render.child_append(staff, barline);
-
-        let bar2 = render.bar_create(4, 4);
-        render.child_append(staff, bar2);
-
-        let chord2 = render.chord_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4);
-        render.chord_set_unpitched(chord2);
-
-        render.bar_insert(bar2, chord2, false);
-
-        let final_barline =
-            render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
-        render.child_append(staff, final_barline);
-
-        render.child_append(song, staff);
-        render.root_set(song);
-
-        render.exec();
-
-        render.chord_update_time(chord1, NoteValue::Eighth.log2() as isize, 0, 4, 16, false);
-
-        snapshot("./snapshots/hello_world.svg", &render.print_for_demo());
-
-        // Make sure we can clean up and no entities are left over.
-        render.root_clear(song);
-        render.exec();
-
-        assert_eq!(render.parents.len(), 0);
-        assert_eq!(render.songs.len(), 0);
-        assert_eq!(render.staffs.len(), 0);
-        assert_eq!(render.line_of_staffs.len(), 0);
-        assert_eq!(render.bars.len(), 0);
-        assert_eq!(render.between_bars.len(), 0);
-        assert_eq!(render.chords.len(), 0);
-        assert_eq!(render.stencils.len(), 0);
-        assert_eq!(render.stencil_maps.len(), 0);
-        assert_eq!(render.world_bbox.len(), 0);
-        assert_eq!(render.contexts.len(), 0);
-        assert_eq!(render.spacing.len(), 0);
-        assert_eq!(render.ordered_children.len(), 0);
-    }
-
-    #[test]
-    fn beaming_1() {
-        use rhythm::NoteValue;
-        use stencil::snapshot;
-
-        let mut render = Render::default();
-        let song = render.song_create();
-        render.song_set_size(song, 215.9, 279.4);
-        render.song_set_title(song, "Six Eight", 26.4f64);
-        render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
-
-        let staff = render.staff_create();
-        let clef = render.between_bars_create(None, Some(Clef::G), Some(4), Some(4), Some(0));
-        render.child_append(staff, clef);
-
-        let bar1 = render.bar_create(4, 4);
-        render.child_append(staff, bar1);
-
-        let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 0, 1);
-        let chord2 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
-
-        render.chord_set_pitch(chord1, 60, 0);
-        render.bar_insert(bar1, chord1, false);
-        render.chord_set_pitch(chord2, 60, 0);
-        render.bar_insert(bar1, chord2, false);
-
-        let final_barline =
-            render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
-        render.child_append(staff, final_barline);
-
-        render.child_append(song, staff);
-        render.root_set(song);
-
-        render.exec();
-
-        snapshot("./snapshots/beaming_1.svg", &render.print_for_demo());
-    }
-}
+//
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//
+//     #[test]
+//     fn it_works() {
+//         use rhythm::NoteValue;
+//         use stencil::snapshot;
+//
+//         let mut render = Render::default();
+//         let song = render.song_create();
+//         render.song_set_size(song, 215.9, 279.4);
+//         render.song_set_title(song, "Six Eight", 26.4f64);
+//         render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
+//
+//         let staff = render.staff_create();
+//         let clef =
+//             render.between_bars_create(None, Some(Clef::Percussion), Some(4), Some(4), Some(0));
+//         render.child_append(staff, clef);
+//
+//         let bar1 = render.bar_create(4, 4);
+//         render.child_append(staff, bar1);
+//
+//         let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
+//         render.chord_set_unpitched(chord1);
+//
+//         render.bar_insert(bar1, chord1, false);
+//         let barline = render.between_bars_create(Some(Barline::Normal), None, None, None, Some(0));
+//         render.child_append(staff, barline);
+//
+//         let bar2 = render.bar_create(4, 4);
+//         render.child_append(staff, bar2);
+//
+//         let chord2 = render.chord_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4);
+//         render.chord_set_unpitched(chord2);
+//
+//         render.bar_insert(bar2, chord2, false);
+//
+//         let final_barline =
+//             render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
+//         render.child_append(staff, final_barline);
+//
+//         render.child_append(song, staff);
+//         render.root_set(song);
+//
+//         render.exec();
+//
+//         render.chord_update_time(chord1, NoteValue::Eighth.log2() as isize, 0, 4, 16, false);
+//
+//         snapshot("./snapshots/hello_world.svg", &render.print_for_demo());
+//
+//         // Make sure we can clean up and no entities are left over.
+//         render.root_clear(song);
+//         render.exec();
+//
+//         assert_eq!(render.parents.len(), 0);
+//         assert_eq!(render.songs.len(), 0);
+//         assert_eq!(render.staffs.len(), 0);
+//         assert_eq!(render.line_of_staffs.len(), 0);
+//         assert_eq!(render.bars.len(), 0);
+//         assert_eq!(render.between_bars.len(), 0);
+//         assert_eq!(render.chords.len(), 0);
+//         assert_eq!(render.stencils.len(), 0);
+//         assert_eq!(render.stencil_maps.len(), 0);
+//         assert_eq!(render.world_bbox.len(), 0);
+//         assert_eq!(render.contexts.len(), 0);
+//         assert_eq!(render.spacing.len(), 0);
+//         assert_eq!(render.ordered_children.len(), 0);
+//     }
+//
+//     #[test]
+//     fn beaming_1() {
+//         use rhythm::NoteValue;
+//         use stencil::snapshot;
+//
+//         let mut render = Render::default();
+//         let song = render.song_create();
+//         render.song_set_size(song, 215.9, 279.4);
+//         render.song_set_title(song, "Six Eight", 26.4f64);
+//         render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
+//
+//         let staff = render.staff_create();
+//         let clef = render.between_bars_create(None, Some(Clef::G), Some(4), Some(4), Some(0));
+//         render.child_append(staff, clef);
+//
+//         let bar1 = render.bar_create(4, 4);
+//         render.child_append(staff, bar1);
+//
+//         let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 0, 1);
+//         let chord2 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
+//
+//         render.chord_set_pitch(chord1, 60, 0);
+//         render.bar_insert(bar1, chord1, false);
+//         render.chord_set_pitch(chord2, 60, 0);
+//         render.bar_insert(bar1, chord2, false);
+//
+//         let final_barline =
+//             render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
+//         render.child_append(staff, final_barline);
+//
+//         render.child_append(song, staff);
+//         render.root_set(song);
+//
+//         render.exec();
+//
+//         snapshot("./snapshots/beaming_1.svg", &render.print_for_demo());
+//     }
+// }

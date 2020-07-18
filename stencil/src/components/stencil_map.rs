@@ -40,6 +40,10 @@ impl StencilMap {
         self
     }
 
+    pub fn translate(&self) -> &Option<Vec2> {
+        &self.translate
+    }
+
     pub fn explicit_rect(&self) -> Option<Rect> {
         self.explicit_rect
     }

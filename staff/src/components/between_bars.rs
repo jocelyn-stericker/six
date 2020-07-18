@@ -1,9 +1,9 @@
-use chord::Context;
+use chord::components::Context;
 use kurbo::Vec2;
 use pitch::{Clef, NoteName, Pitch};
-use specs::{storage::BTreeStorage, Component, Entities, Entity};
+use specs::{Component, Entities, Entity, VecStorage};
 use std::cmp::Ordering;
-use stencil::Stencil;
+use stencil::components::Stencil;
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -31,7 +31,7 @@ pub struct BetweenBars {
 }
 
 impl Component for BetweenBars {
-    type Storage = BTreeStorage<Self>;
+    type Storage = VecStorage<Self>;
 }
 
 impl BetweenBars {
@@ -157,7 +157,7 @@ impl BetweenBars {
         if let (Some(key), clef) = (self.key, self.clef.unwrap_or(context.clef)) {
             if key != 0 && clef != Clef::Percussion {
                 stencil = stencil.and_right(Stencil::padding(100.0));
-                for pitch in key_signature_pitches(key, clef) {
+                for pitch in Self::key_signature_pitches(key, clef) {
                     stencil = stencil.and_right(
                         if key < 0 {
                             Stencil::flat()

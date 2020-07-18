@@ -1,3 +1,5 @@
+use specs::{Component, Entity, VecStorage};
+
 #[derive(Debug)]
 pub struct LineOfStaff {
     pub width: f64,
@@ -5,7 +7,7 @@ pub struct LineOfStaff {
 }
 
 impl Component for LineOfStaff {
-    type Storage = BTreeStorage<Self>;
+    type Storage = VecStorage<Self>;
 }
 
 impl LineOfStaff {

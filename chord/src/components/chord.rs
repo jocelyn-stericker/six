@@ -1,6 +1,6 @@
 use kurbo::{Point, Vec2};
 use rhythm::{Duration, NoteValue};
-use specs::{storage::BTreeStorage, Component};
+use specs::{Component, VecStorage};
 use stencil::components::Stencil;
 
 use crate::{components::Context, PitchKind};
@@ -19,7 +19,7 @@ pub struct Chord {
 }
 
 impl Component for Chord {
-    type Storage = BTreeStorage<Self>;
+    type Storage = VecStorage<Self>;
 }
 
 impl Chord {

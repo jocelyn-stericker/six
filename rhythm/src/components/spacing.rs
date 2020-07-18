@@ -1,6 +1,6 @@
 use crate::duration::{Duration, RationalToF64};
 use num_rational::Rational;
-use specs::{storage::BTreeStorage, Component};
+use specs::{Component, VecStorage};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Spacing {
@@ -11,7 +11,7 @@ pub struct Spacing {
 }
 
 impl Component for Spacing {
-    type Storage = BTreeStorage<Self>;
+    type Storage = VecStorage<Self>;
 }
 
 impl Default for Spacing {

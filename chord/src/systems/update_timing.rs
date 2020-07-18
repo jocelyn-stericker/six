@@ -1,54 +1,67 @@
-use std::collections::HashMap;
+#![allow(clippy::type_complexity)]
 
 use crate::{components::Chord, components::Context, PitchKind};
 use rhythm::{components::Bar, components::Spacing, BarChild};
-use specs::{Entities, Entity};
-use stencil::components::Stencil;
+use specs::{Entities, Join, System, WriteStorage};
+use stencil::components::{Parent, Stencil};
 
-pub fn sys_update_chord_timing(
-    entities: &Entities,
-    chord: &mut HashMap<Entity, Chord>,
-    contexts: &mut HashMap<Entity, Context>,
-    bars: &mut HashMap<Entity, Bar>,
-    spacing: &mut HashMap<Entity, Spacing>,
-    parents: &mut HashMap<Entity, Entity>,
-    render: &mut HashMap<Entity, Stencil>,
-) {
-    for (bar_id, bar) in bars {
-        let bar_context = contexts.get(bar_id).cloned().unwrap_or_default();
-        while let Some((duration, entity)) = bar.push_managed_entity(entities) {
-            chord.insert(entity, Chord::new(duration, PitchKind::Rest));
-            contexts.insert(entity, Context::default());
-            spacing.insert(entity, Spacing::default());
-            parents.insert(entity, *bar_id);
-            render.insert(entity, Stencil::default());
-        }
+#[derive(Debug, Default)]
+pub struct UpdateTiming;
 
-        while let Some(entity) = bar.pop_managed_entity() {
-            chord.remove(&entity);
-            spacing.remove(&entity);
-            parents.remove(&entity);
-            render.remove(&entity);
-        }
+impl<'a> System<'a> for UpdateTiming {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, Chord>,
+        WriteStorage<'a, Context>,
+        WriteStorage<'a, Bar>,
+        WriteStorage<'a, Spacing>,
+        WriteStorage<'a, Parent>,
+        WriteStorage<'a, Stencil>,
+    );
 
-        for BarChild {
-            duration,
-            start,
-            stencil,
-            lifetime,
-        } in bar.children()
-        {
-            if let Some(chord) = chord.get_mut(&stencil) {
-                chord.duration = duration;
-                if lifetime.is_automatic() {
-                    chord.natural_duration = duration;
-                }
+    fn run(
+        &mut self,
+        (entities, mut chords, mut contexts, mut bars, mut spacings, mut parents, mut stencils): Self::SystemData,
+    ) {
+        for (bar_id, bar) in (&entities, &mut bars).join() {
+            let bar_context = contexts.get(bar_id).cloned().unwrap_or_default();
+            while let Some((duration, entity)) = bar.push_managed_entity(&entities) {
+                spacings.entry(entity).unwrap().replace(Spacing::default());
+                chords
+                    .entry(entity)
+                    .unwrap()
+                    .replace(Chord::new(duration, PitchKind::Rest));
+                contexts.entry(entity).unwrap().replace(Context::default());
+                parents.entry(entity).unwrap().replace(Parent(bar_id));
+                stencils.entry(entity).unwrap().replace(Stencil::default());
             }
-            if let Some(context_data) = contexts.get_mut(&stencil) {
-                context_data.bar = bar_context.bar;
-                context_data.beat = start;
-                if lifetime.is_automatic() {
-                    context_data.natural_beat = start;
+
+            while let Some(entity) = bar.pop_managed_entity() {
+                chords.remove(entity);
+                spacings.remove(entity);
+                parents.remove(entity);
+                stencils.remove(entity);
+            }
+
+            for BarChild {
+                duration,
+                start,
+                stencil,
+                lifetime,
+            } in bar.children()
+            {
+                if let Some(chord) = chords.get_mut(stencil) {
+                    chord.duration = duration;
+                    if lifetime.is_automatic() {
+                        chord.natural_duration = duration;
+                    }
+                }
+                if let Some(context_data) = contexts.get_mut(stencil) {
+                    context_data.bar = bar_context.bar;
+                    context_data.beat = start;
+                    if lifetime.is_automatic() {
+                        context_data.natural_beat = start;
+                    }
                 }
             }
         }

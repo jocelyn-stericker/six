@@ -4,8 +4,7 @@
 use crate::components::{CombineStencil, Stencil, StencilMap};
 use deflate::Compression;
 use kurbo::{Affine, BezPath, PathEl, Point, Size};
-use specs::Entity;
-use std::collections::HashMap;
+use specs::{shred::Fetch, storage::MaskedStorage, Storage};
 use std::io::{self, Write};
 
 struct Counter<T> {
@@ -425,8 +424,8 @@ impl Pdf {
         &mut self,
         stencil: &Stencil,
         transform: Affine,
-        stencils: &HashMap<Entity, Stencil>,
-        stencil_maps: &HashMap<Entity, StencilMap>,
+        stencils: &Storage<Stencil, Fetch<MaskedStorage<Stencil>>>,
+        stencil_maps: &Storage<StencilMap, Fetch<MaskedStorage<StencilMap>>>,
     ) {
         match stencil {
             Stencil::RawSvg(svg) => {
@@ -458,8 +457,8 @@ impl Pdf {
         &mut self,
         stencil_map: &StencilMap,
         transform: Affine,
-        stencils: &HashMap<Entity, Stencil>,
-        stencil_maps: &HashMap<Entity, StencilMap>,
+        stencils: &Storage<Stencil, Fetch<MaskedStorage<Stencil>>>,
+        stencil_maps: &Storage<StencilMap, Fetch<MaskedStorage<StencilMap>>>,
     ) {
         let transform = if let Some(translate) = stencil_map.translate {
             transform * Affine::translate(translate)
@@ -473,10 +472,10 @@ impl Pdf {
             } else {
                 transform
             };
-            if let Some(child) = stencils.get(&child) {
+            if let Some(child) = stencils.get(child) {
                 self.write_stencil(child, child_transform, stencils, stencil_maps);
             }
-            if let Some(child) = stencil_maps.get(&child) {
+            if let Some(child) = stencil_maps.get(child) {
                 self.write_stencil_map(child, child_transform, stencils, stencil_maps);
             }
         }

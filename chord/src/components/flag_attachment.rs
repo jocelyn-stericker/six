@@ -1,9 +1,9 @@
-use kurbo::Rect;
+use kurbo::Point;
 use specs::{Component, VecStorage};
 
 #[derive(Debug, Default)]
-pub struct WorldBbox(pub Rect);
+pub struct FlagAttachment(pub Option<Point>);
 
-impl Component for WorldBbox {
+impl Component for FlagAttachment {
     type Storage = VecStorage<Self>;
 }

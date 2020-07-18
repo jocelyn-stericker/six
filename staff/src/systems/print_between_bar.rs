@@ -1,18 +1,25 @@
-use std::collections::HashMap;
+use crate::components::BetweenBars;
+use chord::components::Context;
+use specs::{Join, ReadStorage, System, WriteStorage};
+use stencil::components::Stencil;
 
-use crate::BetweenBars;
-use chord::Context;
-use specs::{Entity, Join};
-use stencil::Stencil;
+#[derive(Debug, Default)]
+pub struct PrintBetweenBar;
 
-pub fn sys_print_between_bars(
-    between_bars: &HashMap<Entity, BetweenBars>,
-    contexts: &HashMap<Entity, Context>,
-    stencils: &mut HashMap<Entity, Stencil>,
-) {
-    for (between_bar, context) in (between_bars, contexts).join().values_mut() {
-        *stencils.get_mut(&between_bar.stencil_start).unwrap() = between_bar.render_start(context);
-        *stencils.get_mut(&between_bar.stencil_middle).unwrap() = between_bar.render_mid(context);
-        *stencils.get_mut(&between_bar.stencil_end).unwrap() = between_bar.render_end(context);
+impl<'a> System<'a> for PrintBetweenBar {
+    type SystemData = (
+        ReadStorage<'a, BetweenBars>,
+        ReadStorage<'a, Context>,
+        WriteStorage<'a, Stencil>,
+    );
+
+    fn run(&mut self, (between_bars, contexts, mut stencils): Self::SystemData) {
+        for (between_bar, context) in (&between_bars, &contexts).join() {
+            *stencils.get_mut(between_bar.stencil_start).unwrap() =
+                between_bar.render_start(context);
+            *stencils.get_mut(between_bar.stencil_middle).unwrap() =
+                between_bar.render_mid(context);
+            *stencils.get_mut(between_bar.stencil_end).unwrap() = between_bar.render_end(context);
+        }
     }
 }

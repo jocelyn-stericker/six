@@ -8,7 +8,7 @@ use crate::rhythmic_beaming::RhythmicBeaming;
 use num_integer::Integer;
 use num_rational::Rational;
 use num_traits::{sign::Signed, One, Zero};
-use specs::{storage::BTreeStorage, Component, Entities, Entity};
+use specs::{Component, Entities, Entity, VecStorage};
 use std::collections::{BTreeSet, BinaryHeap};
 
 #[derive(Clone, Debug)]
@@ -31,7 +31,7 @@ pub struct Bar {
 }
 
 impl Component for Bar {
-    type Storage = BTreeStorage<Bar>;
+    type Storage = VecStorage<Bar>;
 }
 
 impl Bar {
@@ -861,6 +861,8 @@ mod bar_tests {
     #[test]
     fn four_four_quarters() {
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(4, 4));
@@ -869,7 +871,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -877,7 +879,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -897,7 +899,7 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -909,7 +911,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Half, 0, None),
@@ -924,7 +926,7 @@ mod bar_tests {
                 Rational::new(1, 2),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -936,7 +938,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -952,11 +954,11 @@ mod bar_tests {
                 vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create()),
+                        Lifetime::Explicit(ent_a),
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create()),
+                        Lifetime::Explicit(ent_b),
                     ),
                 ],
             );
@@ -973,7 +975,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -985,7 +987,7 @@ mod bar_tests {
                 Rational::new(4, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(bar.rhythm(), &vec![]);
@@ -997,7 +999,7 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1009,7 +1011,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Half, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -1023,6 +1025,10 @@ mod bar_tests {
     #[test]
     fn simplify() {
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
+        let ent_c = ents.create();
+        let ent_d = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(4, 4));
@@ -1030,7 +1036,7 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
@@ -1049,7 +1055,7 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
@@ -1068,7 +1074,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -1088,7 +1094,7 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
@@ -1108,7 +1114,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -1128,28 +1134,28 @@ mod bar_tests {
                 Rational::new(0, 1),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(1, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             bar.splice(
                 Rational::new(2, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_c),
                 )],
             );
             bar.splice(
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_d),
                 )],
             );
             bar.splice(
@@ -1178,7 +1184,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -1201,13 +1207,15 @@ mod bar_tests {
     fn simple_time_exposes_middle() {
         // From Beyond Bars, by Elaine Gould (2011), p. 161
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         for bar in &mut [Bar::new(Metre::new(4, 8)), Bar::new(Metre::new(2, 4))] {
             bar.splice(
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1223,7 +1231,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1234,14 +1242,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -1249,7 +1257,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -1261,7 +1269,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                 ],
             );
@@ -1271,7 +1279,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1279,7 +1287,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -1298,7 +1306,7 @@ mod bar_tests {
                 Rational::new(3, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1314,7 +1322,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1325,14 +1333,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(3, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -1340,7 +1348,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -1352,7 +1360,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                 ],
             );
@@ -1362,7 +1370,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1370,7 +1378,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -1389,6 +1397,8 @@ mod bar_tests {
     fn compound_time_exposes_middle() {
         // From Beyond Bars, by Elaine Gould (2011), p. 161
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(6, 16));
@@ -1396,7 +1406,7 @@ mod bar_tests {
                 Rational::new(5, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1412,7 +1422,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1423,14 +1433,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(4, 16),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -1438,7 +1448,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
@@ -1450,7 +1460,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                 ],
             );
@@ -1461,7 +1471,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1469,7 +1479,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
@@ -1493,7 +1503,7 @@ mod bar_tests {
                 Rational::new(5, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1509,7 +1519,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1520,14 +1530,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(4, 8),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -1535,7 +1545,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -1547,7 +1557,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                 ],
             );
@@ -1558,7 +1568,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1566,7 +1576,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -1590,7 +1600,7 @@ mod bar_tests {
                 Rational::new(5, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1606,7 +1616,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1617,14 +1627,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(4, 4),
                 vec![(
                     Duration::new(NoteValue::Half, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -1632,7 +1642,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Half, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -1644,7 +1654,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Half, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                 ],
             );
@@ -1655,7 +1665,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1663,7 +1673,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -1687,7 +1697,7 @@ mod bar_tests {
                 Rational::new(11, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1707,7 +1717,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1718,6 +1728,7 @@ mod bar_tests {
     fn three_shows_all_beats() {
         // From Beyond Bars, by Elaine Gould (2011), p. 161
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(3, 4));
@@ -1725,7 +1736,7 @@ mod bar_tests {
                 Rational::new(2, 4),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1741,7 +1752,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1753,7 +1764,7 @@ mod bar_tests {
                 Rational::new(2, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1769,7 +1780,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1781,7 +1792,7 @@ mod bar_tests {
                 Rational::new(6, 8),
                 vec![(
                     Duration::new(NoteValue::Quarter, 1, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1797,7 +1808,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1808,6 +1819,8 @@ mod bar_tests {
     fn dotted_rests() {
         // From Beyond Bars, by Elaine Gould (2011), p. 161
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(2, 4));
@@ -1815,14 +1828,14 @@ mod bar_tests {
                 Rational::new(3, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(7, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -1834,7 +1847,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 1, None),
@@ -1842,7 +1855,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                 ],
             );
@@ -1854,7 +1867,7 @@ mod bar_tests {
                 Rational::new(8, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -1874,7 +1887,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -1885,6 +1898,8 @@ mod bar_tests {
     fn no_dotted_rests_at_end_of_simple_time_beat() {
         // From Beyond Bars, by Elaine Gould (2011), p. 162
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(2, 4));
@@ -1892,14 +1907,14 @@ mod bar_tests {
                 Rational::new(3, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(4, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -1911,11 +1926,11 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
@@ -1934,14 +1949,14 @@ mod bar_tests {
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(4, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -1953,11 +1968,11 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -1976,6 +1991,7 @@ mod bar_tests {
     fn maximum_dotted_rest() {
         // From Beyond Bars, by Elaine Gould (2011), p. 162
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(4, 4));
@@ -1983,7 +1999,7 @@ mod bar_tests {
                 Rational::new(7, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2003,7 +2019,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -2015,7 +2031,7 @@ mod bar_tests {
                 Rational::new(3, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2027,7 +2043,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -2047,14 +2063,14 @@ mod bar_tests {
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(7, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2066,7 +2082,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
@@ -2074,7 +2090,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -2086,7 +2102,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2094,7 +2110,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -2117,6 +2133,8 @@ mod bar_tests {
     fn double_dotted_rest() {
         // From Beyond Bars, by Elaine Gould (2011), p. 162
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(2, 4));
@@ -2124,7 +2142,7 @@ mod bar_tests {
                 Rational::new(7, 32),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2136,7 +2154,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -2152,14 +2170,14 @@ mod bar_tests {
                 Rational::new(7, 32),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(8, 32),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -2171,11 +2189,11 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
@@ -2198,6 +2216,8 @@ mod bar_tests {
     fn expose_middle_of_beat() {
         // From Beyond Bars, by Elaine Gould (2011), p. 163
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(2, 4));
@@ -2205,14 +2225,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(7, 32),
                 vec![(
                     Duration::new(NoteValue::ThirtySecond, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -2220,7 +2240,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
@@ -2236,7 +2256,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::ThirtySecond, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -2253,6 +2273,7 @@ mod bar_tests {
     fn compound_combine_segments() {
         // From Beyond Bars, by Elaine Gould (2011), p. 163
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(12, 8));
@@ -2260,7 +2281,7 @@ mod bar_tests {
                 Rational::new(9, 8),
                 vec![(
                     Duration::new(NoteValue::Quarter, 1, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2276,7 +2297,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                 ],
             );
@@ -2288,7 +2309,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 1, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2296,7 +2317,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
@@ -2315,6 +2336,8 @@ mod bar_tests {
     fn compound_combine_start() {
         // From Beyond Bars, by Elaine Gould (2011), p. 163
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(6, 8));
@@ -2322,14 +2345,14 @@ mod bar_tests {
                 Rational::new(1, 4),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(5, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -2341,7 +2364,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -2349,7 +2372,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                 ],
             );
@@ -2361,7 +2384,7 @@ mod bar_tests {
                 Rational::new(5, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2377,7 +2400,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
@@ -2392,6 +2415,8 @@ mod bar_tests {
     fn compound_spell_out_later_beats() {
         // From Beyond Bars, by Elaine Gould (2011), p. 163
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(6, 8));
@@ -2399,14 +2424,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(3, 8),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -2414,7 +2439,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -2426,7 +2451,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
@@ -2448,13 +2473,14 @@ mod bar_tests {
     #[test]
     fn overfill() {
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
 
         let mut bar = Bar::new(Metre::new(4, 4));
         bar.splice(
             Rational::new(3, 4),
             vec![(
                 Duration::new(NoteValue::Half, 0, None),
-                Lifetime::Explicit(ents.create()),
+                Lifetime::Explicit(ent_a),
             )],
         );
         assert_eq!(
@@ -2470,7 +2496,7 @@ mod bar_tests {
                 ),
                 (
                     Duration::new(NoteValue::Quarter, 0, None),
-                    Lifetime::Explicit(ents.create())
+                    Lifetime::Explicit(ent_a)
                 ),
             ],
         );
@@ -2479,6 +2505,9 @@ mod bar_tests {
     #[test]
     fn compound_combine_initial_rests_unless_confusing() {
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
+        let ent_c = ents.create();
 
         // p163
         {
@@ -2487,14 +2516,14 @@ mod bar_tests {
                 Rational::new(2, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(11, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -2506,7 +2535,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -2518,7 +2547,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                 ],
             );
@@ -2531,21 +2560,21 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(5, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             bar.splice(
                 Rational::new(8, 8),
                 vec![(
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_c),
                 )],
             );
             assert_eq!(
@@ -2553,7 +2582,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
@@ -2569,7 +2598,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, None),
@@ -2577,7 +2606,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Eighth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_c)
                     ),
                 ],
             );
@@ -2589,14 +2618,14 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             bar.splice(
                 Rational::new(5, 16),
                 vec![(
                     Duration::new(NoteValue::Sixteenth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 )],
             );
             assert_eq!(
@@ -2604,7 +2633,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
@@ -2621,7 +2650,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Sixteenth, 0, None),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_b)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 1, None),
@@ -2636,6 +2665,7 @@ mod bar_tests {
     fn triplets() {
         // Triplet rests are described on p211, but these are different.
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
 
         {
             let mut bar = Bar::new(Metre::new(4, 4));
@@ -2643,7 +2673,7 @@ mod bar_tests {
                 Rational::zero(),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2651,7 +2681,7 @@ mod bar_tests {
                 &vec![
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
@@ -2674,7 +2704,7 @@ mod bar_tests {
                 Rational::new(2, 6),
                 vec![(
                     Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_a),
                 )],
             );
             assert_eq!(
@@ -2690,7 +2720,7 @@ mod bar_tests {
                     ),
                     (
                         Duration::new(NoteValue::Quarter, 0, Some(Rational::new(3, 2))),
-                        Lifetime::Explicit(ents.create())
+                        Lifetime::Explicit(ent_a)
                     ),
                     (
                         Duration::new(NoteValue::Half, 0, None),
@@ -2704,20 +2734,22 @@ mod bar_tests {
     #[test]
     fn regression_splice_12_8_unprintable() {
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
 
         let mut bar = Bar::new(Metre::new(12, 8));
         bar.splice(
             Rational::zero(),
             vec![(
                 Duration::new(NoteValue::Eighth, 0, None),
-                Lifetime::Explicit(ents.create()),
+                Lifetime::Explicit(ent_a),
             )],
         );
         bar.splice(
             Rational::new(11, 8),
             vec![(
                 Duration::new(NoteValue::Eighth, 0, None),
-                Lifetime::Explicit(ents.create()),
+                Lifetime::Explicit(ent_b),
             )],
         );
         assert_eq!(
@@ -2725,7 +2757,7 @@ mod bar_tests {
             &vec![
                 (
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create())
+                    Lifetime::Explicit(ent_a)
                 ),
                 (
                     Duration::new(NoteValue::Eighth, 0, None),
@@ -2749,7 +2781,7 @@ mod bar_tests {
                 ),
                 (
                     Duration::new(NoteValue::Eighth, 0, None),
-                    Lifetime::Explicit(ents.create()),
+                    Lifetime::Explicit(ent_b),
                 ),
             ],
         );
@@ -2810,11 +2842,11 @@ mod bar_tests {
         let nine_eight = Bar::new(Metre::new(9, 8));
 
         assert_eq!(
-            two_four.split_note(Rational::new(1, 8), Duration::new(NoteValue::Half, 0, None)),
-            vec![
-                Duration::new(NoteValue::Eighth, 0, None),
-                Duration::new(NoteValue::Quarter, 1, None),
-            ]
+            two_four.split_note(
+                Rational::new(1, 8),
+                Duration::new(NoteValue::Quarter, 1, None)
+            ),
+            vec![Duration::new(NoteValue::Quarter, 1, None),]
         );
 
         assert_eq!(
@@ -2834,13 +2866,14 @@ mod bar_tests {
     #[test]
     fn split_note_existing_space() {
         let ents = EntitiesRes::default();
+        let ent_a = ents.create();
 
         let mut four_four = Bar::new(Metre::new(4, 4));
         four_four.splice(
             Rational::new(1, 8),
             vec![(
                 Duration::new(NoteValue::Quarter, 1, None),
-                Lifetime::Explicit(ents.create()),
+                Lifetime::Explicit(ent_a),
             )],
         );
 

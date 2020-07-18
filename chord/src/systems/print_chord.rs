@@ -1,21 +1,38 @@
-use kurbo::Point;
+#![allow(clippy::type_complexity)]
+
 use stencil::components::Stencil;
 
-use crate::components::{Chord, Context};
-use specs::Entity;
-use std::collections::HashMap;
+use crate::components::{BeamForChord, Chord, Context, FlagAttachment};
+use specs::{Join, ReadStorage, System, WriteStorage};
 
-pub fn sys_print_chord(
-    chord: &HashMap<Entity, Chord>,
-    contexts: &HashMap<Entity, Context>,
-    beam_for_chord: &HashMap<Entity, Entity>,
-    attachments: &mut HashMap<Entity, Option<Point>>,
-    stencils: &mut HashMap<Entity, Stencil>,
-) {
-    for (id, (chord, context, stencil)) in (chord, contexts, stencils).join() {
-        let has_beam = beam_for_chord.contains_key(&id);
-        let result = chord.print(context, has_beam);
-        *stencil = result.0;
-        *attachments.entry(id).or_default() = result.1;
+#[derive(Debug, Default)]
+pub struct PrintChord;
+
+impl<'a> System<'a> for PrintChord {
+    type SystemData = (
+        ReadStorage<'a, Chord>,
+        ReadStorage<'a, Context>,
+        ReadStorage<'a, BeamForChord>,
+        WriteStorage<'a, FlagAttachment>,
+        WriteStorage<'a, Stencil>,
+    );
+
+    fn run(
+        &mut self,
+        (chords, contexts, beam_for_chord, mut attachments, mut stencils): Self::SystemData,
+    ) {
+        for (chord, context, beam, attachment, stencil) in (
+            &chords,
+            &contexts,
+            beam_for_chord.maybe(),
+            &mut attachments,
+            &mut stencils,
+        )
+            .join()
+        {
+            let result = chord.print(context, beam.is_some());
+            *stencil = result.0;
+            attachment.0 = result.1;
+        }
     }
 }

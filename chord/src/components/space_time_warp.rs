@@ -1,5 +1,5 @@
 use num_rational::Rational;
-use specs::{storage::BTreeStorage, Component};
+use specs::{Component, VecStorage};
 
 /// A map from time to position.
 ///
@@ -8,7 +8,7 @@ use specs::{storage::BTreeStorage, Component};
 pub struct SpaceTimeWarp(pub Vec<(Rational, f64)>);
 
 impl Component for SpaceTimeWarp {
-    type Storage = BTreeStorage<Self>;
+    type Storage = VecStorage<Self>;
 }
 
 impl SpaceTimeWarp {

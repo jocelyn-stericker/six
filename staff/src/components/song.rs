@@ -1,13 +1,15 @@
+use specs::{Component, Entity, VecStorage};
+
 #[derive(Debug)]
 pub struct Song {
-    freeze_spacing: Option<isize>,
-    prev_freeze_spacing: Option<isize>,
+    pub freeze_spacing: Option<isize>,
+    pub prev_freeze_spacing: Option<isize>,
 
     /// In mm
-    width: f64,
+    pub width: f64,
 
     /// In mm
-    height: f64,
+    pub height: f64,
 
     /// Convert from staff-size (1 unit is 1 staff) to paper-size (1 unit is 1 mm)
     ///
@@ -20,19 +22,19 @@ pub struct Song {
     ///  - 5 is less commonly used for single-staff-parts, piano music, and songs.
     ///  - 6-7 are used for choral music, cue saves, or ossia.
     ///  - 8 is used for full scores.
-    rastal_size: u8,
+    pub rastal_size: u8,
 
-    title: String,
-    title_width: f64,
-    title_stencil: Option<Entity>,
+    pub title: String,
+    pub title_width: f64,
+    pub title_stencil: Option<Entity>,
 
-    author: String,
-    author_width: f64,
-    author_stencil: Option<Entity>,
+    pub author: String,
+    pub author_width: f64,
+    pub author_stencil: Option<Entity>,
 }
 
 impl Component for Song {
-    type Storage = HashMapStorage<Self>;
+    type Storage = VecStorage<Self>;
 }
 
 impl Default for Song {
@@ -70,4 +72,3 @@ impl Song {
         }
     }
 }
-
