@@ -1,6 +1,8 @@
-use chord::resources::KeepSpacing;
 use specs::{Read, ReadStorage, System, Write};
-use staff::{components::Song, resources::Root};
+use staff::{
+    components::Song,
+    resources::{KeepSpacing, Root},
+};
 
 #[derive(Debug, Default)]
 pub struct UpdateKeepSpacing;

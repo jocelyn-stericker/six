@@ -3,15 +3,6 @@
 mod systems;
 
 use crate::systems::{DeleteOrphans, PrintMeta, PrintSong, UpdateKeepSpacing, UpdateWorldBbox};
-use chord::{
-    components::{Beam, BeamForChord, Chord, Context, FlagAttachment, SpaceTimeWarp},
-    resources::KeepSpacing,
-    systems::{
-        ApplySpaceTimeWarp, DraftBeam, PrintBeam, PrintChord, RecordSpaceTimeWarp, SpaceBeam,
-        UpdateTiming,
-    },
-    PitchKind,
-};
 use kurbo::{Affine, Size, Vec2};
 use num_rational::Rational;
 use pitch::{Clef, NoteModifier, Pitch};
@@ -21,12 +12,17 @@ use rhythm::{
 };
 use specs::{Builder, Entity, Join, RunNow, World, WorldExt};
 use staff::{
-    components::{BetweenBars, Children, Cursor, LineOfStaff, Song, Staff},
-    resources::Root,
-    systems::{
-        BreakIntoLines, PrintBetweenBar, PrintCursor, PrintStaff, PrintStaffLines, UpdateContext,
+    components::{
+        Beam, BeamForChord, BetweenBars, Children, Chord, Context, Cursor, FlagAttachment,
+        LineOfStaff, Song, SpaceTimeWarp, Staff,
     },
-    Barline,
+    resources::{KeepSpacing, Root},
+    systems::{
+        ApplySpaceTimeWarp, BreakIntoLines, DraftBeam, PrintBeam, PrintBetweenBar, PrintChord,
+        PrintCursor, PrintStaff, PrintStaffLines, RecordSpaceTimeWarp, SpaceBeam, UpdateContext,
+        UpdateTiming,
+    },
+    Barline, PitchKind,
 };
 use std::convert::TryInto;
 use stencil::{

@@ -1,5 +1,4 @@
-use crate::components::BetweenBars;
-use chord::components::Context;
+use crate::components::{BetweenBars, Context};
 use specs::{Join, ReadStorage, System, WriteStorage};
 use stencil::components::Stencil;
 

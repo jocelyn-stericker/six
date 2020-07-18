@@ -2,9 +2,8 @@
 
 use std::collections::BTreeSet;
 
-use crate::components::{Children, LineOfStaff};
+use crate::components::{BeamForChord, Children, LineOfStaff};
 use crate::systems::break_into_lines::STAFF_MARGIN;
-use chord::components::BeamForChord;
 use kurbo::{Rect, Vec2};
 use rhythm::{components::Bar, components::Spacing, BarChild};
 use specs::{Entities, Join, ReadStorage, System, WriteStorage};

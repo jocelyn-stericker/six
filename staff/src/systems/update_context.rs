@@ -2,8 +2,10 @@
 
 use std::collections::HashMap;
 
-use crate::components::{BetweenBars, Children, Staff};
-use chord::{components::Chord, components::Context, PitchKind};
+use crate::{
+    components::{BetweenBars, Children, Chord, Context, Staff},
+    PitchKind,
+};
 use num_rational::Rational;
 use pitch::{key_signature_note_names, Clef, NoteModifier, NoteName};
 use rhythm::{components::Bar, BarChild};

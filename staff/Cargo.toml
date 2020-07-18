@@ -8,7 +8,6 @@ description = "Renders a staff"
 repository = "https://github.com/jnetterf/six"
 
 [dependencies]
-chord = {path = "../chord"}
 rhythm = {path = "../rhythm"}
 stencil = {path = "../stencil"}
 pitch = {path = "../pitch"}

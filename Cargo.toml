@@ -5,7 +5,6 @@ overflow-checks = false     # Disable integer overflow checks.
 members = [
     "pitch",
     "render",
-    "chord",
     "rhythm",
     "staff",
     "stencil",

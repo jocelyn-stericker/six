@@ -1,4 +1,4 @@
-use chord::components::Context;
+use crate::components::Context;
 use kurbo::Vec2;
 use pitch::{Clef, NoteName, Pitch};
 use specs::{Component, Entities, Entity, VecStorage};

@@ -88,7 +88,6 @@ module.exports = {
       outDir: path.resolve(__dirname, "rust_render_built"),
       watchDirectories: [
         path.resolve(__dirname, "..", "pitch"),
-        path.resolve(__dirname, "..", "chord"),
         path.resolve(__dirname, "..", "rhythm"),
         path.resolve(__dirname, "..", "staff"),
         path.resolve(__dirname, "..", "stencil"),

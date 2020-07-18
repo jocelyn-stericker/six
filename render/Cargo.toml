@@ -12,7 +12,6 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pitch = { path = "../pitch" }
-chord = { path = "../chord" }
 rhythm = { path = "../rhythm" }
 staff = { path = "../staff" }
 stencil = { path = "../stencil" }
