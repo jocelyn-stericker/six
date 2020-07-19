@@ -4,7 +4,7 @@ use num_rational::Rational;
 
 use crate::{
     components::{BetweenBars, Children, LineOfStaff, Song, Staff},
-    resources::Root,
+    resources::{KeepSpacing, Root},
 };
 use rhythm::{components::Bar, components::Spacing, BarChild, Duration};
 use specs::{Entities, Entity, Join, Read, ReadStorage, System, WriteStorage};
@@ -17,6 +17,7 @@ impl<'a> System<'a> for BreakIntoLines {
     type SystemData = (
         Entities<'a>,
         Read<'a, Root>,
+        Read<'a, KeepSpacing>,
         ReadStorage<'a, Song>,
         ReadStorage<'a, Bar>,
         ReadStorage<'a, BetweenBars>,
@@ -33,6 +34,7 @@ impl<'a> System<'a> for BreakIntoLines {
         (
             entities,
             root,
+            keep_spacing,
             songs,
             bars,
             between_bars,
@@ -44,9 +46,14 @@ impl<'a> System<'a> for BreakIntoLines {
             mut line_of_staffs,
         ): Self::SystemData,
     ) {
+        if keep_spacing.0 {
+            return;
+        }
+
         let song = root.0.and_then(|root| songs.get(root));
 
-        let width = song.map(|song| song.width).unwrap_or(0.0) - STAFF_MARGIN * 2f64;
+        // TODO(joshuan): scale is fixed as rastal size 3.
+        let width = song.map(|song| song.width / 7.0 * 1000.0).unwrap_or(0.0) - STAFF_MARGIN * 2f64;
 
         let mut to_add = vec![];
         for (id, staff, children) in (&entities, &mut staffs, &mut children).join() {
@@ -145,7 +152,7 @@ impl<'a> System<'a> for BreakIntoLines {
         }
 
         for (entity, val) in to_add {
-            children.entry(entity).unwrap().replace(val);
+            children.insert(entity, val).unwrap();
         }
     }
 }
@@ -359,7 +366,7 @@ impl PartialSolution {
 
                     advance = my_spacing.end_x;
 
-                    spacing.entry(stencil).unwrap().replace(my_spacing);
+                    spacing.insert(stencil, my_spacing).unwrap();
                 }
             }
         }

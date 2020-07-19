@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::stencil::Stencil;
 use kurbo::{Rect, Vec2};
-use specs::{Component, Entity, VecStorage};
+use specs::{shred::Fetch, storage::MaskedStorage, Component, Entity, Storage, VecStorage};
 
 #[derive(Debug, Clone, Default)]
 pub struct StencilMap {
@@ -106,17 +106,17 @@ impl StencilMap {
 
     pub fn to_svg(
         &self,
-        stencil_maps: &HashMap<Entity, StencilMap>,
-        stencils: &HashMap<Entity, Stencil>,
+        stencil_maps: &Storage<StencilMap, Fetch<MaskedStorage<StencilMap>>>,
+        stencils: &Storage<Stencil, Fetch<MaskedStorage<Stencil>>>,
     ) -> String {
         let children: String = self
             .get_sorted_children()
             .into_iter()
             .map(|(entity, translate)| {
                 let child_svg;
-                if let Some(map) = stencil_maps.get(&entity) {
+                if let Some(map) = stencil_maps.get(entity) {
                     child_svg = map.to_svg(stencil_maps, stencils);
-                } else if let Some(stencil) = stencils.get(&entity) {
+                } else if let Some(stencil) = stencils.get(entity) {
                     child_svg = stencil.to_svg();
                 } else {
                     child_svg = String::new();
@@ -158,8 +158,8 @@ impl StencilMap {
     pub fn to_svg_doc_for_testing(
         &self,
         scale: f64,
-        stencil_maps: &HashMap<Entity, StencilMap>,
-        stencils: &HashMap<Entity, Stencil>,
+        stencil_maps: &Storage<StencilMap, Fetch<MaskedStorage<StencilMap>>>,
+        stencils: &Storage<Stencil, Fetch<MaskedStorage<Stencil>>>,
     ) -> String {
         [
             "<svg viewBox=\"0 0 ",

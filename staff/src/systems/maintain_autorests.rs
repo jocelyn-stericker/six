@@ -9,9 +9,9 @@ use specs::{world::Builder, Entities, Join, LazyUpdate, Read, System, WriteStora
 use stencil::components::{Parent, Stencil};
 
 #[derive(Debug, Default)]
-pub struct UpdateTiming;
+pub struct MaintainAutorests;
 
-impl<'a> System<'a> for UpdateTiming {
+impl<'a> System<'a> for MaintainAutorests {
     type SystemData = (
         Entities<'a>,
         Read<'a, LazyUpdate>,

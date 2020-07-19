@@ -1,6 +1,7 @@
 mod apply_space_time_warp;
 pub(crate) mod break_into_lines;
 mod draft_beam;
+mod maintain_autorests;
 mod print_beam;
 mod print_between_bar;
 mod print_chord;
@@ -10,11 +11,11 @@ mod print_staff_lines;
 mod record_space_time_warp;
 mod space_beam;
 mod update_context;
-mod update_timing;
 
 pub use apply_space_time_warp::ApplySpaceTimeWarp;
 pub use break_into_lines::BreakIntoLines;
 pub use draft_beam::DraftBeam;
+pub use maintain_autorests::MaintainAutorests;
 pub use print_beam::PrintBeam;
 pub use print_between_bar::PrintBetweenBar;
 pub use print_chord::PrintChord;
@@ -24,4 +25,3 @@ pub use print_staff_lines::PrintStaffLines;
 pub use record_space_time_warp::RecordSpaceTimeWarp;
 pub use space_beam::SpaceBeam;
 pub use update_context::UpdateContext;
-pub use update_timing::UpdateTiming;

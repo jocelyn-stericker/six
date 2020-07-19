@@ -18,9 +18,9 @@ use staff::{
     },
     resources::{KeepSpacing, Root},
     systems::{
-        ApplySpaceTimeWarp, BreakIntoLines, DraftBeam, PrintBeam, PrintBetweenBar, PrintChord,
-        PrintCursor, PrintStaff, PrintStaffLines, RecordSpaceTimeWarp, SpaceBeam, UpdateContext,
-        UpdateTiming,
+        ApplySpaceTimeWarp, BreakIntoLines, DraftBeam, MaintainAutorests, PrintBeam,
+        PrintBetweenBar, PrintChord, PrintCursor, PrintStaff, PrintStaffLines, RecordSpaceTimeWarp,
+        SpaceBeam, UpdateContext,
     },
     Barline, PitchKind,
 };
@@ -39,7 +39,7 @@ struct Systems {
     print_chord: PrintChord,
     record_space_time_warp: RecordSpaceTimeWarp,
     space_beam: SpaceBeam,
-    update_timing: UpdateTiming,
+    maintain_autorests: MaintainAutorests,
     break_into_lines: BreakIntoLines,
     print_between_bar: PrintBetweenBar,
     print_staff: PrintStaff,
@@ -241,7 +241,7 @@ impl Render {
             .id()
     }
 
-    fn bar_by_index(&self, staff_children: &Vec<Entity>, idx: usize) -> Option<Entity> {
+    fn bar_by_index(&self, staff_children: &[Entity], idx: usize) -> Option<Entity> {
         let bars = self.world.read_component::<Bar>();
 
         let mut i = 0;
@@ -636,11 +636,10 @@ impl Render {
 
     pub fn exec(&mut self) {
         self.systems.delete_orphans.run_now(&self.world);
+        self.systems.update_keep_spacing.run_now(&self.world);
+        self.systems.maintain_autorests.run_now(&self.world);
         self.world.maintain();
 
-        self.systems.update_keep_spacing.run_now(&self.world);
-        self.systems.update_timing.run_now(&self.world);
-        self.world.maintain();
         self.systems.draft_beam.run_now(&self.world);
         self.systems.update_context.run_now(&self.world);
 
@@ -888,18 +887,22 @@ impl Render {
         vec![*f.numer(), *f.denom()]
     }
 
-    // pub fn print_for_demo(&mut self) -> String {
-    //     self.exec();
+    pub fn print_for_demo(&mut self) -> Option<String> {
+        self.exec();
 
-    //     let song = &self.songs[&self.root.unwrap()];
+        let root = self.world.read_resource::<Root>().0?;
+        let songs = self.world.read_component::<Song>();
+        let stencil_maps = self.world.read_component::<StencilMap>();
 
-    //     if let Some(root) = self.root.and_then(|root| self.stencil_maps.get(&root)) {
-    //         root.clone()
-    //             .to_svg_doc_for_testing(song.scale(), &self.stencil_maps, &self.stencils)
-    //     } else {
-    //         String::default()
-    //     }
-    // }
+        let song = songs.get(root)?;
+        let stencil_map = stencil_maps.get(root)?;
+
+        Some(stencil_map.clone().to_svg_doc_for_testing(
+            song.scale(),
+            &self.world.read_component::<StencilMap>(),
+            &self.world.read_component::<Stencil>(),
+        ))
+    }
 
     pub fn to_pdf(&self, embed_file: Option<String>) -> Option<String> {
         let songs = self.world.read_component::<Song>();
@@ -924,112 +927,124 @@ impl Render {
         Some(base64::encode(pdf.into_binary()))
     }
 }
-//
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//
-//     #[test]
-//     fn it_works() {
-//         use rhythm::NoteValue;
-//         use stencil::snapshot;
-//
-//         let mut render = Render::default();
-//         let song = render.song_create();
-//         render.song_set_size(song, 215.9, 279.4);
-//         render.song_set_title(song, "Six Eight", 26.4f64);
-//         render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
-//
-//         let staff = render.staff_create();
-//         let clef =
-//             render.between_bars_create(None, Some(Clef::Percussion), Some(4), Some(4), Some(0));
-//         render.child_append(staff, clef);
-//
-//         let bar1 = render.bar_create(4, 4);
-//         render.child_append(staff, bar1);
-//
-//         let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
-//         render.chord_set_unpitched(chord1);
-//
-//         render.bar_insert(bar1, chord1, false);
-//         let barline = render.between_bars_create(Some(Barline::Normal), None, None, None, Some(0));
-//         render.child_append(staff, barline);
-//
-//         let bar2 = render.bar_create(4, 4);
-//         render.child_append(staff, bar2);
-//
-//         let chord2 = render.chord_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4);
-//         render.chord_set_unpitched(chord2);
-//
-//         render.bar_insert(bar2, chord2, false);
-//
-//         let final_barline =
-//             render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
-//         render.child_append(staff, final_barline);
-//
-//         render.child_append(song, staff);
-//         render.root_set(song);
-//
-//         render.exec();
-//
-//         render.chord_update_time(chord1, NoteValue::Eighth.log2() as isize, 0, 4, 16, false);
-//
-//         snapshot("./snapshots/hello_world.svg", &render.print_for_demo());
-//
-//         // Make sure we can clean up and no entities are left over.
-//         render.root_clear(song);
-//         render.exec();
-//
-//         assert_eq!(render.parents.len(), 0);
-//         assert_eq!(render.songs.len(), 0);
-//         assert_eq!(render.staffs.len(), 0);
-//         assert_eq!(render.line_of_staffs.len(), 0);
-//         assert_eq!(render.bars.len(), 0);
-//         assert_eq!(render.between_bars.len(), 0);
-//         assert_eq!(render.chords.len(), 0);
-//         assert_eq!(render.stencils.len(), 0);
-//         assert_eq!(render.stencil_maps.len(), 0);
-//         assert_eq!(render.world_bbox.len(), 0);
-//         assert_eq!(render.contexts.len(), 0);
-//         assert_eq!(render.spacing.len(), 0);
-//         assert_eq!(render.ordered_children.len(), 0);
-//     }
-//
-//     #[test]
-//     fn beaming_1() {
-//         use rhythm::NoteValue;
-//         use stencil::snapshot;
-//
-//         let mut render = Render::default();
-//         let song = render.song_create();
-//         render.song_set_size(song, 215.9, 279.4);
-//         render.song_set_title(song, "Six Eight", 26.4f64);
-//         render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
-//
-//         let staff = render.staff_create();
-//         let clef = render.between_bars_create(None, Some(Clef::G), Some(4), Some(4), Some(0));
-//         render.child_append(staff, clef);
-//
-//         let bar1 = render.bar_create(4, 4);
-//         render.child_append(staff, bar1);
-//
-//         let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 0, 1);
-//         let chord2 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
-//
-//         render.chord_set_pitch(chord1, 60, 0);
-//         render.bar_insert(bar1, chord1, false);
-//         render.chord_set_pitch(chord2, 60, 0);
-//         render.bar_insert(bar1, chord2, false);
-//
-//         let final_barline =
-//             render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
-//         render.child_append(staff, final_barline);
-//
-//         render.child_append(song, staff);
-//         render.root_set(song);
-//
-//         render.exec();
-//
-//         snapshot("./snapshots/beaming_1.svg", &render.print_for_demo());
-//     }
-// }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn it_works() {
+        use rhythm::NoteValue;
+        use stencil::snapshot;
+
+        let mut render = Render::default();
+        let song = render.song_create();
+        render.song_set_size(song, 215.9, 279.4);
+        render.song_set_title(song, "Six Eight", 26.4f64);
+        render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
+
+        let staff = render.staff_create();
+        let clef =
+            render.between_bars_create(None, Some(Clef::Percussion), Some(4), Some(4), Some(0));
+        render.child_append(staff, clef);
+
+        let bar1 = render.bar_create(4, 4);
+        render.child_append(staff, bar1);
+
+        let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
+        render.chord_set_unpitched(chord1);
+
+        render.bar_insert(bar1, chord1, false);
+        let barline = render.between_bars_create(Some(Barline::Normal), None, None, None, Some(0));
+        render.child_append(staff, barline);
+
+        let bar2 = render.bar_create(4, 4);
+        render.child_append(staff, bar2);
+
+        let chord2 = render.chord_create(NoteValue::SixtyFourth.log2() as isize, 0, 1, 4);
+        render.chord_set_unpitched(chord2);
+
+        render.bar_insert(bar2, chord2, false);
+
+        let final_barline =
+            render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
+        render.child_append(staff, final_barline);
+
+        render.child_append(song, staff);
+        render.root_set(song);
+
+        render.exec();
+
+        render.chord_update_time(chord1, NoteValue::Eighth.log2() as isize, 0, 4, 16, false);
+
+        snapshot(
+            "./snapshots/hello_world.svg",
+            &render.print_for_demo().unwrap_or_default(),
+        );
+
+        // Make sure we can clean up and no entities are left over.
+        render.root_clear(song);
+        render.exec();
+
+        assert_eq!(render.world.read_component::<Parent>().is_empty(), true);
+        assert_eq!(render.world.read_component::<Song>().is_empty(), true);
+        assert_eq!(render.world.read_component::<Staff>().is_empty(), true);
+        assert_eq!(
+            render.world.read_component::<LineOfStaff>().is_empty(),
+            true
+        );
+        assert_eq!(render.world.read_component::<Bar>().is_empty(), true);
+        assert_eq!(
+            render.world.read_component::<BetweenBars>().is_empty(),
+            true
+        );
+        assert_eq!(render.world.read_component::<Chord>().is_empty(), true);
+        assert_eq!(render.world.read_component::<Stencil>().is_empty(), true);
+        assert_eq!(render.world.read_component::<StencilMap>().is_empty(), true);
+        assert_eq!(render.world.read_component::<WorldBbox>().is_empty(), true);
+        assert_eq!(render.world.read_component::<Context>().is_empty(), true);
+        assert_eq!(render.world.read_component::<Spacing>().is_empty(), true);
+        assert_eq!(render.world.read_component::<Children>().is_empty(), true);
+    }
+
+    #[test]
+    fn beaming_1() {
+        use rhythm::NoteValue;
+        use stencil::snapshot;
+
+        let mut render = Render::default();
+        let song = render.song_create();
+        render.song_set_size(song, 215.9, 279.4);
+        render.song_set_title(song, "Six Eight", 26.4f64);
+        render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
+
+        let staff = render.staff_create();
+        let clef = render.between_bars_create(None, Some(Clef::G), Some(4), Some(4), Some(0));
+        render.child_append(staff, clef);
+
+        let bar1 = render.bar_create(4, 4);
+        render.child_append(staff, bar1);
+
+        let chord1 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 0, 1);
+        let chord2 = render.chord_create(NoteValue::Eighth.log2() as isize, 0, 1, 8);
+
+        render.chord_set_pitch(chord1, 60, 0);
+        render.bar_insert(bar1, chord1, false);
+        render.chord_set_pitch(chord2, 60, 0);
+        render.bar_insert(bar1, chord2, false);
+
+        let final_barline =
+            render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
+        render.child_append(staff, final_barline);
+
+        render.child_append(song, staff);
+        render.root_set(song);
+
+        render.exec();
+
+        snapshot(
+            "./snapshots/beaming_1.svg",
+            &render.print_for_demo().unwrap_or_default(),
+        );
+    }
+}
