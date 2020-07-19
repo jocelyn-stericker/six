@@ -4,7 +4,7 @@ declare namespace JSX {
     staff: import("./reconciler").StaffProps;
     bar: import("./reconciler").BarProps;
     chord: import("./reconciler").ChordProps;
-    between: import("./reconciler").BetweenBarsProps;
+    signature: import("./reconciler").SignatureProps;
     cursor: import("./reconciler").CursorProps;
   }
 }

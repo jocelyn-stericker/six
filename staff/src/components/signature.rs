@@ -14,7 +14,7 @@ pub enum Barline {
 }
 
 #[derive(Debug)]
-pub struct BetweenBars {
+pub struct Signature {
     pub clef: Option<Clef>,
     pub time: Option<(u8, u8)>,
     pub key: Option<i8>,
@@ -30,13 +30,13 @@ pub struct BetweenBars {
     pub stencil_end: Entity,
 }
 
-impl Component for BetweenBars {
+impl Component for Signature {
     type Storage = VecStorage<Self>;
 }
 
-impl BetweenBars {
-    pub fn new(&self, entities: &Entities) -> BetweenBars {
-        BetweenBars {
+impl Signature {
+    pub fn new(&self, entities: &Entities) -> Signature {
+        Signature {
             clef: None,
             time: None,
             key: None,
@@ -102,7 +102,7 @@ impl BetweenBars {
 
         if key != 0 && clef != Clef::Percussion {
             stencil = stencil.and_right(Stencil::padding(100.0));
-            for pitch in BetweenBars::key_signature_pitches(key, clef) {
+            for pitch in Signature::key_signature_pitches(key, clef) {
                 stencil = stencil.and_right(
                     if key < 0 {
                         Stencil::flat()
@@ -225,7 +225,7 @@ mod tests {
 
         snapshot(
             "./snapshots/signatures.svg",
-            &BetweenBars {
+            &Signature {
                 clef: Some(Clef::G),
                 time: Some((4, 4)),
                 key: Some(0),
@@ -236,7 +236,7 @@ mod tests {
             }
             .render_start(&context)
             .and_right(
-                BetweenBars {
+                Signature {
                     clef: Some(Clef::G),
                     time: Some((4, 4)),
                     key: Some(6),
@@ -248,7 +248,7 @@ mod tests {
                 .render_start(&context),
             )
             .and_right(
-                BetweenBars {
+                Signature {
                     clef: Some(Clef::G),
                     time: Some((4, 4)),
                     key: Some(-6),
@@ -260,7 +260,7 @@ mod tests {
                 .render_start(&context),
             )
             .and_right(
-                BetweenBars {
+                Signature {
                     clef: Some(Clef::F),
                     time: Some((6, 8)),
                     key: Some(6),
@@ -272,7 +272,7 @@ mod tests {
                 .render_start(&context),
             )
             .and_right(
-                BetweenBars {
+                Signature {
                     clef: Some(Clef::F),
                     time: Some((6, 8)),
                     key: Some(-6),

@@ -103,7 +103,7 @@ export default function Meta({ appState, dispatch }: Props) {
                 }),
               );
             }}
-            selectedValue={appState.song.global.between[0].clef}
+            selectedValue={appState.song.global.signatures[0].clef}
           >
             <Radio large={true} label="Treble" value="g" />
             <Radio large={true} label="Bass" value="f" />
@@ -116,11 +116,11 @@ export default function Meta({ appState, dispatch }: Props) {
           className={css.metaGroup}
         >
           <HTMLSelect
-            disabled={appState.song.global.between[0].clef === "percussion"}
+            disabled={appState.song.global.signatures[0].clef === "percussion"}
             value={
-              appState.song.global.between[0].clef === "percussion"
+              appState.song.global.signatures[0].clef === "percussion"
                 ? 0
-                : appState.song.global.between[0].ks
+                : appState.song.global.signatures[0].ks
             }
             onChange={ev => {
               dispatch(
@@ -156,7 +156,7 @@ export default function Meta({ appState, dispatch }: Props) {
                 .map(ts => parseInt(ts));
               dispatch(setTs(appState, { beforeBar: 0, ts: [num, den] }));
             }}
-            selectedValue={`${appState.song.global.between[0].ts[0]}/${appState.song.global.between[0].ts[1]}`}
+            selectedValue={`${appState.song.global.signatures[0].ts[0]}/${appState.song.global.signatures[0].ts[1]}`}
             className={css.metaTsSelect}
           >
             <Radio label="4/4" value="4/4" />
@@ -177,7 +177,7 @@ export default function Meta({ appState, dispatch }: Props) {
         </FormGroup>
         <div style={{ height: 8 }} />
         <FormGroup
-          label={`Does the first bar have ${appState.song.global.between[0].ts[0]} beats?`}
+          label={`Does the first bar have ${appState.song.global.signatures[0].ts[0]} beats?`}
           labelFor="meta-pickup"
         >
           <HTMLSelect
@@ -213,23 +213,23 @@ export default function Meta({ appState, dispatch }: Props) {
                 options={[
                   {
                     label: "\u00bd",
-                    value: `${appState.song.global.between[0].ts[0] * 2 -
-                      1}/${appState.song.global.between[0].ts[1] * 2}`,
+                    value: `${appState.song.global.signatures[0].ts[0] * 2 -
+                      1}/${appState.song.global.signatures[0].ts[1] * 2}`,
                   },
-                  ...Array(appState.song.global.between[0].ts[0] - 1)
+                  ...Array(appState.song.global.signatures[0].ts[0] - 1)
                     .fill(null)
                     .map((_, i) => [
                       {
                         label: String(i + 1),
-                        value: `${appState.song.global.between[0].ts[1] -
+                        value: `${appState.song.global.signatures[0].ts[1] -
                           i -
-                          1}/${appState.song.global.between[0].ts[1]}`,
+                          1}/${appState.song.global.signatures[0].ts[1]}`,
                       },
                       {
                         label: `${i + 1} \u00bd`,
-                        value: `${appState.song.global.between[0].ts[1] * 2 -
+                        value: `${appState.song.global.signatures[0].ts[1] * 2 -
                           (i * 2 + 1) -
-                          2}/${appState.song.global.between[0].ts[1] * 2}`,
+                          2}/${appState.song.global.signatures[0].ts[1] * 2}`,
                       },
                     ])
                     .reduce((memo, item) => [...memo, ...item], []),

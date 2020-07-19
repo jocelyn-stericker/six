@@ -3,7 +3,7 @@
 use num_rational::Rational;
 
 use crate::{
-    components::{BetweenBars, Children, LineOfStaff, Song, Staff},
+    components::{Children, LineOfStaff, Signature, Song, Staff},
     resources::{KeepSpacing, Root},
 };
 use rhythm::{components::Bar, components::Spacing, BarChild, Duration};
@@ -20,7 +20,7 @@ impl<'a> System<'a> for BreakIntoLines {
         Read<'a, KeepSpacing>,
         ReadStorage<'a, Song>,
         ReadStorage<'a, Bar>,
-        ReadStorage<'a, BetweenBars>,
+        ReadStorage<'a, Signature>,
         ReadStorage<'a, Stencil>,
         WriteStorage<'a, Spacing>,
         WriteStorage<'a, Staff>,
@@ -37,7 +37,7 @@ impl<'a> System<'a> for BreakIntoLines {
             keep_spacing,
             songs,
             bars,
-            between_bars,
+            signatures,
             stencils,
             mut spacings,
             mut staffs,
@@ -61,17 +61,17 @@ impl<'a> System<'a> for BreakIntoLines {
             let mut current_solution = PartialSolution::default();
             let mut next_solution = PartialSolution::default();
             let mut good_solution = PartialSolution::default();
-            let mut recent_between = None;
+            let mut recent_signature = None;
 
             // This is greedy.
             for &child in &children.0 {
                 if let Some(bar) = bars.get(child) {
                     current_solution.add_bar(child, bar, &stencils);
                     next_solution.add_bar(child, bar, &stencils);
-                } else if let Some(between) = between_bars.get(child) {
-                    current_solution.add_between(between, &stencils);
-                    next_solution.add_between(between, &stencils);
-                    recent_between = Some(between);
+                } else if let Some(signature) = signatures.get(child) {
+                    current_solution.add_signature(signature, &stencils);
+                    next_solution.add_signature(signature, &stencils);
+                    recent_signature = Some(signature);
                 } else {
                     panic!();
                 }
@@ -80,8 +80,8 @@ impl<'a> System<'a> for BreakIntoLines {
                     if current_solution.width < width {
                         good_solution = current_solution.clone();
                         next_solution = PartialSolution::default();
-                        if let Some(between) = recent_between {
-                            next_solution.add_between(between, &stencils);
+                        if let Some(signature) = recent_signature {
+                            next_solution.add_signature(signature, &stencils);
                         }
                     } else {
                         good_solution.apply_spacing(width, &bars, &mut spacings);
@@ -160,7 +160,7 @@ impl<'a> System<'a> for BreakIntoLines {
 pub(crate) const STAFF_MARGIN: f64 = 2500f64;
 
 #[derive(Debug, Clone)]
-struct BetweenMeta {
+struct SignatureMeta {
     /// Stencil and width if at start of line.
     start: (Entity, f64),
     /// Stencil and width if in middle of line.
@@ -170,38 +170,38 @@ struct BetweenMeta {
 }
 
 #[derive(Debug, Clone)]
-/// Line-splitting metadata for notes and betweens.
+/// Line-splitting metadata for notes and signatures.
 enum ItemMeta {
     Note(Duration, Entity, f64),
-    Between(BetweenMeta),
+    Signature(SignatureMeta),
 }
 
 impl ItemMeta {
     fn start_meta(&self) -> (Entity, f64) {
         match self {
             ItemMeta::Note(_, stencil, width) => (*stencil, *width),
-            ItemMeta::Between(bm) => bm.start,
+            ItemMeta::Signature(bm) => bm.start,
         }
     }
 
     fn mid_meta(&self) -> (Entity, f64) {
         match self {
             ItemMeta::Note(_, stencil, width) => (*stencil, *width),
-            ItemMeta::Between(bm) => bm.mid,
+            ItemMeta::Signature(bm) => bm.mid,
         }
     }
 
     fn end_meta(&self) -> (Entity, f64) {
         match self {
             ItemMeta::Note(_, stencil, width) => (*stencil, *width),
-            ItemMeta::Between(bm) => bm.end,
+            ItemMeta::Signature(bm) => bm.end,
         }
     }
 
     fn duration(&self) -> Option<Duration> {
         match self {
             ItemMeta::Note(duration, _, _) => Some(*duration),
-            ItemMeta::Between(_) => None,
+            ItemMeta::Signature(_) => None,
         }
     }
 }
@@ -277,32 +277,32 @@ impl PartialSolution {
         self.is_valid = false;
     }
 
-    fn add_between(&mut self, between: &BetweenBars, stencils: &ReadStorage<Stencil>) {
+    fn add_signature(&mut self, signature: &Signature, stencils: &ReadStorage<Stencil>) {
         self.entities.push(ConditionalChildren {
-            start: between.stencil_start,
-            mid: between.stencil_middle,
-            end: between.stencil_end,
+            start: signature.stencil_start,
+            mid: signature.stencil_middle,
+            end: signature.stencil_end,
         });
 
-        self.children.push(ItemMeta::Between(BetweenMeta {
+        self.children.push(ItemMeta::Signature(SignatureMeta {
             start: (
-                between.stencil_start,
-                stencils.get(between.stencil_start).unwrap().advance(),
+                signature.stencil_start,
+                stencils.get(signature.stencil_start).unwrap().advance(),
             ),
             mid: (
-                between.stencil_middle,
-                stencils.get(between.stencil_middle).unwrap().advance(),
+                signature.stencil_middle,
+                stencils.get(signature.stencil_middle).unwrap().advance(),
             ),
             end: (
-                between.stencil_end,
-                stencils.get(between.stencil_end).unwrap().advance(),
+                signature.stencil_end,
+                stencils.get(signature.stencil_end).unwrap().advance(),
             ),
         }));
         let w = if self.entities.len() == 1 {
-            stencils.get(between.stencil_start).unwrap().advance()
+            stencils.get(signature.stencil_start).unwrap().advance()
         } else {
             // TODO: should be end, but back to middle when adding another bar.
-            stencils.get(between.stencil_middle).unwrap().advance()
+            stencils.get(signature.stencil_middle).unwrap().advance()
         };
         self.width += w;
         self.is_valid = true;

@@ -13,14 +13,14 @@ use rhythm::{
 use specs::{Builder, Entity, Join, RunNow, World, WorldExt};
 use staff::{
     components::{
-        Beam, BeamForChord, BetweenBars, Children, Chord, Context, Cursor, FlagAttachment,
-        LineOfStaff, Song, SpaceTimeWarp, Staff,
+        Beam, BeamForChord, Children, Chord, Context, Cursor, FlagAttachment, LineOfStaff,
+        Signature, Song, SpaceTimeWarp, Staff,
     },
     resources::{KeepSpacing, Root},
     systems::{
-        ApplySpaceTimeWarp, BreakIntoLines, DraftBeam, MaintainAutorests, PrintBeam,
-        PrintBetweenBar, PrintChord, PrintCursor, PrintStaff, PrintStaffLines, RecordSpaceTimeWarp,
-        SpaceBeam, UpdateContext,
+        ApplySpaceTimeWarp, BreakIntoLines, DraftBeam, MaintainAutorests, PrintBeam, PrintChord,
+        PrintCursor, PrintSignature, PrintStaff, PrintStaffLines, RecordSpaceTimeWarp, SpaceBeam,
+        UpdateContext,
     },
     Barline, PitchKind,
 };
@@ -41,7 +41,7 @@ struct Systems {
     space_beam: SpaceBeam,
     maintain_autorests: MaintainAutorests,
     break_into_lines: BreakIntoLines,
-    print_between_bar: PrintBetweenBar,
+    print_signature: PrintSignature,
     print_staff: PrintStaff,
     print_staff_lines: PrintStaffLines,
     print_cursor: PrintCursor,
@@ -70,7 +70,7 @@ impl Default for Render {
         world.register::<Staff>();
         world.register::<LineOfStaff>();
         world.register::<Bar>();
-        world.register::<BetweenBars>();
+        world.register::<Signature>();
         world.register::<Chord>();
         world.register::<Beam>();
         world.register::<BeamForChord>();
@@ -554,7 +554,7 @@ impl Render {
     /// Insert content that lives before or after a bar, without attaching it to a staff.
     ///
     /// This includes signatures, barlines, clefs, etc.
-    pub fn between_bars_create(
+    pub fn signature_create(
         &mut self,
         barline: Option<Barline>,
         clef: Option<Clef>,
@@ -572,11 +572,11 @@ impl Render {
             None
         };
 
-        let between_bars = self
+        let signature = self
             .world
             .create_entity()
             .with(Context::default())
-            .with(BetweenBars {
+            .with(Signature {
                 barline,
                 clef,
                 time,
@@ -589,26 +589,24 @@ impl Render {
 
         let mut parents = self.world.write_component::<Parent>();
 
-        parents.insert(stencil_start, Parent(between_bars)).unwrap();
-        parents
-            .insert(stencil_middle, Parent(between_bars))
-            .unwrap();
-        parents.insert(stencil_end, Parent(between_bars)).unwrap();
+        parents.insert(stencil_start, Parent(signature)).unwrap();
+        parents.insert(stencil_middle, Parent(signature)).unwrap();
+        parents.insert(stencil_end, Parent(signature)).unwrap();
 
-        between_bars.id()
+        signature.id()
     }
 
-    pub fn between_bars_update(
+    pub fn signature_update(
         &mut self,
-        between_bar: u32,
+        signature: u32,
         barline: Option<Barline>,
         clef: Option<Clef>,
         time_numer: Option<u8>,
         time_denom: Option<u8>,
         key: Option<i8>,
     ) {
-        let between_bar = self.world.entities().entity(between_bar);
-        let mut between_bars = self.world.write_storage::<BetweenBars>();
+        let signature = self.world.entities().entity(signature);
+        let mut signatures = self.world.write_storage::<Signature>();
 
         let time = if let (Some(time_numer), Some(time_denom)) = (time_numer, time_denom) {
             Some((time_numer, time_denom))
@@ -616,12 +614,12 @@ impl Render {
             None
         };
 
-        let bb = between_bars.remove(between_bar).unwrap();
+        let bb = signatures.remove(signature).unwrap();
 
-        between_bars
+        signatures
             .insert(
-                between_bar,
-                BetweenBars {
+                signature,
+                Signature {
                     barline,
                     clef,
                     time,
@@ -644,7 +642,7 @@ impl Render {
         self.systems.update_context.run_now(&self.world);
 
         self.systems.print_chord.run_now(&self.world);
-        self.systems.print_between_bar.run_now(&self.world);
+        self.systems.print_signature.run_now(&self.world);
 
         self.systems.apply_space_time_warp.run_now(&self.world);
         self.systems.break_into_lines.run_now(&self.world);
@@ -745,7 +743,7 @@ impl Render {
             lines.push(entity.id().to_string());
             let kind = if self.world.read_component::<Chord>().contains(entity) {
                 0
-            } else if self.world.read_component::<BetweenBars>().contains(entity) {
+            } else if self.world.read_component::<Signature>().contains(entity) {
                 1
             } else {
                 -1
@@ -944,8 +942,7 @@ mod tests {
         render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
 
         let staff = render.staff_create();
-        let clef =
-            render.between_bars_create(None, Some(Clef::Percussion), Some(4), Some(4), Some(0));
+        let clef = render.signature_create(None, Some(Clef::Percussion), Some(4), Some(4), Some(0));
         render.child_append(staff, clef);
 
         let bar1 = render.bar_create(4, 4);
@@ -955,7 +952,7 @@ mod tests {
         render.chord_set_unpitched(chord1);
 
         render.bar_insert(bar1, chord1, false);
-        let barline = render.between_bars_create(Some(Barline::Normal), None, None, None, Some(0));
+        let barline = render.signature_create(Some(Barline::Normal), None, None, None, Some(0));
         render.child_append(staff, barline);
 
         let bar2 = render.bar_create(4, 4);
@@ -967,7 +964,7 @@ mod tests {
         render.bar_insert(bar2, chord2, false);
 
         let final_barline =
-            render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
+            render.signature_create(Some(Barline::Final), None, None, None, Some(0));
         render.child_append(staff, final_barline);
 
         render.child_append(song, staff);
@@ -994,10 +991,7 @@ mod tests {
             true
         );
         assert_eq!(render.world.read_component::<Bar>().is_empty(), true);
-        assert_eq!(
-            render.world.read_component::<BetweenBars>().is_empty(),
-            true
-        );
+        assert_eq!(render.world.read_component::<Signature>().is_empty(), true);
         assert_eq!(render.world.read_component::<Chord>().is_empty(), true);
         assert_eq!(render.world.read_component::<Stencil>().is_empty(), true);
         assert_eq!(render.world.read_component::<StencilMap>().is_empty(), true);
@@ -1019,7 +1013,7 @@ mod tests {
         render.song_set_author(song, "Six Eight", 26.4f64 * 5f64 / 7f64);
 
         let staff = render.staff_create();
-        let clef = render.between_bars_create(None, Some(Clef::G), Some(4), Some(4), Some(0));
+        let clef = render.signature_create(None, Some(Clef::G), Some(4), Some(4), Some(0));
         render.child_append(staff, clef);
 
         let bar1 = render.bar_create(4, 4);
@@ -1034,7 +1028,7 @@ mod tests {
         render.bar_insert(bar1, chord2, false);
 
         let final_barline =
-            render.between_bars_create(Some(Barline::Final), None, None, None, Some(0));
+            render.signature_create(Some(Barline::Final), None, None, None, Some(0));
         render.child_append(staff, final_barline);
 
         render.child_append(song, staff);

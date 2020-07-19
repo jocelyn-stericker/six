@@ -24,7 +24,7 @@ import splitDurationIntoParts, {
   NoteAddPatch,
 } from "./split_duration_into_parts";
 import EditorHotkeys from "./hotkeys";
-import Between from "./between";
+import Signature from "./signature";
 import Keyboard, { KeyboardRef } from "./keyboard";
 import css from "./index.module.scss";
 import appCss from "../app.module.scss";
@@ -42,7 +42,7 @@ const Editor = forwardRef(function Editor(
 ) {
   const { cursorTime, cursorBarIdx } = appState;
   const pickup = appState.song.global.pickupSkip;
-  let currTs = appState.song.global.between[0].ts;
+  let currTs = appState.song.global.signatures[0].ts;
 
   const songRef = useRef<RustRenderApi>(null);
   const barRefs = useMemo(
@@ -328,7 +328,7 @@ const Editor = forwardRef(function Editor(
               author={appState.song.global.author}
             >
               <staff ref={staff}>
-                <Between
+                <Signature
                   appState={appState}
                   dispatch={ev => {
                     dispatch(ev);
@@ -336,7 +336,8 @@ const Editor = forwardRef(function Editor(
                   beforeBar={0}
                 />
                 {appState.song.part.bars.map((bar, barIdx) => {
-                  currTs = appState.song.global.between[barIdx]?.ts ?? currTs;
+                  currTs =
+                    appState.song.global.signatures[barIdx]?.ts ?? currTs;
 
                   // TODO: have stable keys even when adding/removing bars.
                   return (
@@ -386,6 +387,9 @@ const Editor = forwardRef(function Editor(
                                                 startTime: tiedStartTime,
                                                 divisions,
                                                 pitch,
+                                                beforeTime: appState.cursorTime,
+                                                beforeBarIdx:
+                                                  appState.cursorBarIdx,
                                               }),
                                             );
                                           }}
@@ -435,7 +439,7 @@ const Editor = forwardRef(function Editor(
                             </chord>
                           ))}
                       </bar>
-                      <Between
+                      <Signature
                         appState={appState}
                         dispatch={ev => {
                           dispatch(ev);

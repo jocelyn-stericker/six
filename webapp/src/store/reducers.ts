@@ -1,14 +1,15 @@
 import { Bar, State } from "./state";
 import { Action, Invertible } from "./actions";
+import { update } from "./versions";
 
 export function getInitialState(): State {
   return {
     song: {
-      v: 1,
+      v: 2,
       global: {
         title: "",
         author: "",
-        between: [
+        signatures: [
           {
             ts: [4, 4],
             ks: 0,
@@ -78,17 +79,17 @@ function apply(state: State, action: Invertible) {
       state.song.part.bars[state.song.part.bars.length - 1].barline = "normal";
       state.song.part.bars.splice(action.barIdx, 0, action.bar);
       state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
-      state.song.global.between.splice(action.barIdx + 1, 0, undefined);
+      state.song.global.signatures.splice(action.barIdx + 1, 0, undefined);
       break;
     }
     case "REMOVE_BAR": {
       state.song.part.bars[state.song.part.bars.length - 1].barline = "normal";
       state.song.part.bars.splice(action.barIdx, 1);
       state.song.part.bars[state.song.part.bars.length - 1].barline = "final";
-      const origFirst = state.song.global.between[0];
-      state.song.global.between.splice(action.barIdx, 1);
-      state.song.global.between[0] = {
-        ...state.song.global.between[0],
+      const origFirst = state.song.global.signatures[0];
+      state.song.global.signatures.splice(action.barIdx, 1);
+      state.song.global.signatures[0] = {
+        ...state.song.global.signatures[0],
         ...origFirst,
       };
       break;
@@ -110,8 +111,8 @@ function apply(state: State, action: Invertible) {
       break;
     }
     case "SET_CLEF": {
-      state.song.global.between[action.beforeBar] = {
-        ...state.song.global.between[action.beforeBar],
+      state.song.global.signatures[action.beforeBar] = {
+        ...state.song.global.signatures[action.beforeBar],
         clef: action.clef,
       };
       break;
@@ -127,18 +128,18 @@ function apply(state: State, action: Invertible) {
       } = action;
       let tsInto = null;
       for (let i = 0; i < beforeBar && !tsInto; i += 1) {
-        tsInto = state.song.global.between[i]?.ts;
+        tsInto = state.song.global.signatures[i]?.ts;
       }
 
-      const origFirst = state.song.global.between[beforeBar] || {};
-      state.song.global.between.splice(
+      const origFirst = state.song.global.signatures[beforeBar] || {};
+      state.song.global.signatures.splice(
         beforeBar,
         barRemoveCount,
         ...Array(barAddCount).fill(undefined),
       );
-      state.song.global.between[beforeBar] = {
+      state.song.global.signatures[beforeBar] = {
         ...origFirst,
-        ...state.song.global.between[beforeBar],
+        ...state.song.global.signatures[beforeBar],
         ts:
           tsInto && ts[0] === tsInto[0] && ts[1] && tsInto[1] ? undefined : ts,
       };
@@ -146,7 +147,7 @@ function apply(state: State, action: Invertible) {
       // TODO: keep clef/ks if also changed.
       // TODO: I'm not sure if this is right.
       if (endIdx >= beforeBar) {
-        state.song.global.between[endIdx] = {
+        state.song.global.signatures[endIdx] = {
           ts:
             after && (after[0] !== ts[0] || after[1] !== ts[1])
               ? [after[0], after[1]]
@@ -169,8 +170,8 @@ function apply(state: State, action: Invertible) {
       break;
     }
     case "SET_KS": {
-      state.song.global.between[action.beforeBar] = {
-        ...state.song.global.between[action.beforeBar],
+      state.song.global.signatures[action.beforeBar] = {
+        ...state.song.global.signatures[action.beforeBar],
         ks: action.ks,
       };
       break;
@@ -352,10 +353,12 @@ export function reduce(state: State, action: Action): State {
       };
     }
     case "LOAD": {
-      const { pickupSkip } = action.song.global;
+      const song = update(action.song);
+
+      const { pickupSkip } = song.global;
       return {
         ...getInitialState(),
-        song: action.song,
+        song,
         numChanges: state.numChanges + 1 || 0,
         cursorTime: pickupSkip ? [pickupSkip[0], pickupSkip[1]] : [0, 1],
       };

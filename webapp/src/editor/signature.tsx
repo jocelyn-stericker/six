@@ -11,9 +11,9 @@ import {
   State,
 } from "../store";
 import { Barline, Clef } from "../scene";
-import css from "./between.module.scss";
+import css from "./signature.module.scss";
 
-const BetweenBarPopover = React.lazy(() => import("./between_bar_popover"));
+const SignaturePopover = React.lazy(() => import("./signature_popover"));
 
 function clefStrToNum(clef: ClefStr): Clef {
   if (clef === "g") {
@@ -29,7 +29,7 @@ function clefStrToNum(clef: ClefStr): Clef {
   throw new Error("Unexpected clef");
 }
 
-export default function Between({
+export default function Signature({
   appState,
   dispatch,
   beforeBar,
@@ -39,25 +39,25 @@ export default function Between({
   beforeBar: number;
 }) {
   const bar = appState.song.part.bars[beforeBar - 1];
-  const between = appState.song.global.between[beforeBar];
+  const signature = appState.song.global.signatures[beforeBar];
   let barline: Barline | undefined;
   if (bar) {
     barline = bar.barline === "normal" ? Barline.Normal : Barline.Final;
   }
-  const clef = between?.clef;
+  const clef = signature?.clef;
 
   return (
-    <between
+    <signature
       barline={barline}
       clef={clef && clefStrToNum(clef)}
-      tsNum={between?.ts?.[0]}
-      tsDen={between?.ts?.[1]}
-      ks={between?.ks}
-      className={css.betweenBars}
+      tsNum={signature?.ts?.[0]}
+      tsDen={signature?.ts?.[1]}
+      ks={signature?.ks}
+      className={css.signature}
       html={({ width, height }) => (
         <React.Suspense fallback={null}>
-          <BetweenBarPopover
-            ts={between?.ts}
+          <SignaturePopover
+            ts={signature?.ts}
             setClef={clef => {
               dispatch(setClef(appState, { clef, beforeBar }));
             }}
@@ -93,14 +93,14 @@ export default function Between({
             }
           >
             <div
-              className={css.betweenEdit}
+              className={css.signatureEdit}
               style={{
                 width,
                 height,
                 cursor: "pointer",
               }}
             />
-          </BetweenBarPopover>
+          </SignaturePopover>
         </React.Suspense>
       )}
     />

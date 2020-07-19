@@ -41,7 +41,7 @@ export enum NoteValue {
 }
 
 interface Instance {
-  type: "song" | "staff" | "bar" | "between" | "chord" | "cursor";
+  type: "song" | "staff" | "bar" | "signature" | "chord" | "cursor";
   container: RustRenderApi;
   entity: number;
   meta: any;
@@ -86,7 +86,7 @@ export interface BarProps extends Stylable {
   children?: any;
 }
 
-export interface BetweenBarsProps extends Stylable {
+export interface SignatureProps extends Stylable {
   key?: string | number | null | undefined;
   ref?: Ref<number>;
   clef?: Clef | undefined;
@@ -116,7 +116,7 @@ type CreateInstanceParam =
   | { type: "song"; props: SongProps }
   | { type: "staff"; props: StaffProps }
   | { type: "bar"; props: BarProps }
-  | { type: "between"; props: BetweenBarsProps }
+  | { type: "signature"; props: SignatureProps }
   | { type: "chord"; props: ChordProps }
   | { type: "cursor"; props: CursorProps };
 
@@ -124,7 +124,7 @@ type TypedInstrinsicProps = {
   song: SongProps;
   staff: StaffProps;
   bar: BarProps;
-  between: BetweenBarsProps;
+  signature: SignatureProps;
   chord: ChordProps;
 };
 
@@ -144,7 +144,7 @@ function createInstance(
   spec: CreateInstanceParam,
   container: RustRenderApi,
 ): Instance | null {
-  let type: "song" | "staff" | "bar" | "between" | "chord" | "cursor";
+  let type: "song" | "staff" | "bar" | "signature" | "chord" | "cursor";
   let entity;
   let meta: any = null;
 
@@ -172,9 +172,9 @@ function createInstance(
     if (spec.props.skipDen != null && spec.props.skipNum != null) {
       container.bar_set_skip(entity, spec.props.skipNum, spec.props.skipDen);
     }
-  } else if (spec.type === "between") {
-    type = "between";
-    entity = container.between_bars_create(
+  } else if (spec.type === "signature") {
+    type = "signature";
+    entity = container.signature_create(
       spec.props.barline,
       spec.props.clef,
       spec.props.tsNum || undefined,
@@ -422,7 +422,7 @@ const Reconciler = ReactReconciler({
       }
     }
 
-    if (is(type, "between", oldProps) && is(type, "between", newProps)) {
+    if (is(type, "signature", oldProps) && is(type, "signature", newProps)) {
       if (
         oldProps.clef !== newProps.clef ||
         oldProps.tsNum !== newProps.tsNum ||
@@ -430,7 +430,7 @@ const Reconciler = ReactReconciler({
         oldProps.ks !== newProps.ks ||
         oldProps.barline !== newProps.barline
       ) {
-        instance.container.between_bars_update(
+        instance.container.signature_update(
           instance.entity,
           newProps.barline,
           newProps.clef,

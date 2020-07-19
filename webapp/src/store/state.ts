@@ -8,7 +8,7 @@ export interface Pitch {
   modifier: number;
 }
 
-export interface Between {
+export interface Signature {
   ts: [number, number];
   ks: number;
   clef: Clef;
@@ -17,7 +17,7 @@ export interface Between {
 export interface Global {
   title: string;
   author: string;
-  between: [Between, ...Array<Partial<Between> | undefined>];
+  signatures: [Signature, ...Array<Partial<Signature> | undefined>];
   pickupSkip: [number, number] | undefined;
 }
 
@@ -43,7 +43,7 @@ export interface Part {
 }
 
 export interface Song {
-  v: 1;
+  v: 2;
   global: Global;
   part: Part;
 }

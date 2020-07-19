@@ -52,9 +52,9 @@ export function setTs(
   { ts, beforeBar }: { ts: [number, number]; beforeBar: number },
 ): SetTs {
   let barsWithoutContent = 0;
-  let prevTs = appState.song.global.between[0].ts;
+  let prevTs = appState.song.global.signatures[0].ts;
   for (let i = 0; i < beforeBar; i += 1) {
-    let ts = appState.song.global.between[i]?.ts;
+    let ts = appState.song.global.signatures[i]?.ts;
     if (ts) {
       prevTs = ts;
     }
@@ -65,11 +65,12 @@ export function setTs(
     appState.song.part.bars[barsWithoutContent + beforeBar]?.notes.length ===
       0 &&
     (!barsWithoutContent ||
-      !appState.song.global.between[barsWithoutContent + beforeBar]?.ts)
+      !appState.song.global.signatures[barsWithoutContent + beforeBar]?.ts)
   ) {
     barsWithoutContent += 1;
     after =
-      appState.song.global.between[barsWithoutContent + beforeBar]?.ts ?? after;
+      appState.song.global.signatures[barsWithoutContent + beforeBar]?.ts ??
+      after;
   }
 
   return {
@@ -97,7 +98,7 @@ export function setKs(
   return {
     type: "SET_KS",
     ks,
-    prevKs: appState.song.global.between[0].ks,
+    prevKs: appState.song.global.signatures[0].ks,
     beforeBar,
   };
 }
@@ -114,13 +115,13 @@ export function setClef(
 ): SetClef {
   let priorClef: Clef | undefined;
   for (let i = 0; i < beforeBar; i += 1) {
-    priorClef = appState.song.global.between[i]?.clef;
+    priorClef = appState.song.global.signatures[i]?.clef;
   }
 
   return {
     type: "SET_CLEF",
     clef: priorClef === clef ? undefined : clef,
-    prevClef: appState.song.global.between[beforeBar]?.clef ?? undefined,
+    prevClef: appState.song.global.signatures[beforeBar]?.clef ?? undefined,
     beforeBar,
   };
 }

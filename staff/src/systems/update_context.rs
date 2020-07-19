@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    components::{BetweenBars, Children, Chord, Context, Staff},
+    components::{Children, Chord, Context, Signature, Staff},
     PitchKind,
 };
 use num_rational::Rational;
@@ -19,14 +19,14 @@ impl<'a> System<'a> for UpdateContext {
         ReadStorage<'a, Staff>,
         ReadStorage<'a, Children>,
         ReadStorage<'a, Bar>,
-        ReadStorage<'a, BetweenBars>,
+        ReadStorage<'a, Signature>,
         ReadStorage<'a, Chord>,
         WriteStorage<'a, Context>,
     );
 
     fn run(
         &mut self,
-        (staffs, ordered_children, bars, between_bars, chords, mut contexts): Self::SystemData,
+        (staffs, ordered_children, bars, signatures, chords, mut contexts): Self::SystemData,
     ) {
         for (_staff, Children(children)) in (&staffs, &ordered_children).join() {
             let mut idx = 0;
@@ -76,11 +76,11 @@ impl<'a> System<'a> for UpdateContext {
                     }
                     idx += 1;
                 }
-                if let Some(between_bar) = between_bars.get(child) {
-                    if let Some(new_clef) = between_bar.clef {
+                if let Some(signature) = signatures.get(child) {
+                    if let Some(new_clef) = signature.clef {
                         clef = new_clef;
                     }
-                    if let Some(new_key) = between_bar.key {
+                    if let Some(new_key) = signature.key {
                         def_accidentals = HashMap::new();
                         key = new_key;
                         for (note_name, note_modifier) in key_signature_note_names(key) {
@@ -89,7 +89,7 @@ impl<'a> System<'a> for UpdateContext {
                             }
                         }
                     }
-                    if let Some(new_time) = between_bar.time {
+                    if let Some(new_time) = signature.time {
                         time = new_time;
                     }
                 }

@@ -13,7 +13,7 @@ export interface Props {
   onRemoveBarRight: (() => void) | null;
 }
 
-export default function BetweenBarPopover({
+export default function SignaturePopover({
   children,
   setClef,
   setKs,

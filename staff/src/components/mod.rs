@@ -1,20 +1,20 @@
 mod beam;
 mod beam_for_chord;
-pub(crate) mod between_bars;
 mod children;
 mod chord;
 mod context;
 mod cursor;
 mod flag_attachment;
 mod line_of_staff;
+pub(crate) mod signature;
 mod song;
 mod space_time_warp;
 mod staff;
 
-pub use between_bars::BetweenBars;
 pub use children::Children;
 pub use cursor::Cursor;
 pub use line_of_staff::LineOfStaff;
+pub use signature::Signature;
 pub use song::Song;
 pub use staff::Staff;
 

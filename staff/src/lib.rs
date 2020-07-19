@@ -7,5 +7,5 @@ pub mod resources;
 pub mod systems;
 
 pub use beam_attachment::BeamAttachment;
-pub use components::between_bars::Barline;
+pub use components::signature::Barline;
 pub use pitch_kind::PitchKind;

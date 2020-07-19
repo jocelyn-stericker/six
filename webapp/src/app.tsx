@@ -5,7 +5,15 @@ import "normalize.css";
 
 import "./global.scss";
 import css from "./app.module.scss";
-import { getInitialState, load, redo, reduce, reset, undo } from "./store";
+import {
+  getInitialState,
+  load,
+  redo,
+  reduce,
+  reset,
+  undo,
+  update,
+} from "./store";
 import About from "./cards/about";
 import Meta from "./cards/meta";
 import { loadPdf, savePdf } from "./file";
@@ -24,6 +32,7 @@ export default function App() {
     getInitialState,
     s => {
       const state = JSON.parse(s);
+      state.song = update(state.song);
       return {
         ...getInitialState(),
         song: state.song,
