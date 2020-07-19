@@ -8,7 +8,7 @@ use crate::rhythmic_beaming::RhythmicBeaming;
 use num_integer::Integer;
 use num_rational::Rational;
 use num_traits::{sign::Signed, One, Zero};
-use specs::{Component, Entities, Entity, VecStorage};
+use specs::{Component, Entity, VecStorage};
 use std::collections::{BTreeSet, BinaryHeap};
 
 #[derive(Clone, Debug)]
@@ -774,30 +774,37 @@ impl Bar {
         target_managed_count
     }
 
-    /// If target_managed_count < managed_count, create a new managed entity.
-    ///
-    /// Returns the duration and ID for the created managed entity.
-    pub fn push_managed_entity(&mut self, entities: &Entities) -> Option<(Duration, Entity)> {
+    /// If there are insufficient automatic rests, returns the next required duration & start time.
+    pub fn next_missing_child(&self) -> Option<(Duration, Rational)> {
         let mut managed_idx = self.managed.len();
 
         if self.whole_rest() && managed_idx == 0 {
-            let entity = entities.create();
-            self.managed.push(entity);
-            return Some((Duration::new_whole_rest(self.metre.duration()), entity));
+            return Some((
+                Duration::new_whole_rest(self.metre.duration()),
+                Rational::zero(),
+            ));
         }
 
+        let mut start = Rational::zero();
         for note in &self.rhythm {
             if note.1.is_automatic() {
                 if managed_idx == 0 {
-                    let entity = entities.create();
-                    self.managed.push(entity);
-                    return Some((note.0, entity));
+                    return Some((note.0, start));
                 }
                 managed_idx -= 1;
             }
+            start += note.0.duration();
         }
 
         None
+    }
+
+    /// Append an automatic rest to this bar.
+    ///
+    /// This is used in tandem with next_missing_child().
+    pub fn push_managed_entity(&mut self, entity: Entity) {
+        assert!(self.next_missing_child().is_some());
+        self.managed.push(entity);
     }
 
     /// If targed_managed_count > managed_count, remove a new managed entity.

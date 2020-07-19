@@ -1,8 +1,11 @@
 #![allow(clippy::type_complexity)]
 
-use crate::{components::Chord, components::Context, PitchKind};
+use crate::{
+    components::{Children, Chord, Context, FlagAttachment},
+    PitchKind,
+};
 use rhythm::{components::Bar, components::Spacing, BarChild};
-use specs::{Entities, Join, System, WriteStorage};
+use specs::{world::Builder, Entities, Join, LazyUpdate, Read, System, WriteStorage};
 use stencil::components::{Parent, Stencil};
 
 #[derive(Debug, Default)]
@@ -11,36 +14,35 @@ pub struct UpdateTiming;
 impl<'a> System<'a> for UpdateTiming {
     type SystemData = (
         Entities<'a>,
+        Read<'a, LazyUpdate>,
         WriteStorage<'a, Chord>,
         WriteStorage<'a, Context>,
         WriteStorage<'a, Bar>,
-        WriteStorage<'a, Spacing>,
-        WriteStorage<'a, Parent>,
-        WriteStorage<'a, Stencil>,
     );
 
-    fn run(
-        &mut self,
-        (entities, mut chords, mut contexts, mut bars, mut spacings, mut parents, mut stencils): Self::SystemData,
-    ) {
+    fn run(&mut self, (entities, lazy, mut chords, mut contexts, mut bars): Self::SystemData) {
         for (bar_id, bar) in (&entities, &mut bars).join() {
             let bar_context = contexts.get(bar_id).cloned().unwrap_or_default();
-            while let Some((duration, entity)) = bar.push_managed_entity(&entities) {
-                spacings.entry(entity).unwrap().replace(Spacing::default());
-                chords
-                    .entry(entity)
-                    .unwrap()
-                    .replace(Chord::new(duration, PitchKind::Rest));
-                contexts.entry(entity).unwrap().replace(Context::default());
-                parents.entry(entity).unwrap().replace(Parent(bar_id));
-                stencils.entry(entity).unwrap().replace(Stencil::default());
+            while let Some((duration, start)) = bar.next_missing_child() {
+                bar.push_managed_entity(
+                    lazy.create_entity(&entities)
+                        .with(Spacing::default())
+                        .with(Chord::new(duration, PitchKind::Rest))
+                        .with(Children::default())
+                        .with(Context {
+                            beat: start,
+                            natural_beat: start,
+                            ..Default::default()
+                        })
+                        .with(FlagAttachment::default())
+                        .with(Stencil::default())
+                        .with(Parent(bar_id))
+                        .build(),
+                );
             }
 
             while let Some(entity) = bar.pop_managed_entity() {
-                chords.remove(entity);
-                spacings.remove(entity);
-                parents.remove(entity);
-                stencils.remove(entity);
+                entities.delete(entity).unwrap();
             }
 
             for BarChild {

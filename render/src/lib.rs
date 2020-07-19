@@ -429,7 +429,6 @@ impl Render {
                 Duration::new(note_value, dots, None),
                 PitchKind::Rest,
             ))
-            .with(Spacing::default())
             .with(Children::default())
             .with(Context {
                 beat: start,
@@ -640,43 +639,27 @@ impl Render {
         self.world.maintain();
 
         self.systems.update_keep_spacing.run_now(&self.world);
-        self.world.maintain();
         self.systems.update_timing.run_now(&self.world);
         self.world.maintain();
         self.systems.draft_beam.run_now(&self.world);
-        self.world.maintain();
         self.systems.update_context.run_now(&self.world);
-        self.world.maintain();
 
         self.systems.print_chord.run_now(&self.world);
-        self.world.maintain();
         self.systems.print_between_bar.run_now(&self.world);
-        self.world.maintain();
 
         self.systems.apply_space_time_warp.run_now(&self.world);
-        self.world.maintain();
         self.systems.break_into_lines.run_now(&self.world);
-        self.world.maintain();
         self.systems.record_space_time_warp.run_now(&self.world);
-        self.world.maintain();
 
         self.systems.space_beam.run_now(&self.world);
-        self.world.maintain();
         self.systems.print_beam.run_now(&self.world);
-        self.world.maintain();
         self.systems.print_staff_lines.run_now(&self.world);
-        self.world.maintain();
         self.systems.print_cursor.run_now(&self.world);
-        self.world.maintain();
 
         self.systems.print_staff.run_now(&self.world);
-        self.world.maintain();
         self.systems.print_staff_lines.run_now(&self.world);
-        self.world.maintain();
         self.systems.print_meta.run_now(&self.world);
-        self.world.maintain();
         self.systems.print_song.run_now(&self.world);
-        self.world.maintain();
 
         self.systems.update_world_bbox.run_now(&self.world);
         self.world.maintain();
