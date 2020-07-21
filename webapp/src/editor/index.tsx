@@ -15,7 +15,6 @@ import {
   Action,
   addNote,
   moveCursor,
-  removeNote,
   setBarCount,
   State,
   undo,
@@ -28,8 +27,6 @@ import Signature from "./signature";
 import Keyboard, { KeyboardRef } from "./keyboard";
 import css from "./index.module.scss";
 import appCss from "../app.module.scss";
-
-const NotePopover = React.lazy(() => import("./note_popover"));
 
 interface Props {
   appState: State;
@@ -358,65 +355,33 @@ const Editor = forwardRef(function Editor(
                             : undefined
                         }
                       >
-                        {bar.notes.map(
-                          (
-                            { divisions, startTime: tiedStartTime, pitch },
-                            divisionIdx,
-                          ) => (
-                            <React.Fragment key={divisionIdx}>
-                              {divisions.map(
-                                ({ noteValue, dots, startTime }, jdx) => (
-                                  <chord
-                                    className={css.note}
-                                    key={jdx}
-                                    noteValue={noteValue}
-                                    dots={dots}
-                                    startNum={startTime[0]}
-                                    startDen={startTime[1]}
-                                    isNote={true}
-                                    isTemporary={false}
-                                    pitch={pitch.base}
-                                    pitchModifier={pitch.modifier}
-                                    html={({ width, height }) => (
-                                      <React.Suspense fallback={null}>
-                                        <NotePopover
-                                          onDeleteNote={() => {
-                                            dispatch(
-                                              removeNote({
-                                                barIdx,
-                                                startTime: tiedStartTime,
-                                                divisions,
-                                                pitch,
-                                                beforeTime: appState.cursorTime,
-                                                beforeBarIdx:
-                                                  appState.cursorBarIdx,
-                                              }),
-                                            );
-                                          }}
-                                        >
-                                          <div
-                                            style={{
-                                              width,
-                                              height,
-                                              cursor: "pointer",
-                                            }}
-                                          />
-                                        </NotePopover>
-                                      </React.Suspense>
+                        {bar.notes.map(({ divisions, pitch }, divisionIdx) => (
+                          <React.Fragment key={divisionIdx}>
+                            {divisions.map(
+                              ({ noteValue, dots, startTime }, jdx) => (
+                                <chord
+                                  className={css.note}
+                                  key={jdx}
+                                  noteValue={noteValue}
+                                  dots={dots}
+                                  startNum={startTime[0]}
+                                  startDen={startTime[1]}
+                                  isNote={true}
+                                  isTemporary={false}
+                                  pitch={pitch.base}
+                                  pitchModifier={pitch.modifier}
+                                >
+                                  {focused &&
+                                    cursorBarIdx === barIdx &&
+                                    cursorTime[0] === startTime[0] &&
+                                    cursorTime[1] === startTime[1] && (
+                                      <cursor className={css.cursor} />
                                     )}
-                                  >
-                                    {focused &&
-                                      cursorBarIdx === barIdx &&
-                                      cursorTime[0] === startTime[0] &&
-                                      cursorTime[1] === startTime[1] && (
-                                        <cursor className={css.cursor} />
-                                      )}
-                                  </chord>
-                                ),
-                              )}
-                            </React.Fragment>
-                          ),
-                        )}
+                                </chord>
+                              ),
+                            )}
+                          </React.Fragment>
+                        ))}
                         {preview &&
                           preview.barIdx === barIdx &&
                           preview.divisions.map((div, idx) => (

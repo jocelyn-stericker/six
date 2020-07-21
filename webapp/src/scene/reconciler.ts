@@ -10,7 +10,6 @@ import ReactReconciler from "react-reconciler";
 import { Ref } from "react";
 
 interface RenderExtra {
-  classNames: { [key: string]: string };
   html: { [key: string]: any };
 }
 
@@ -20,7 +19,6 @@ export { Barline, Clef } from "../../rust_render_built/index";
 
 export function newRender(): RustRenderApi {
   return Object.assign(_Render.new(), {
-    classNames: {} as { [key: string]: string },
     html: {} as { [key: string]: any },
   });
 }
@@ -214,7 +212,7 @@ function createInstance(
   }
 
   if ("className" in spec.props) {
-    container.classNames[entity] = spec.props.className;
+    container.css_set_class(entity, spec.props.className);
   }
 
   if ("html" in spec.props) {
@@ -279,7 +277,7 @@ const Reconciler = ReactReconciler({
       child.container.child_remove(parent.entity, child.entity);
     }
 
-    // TODO: remove child entities from html/classNames
+    // TODO: remove child entities from html
   },
   insertInContainerBefore(
     _container: RustRenderApi,
@@ -442,7 +440,11 @@ const Reconciler = ReactReconciler({
     }
 
     if (oldProps.className !== newProps.className) {
-      instance.container.classNames[instance.entity] = newProps.className;
+      if (newProps.className) {
+        instance.container.css_set_class(instance.entity, newProps.className);
+      } else {
+        instance.container.css_clear_class(instance.entity);
+      }
     }
 
     if (oldProps.html !== newProps.html) {

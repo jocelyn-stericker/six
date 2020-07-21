@@ -1,8 +1,12 @@
 #![allow(clippy::blacklisted_name)]
 
+mod components;
 mod systems;
 
-use crate::systems::{DeleteOrphans, PrintMeta, PrintSong, UpdateKeepSpacing, UpdateWorldBbox};
+use crate::{
+    components::Css,
+    systems::{DeleteOrphans, PrintMeta, PrintSong, UpdateKeepSpacing, UpdateWorldBbox},
+};
 use kurbo::{Affine, Size, Vec2};
 use num_rational::Rational;
 use pitch::{Clef, NoteModifier, Pitch};
@@ -63,26 +67,28 @@ pub struct Render {
 impl Default for Render {
     fn default() -> Render {
         let mut world = World::new();
-        world.insert(Root(None));
         world.insert(KeepSpacing(false));
-        world.register::<Parent>();
-        world.register::<Song>();
-        world.register::<Staff>();
-        world.register::<LineOfStaff>();
+        world.insert(Root(None));
+
         world.register::<Bar>();
-        world.register::<Signature>();
-        world.register::<Chord>();
         world.register::<Beam>();
         world.register::<BeamForChord>();
+        world.register::<Children>();
+        world.register::<Chord>();
+        world.register::<Context>();
+        world.register::<Css>();
+        world.register::<Cursor>();
+        world.register::<FlagAttachment>();
+        world.register::<LineOfStaff>();
+        world.register::<Parent>();
+        world.register::<Signature>();
+        world.register::<Song>();
+        world.register::<SpaceTimeWarp>();
+        world.register::<Spacing>();
+        world.register::<Staff>();
         world.register::<Stencil>();
         world.register::<StencilMap>();
         world.register::<WorldBbox>();
-        world.register::<Context>();
-        world.register::<Spacing>();
-        world.register::<Children>();
-        world.register::<SpaceTimeWarp>();
-        world.register::<FlagAttachment>();
-        world.register::<Cursor>();
 
         Self {
             world,
@@ -115,6 +121,24 @@ impl Render {
             if root.0 == Some(song) {
                 *root = Root(None);
             }
+        }
+    }
+
+    pub fn css_set_class(&mut self, css: u32, class_name: &str) {
+        let css = self.world.entities().entity(css);
+
+        let mut csses = self.world.write_component::<Css>();
+        if let Some(css) = csses.get_mut(css) {
+            css.class = Some(class_name.to_owned());
+        }
+    }
+
+    pub fn css_clear_class(&mut self, css: u32) {
+        let css = self.world.entities().entity(css);
+
+        let mut csses = self.world.write_component::<Css>();
+        if let Some(css) = csses.get_mut(css) {
+            css.class = None;
         }
     }
 
@@ -187,6 +211,7 @@ impl Render {
             .with(Song::default())
             .with(Children::default())
             .with(StencilMap::default())
+            .with(Css::default())
             .build()
             .id()
     }
@@ -331,6 +356,7 @@ impl Render {
             .with(Bar::new(Metre::new(numer, denom)))
             .with(StencilMap::default())
             .with(Context::default())
+            .with(Css::default())
             .build()
             .id()
     }
@@ -437,6 +463,7 @@ impl Render {
             })
             .with(FlagAttachment::default())
             .with(Stencil::default())
+            .with(Css::default())
             .build()
             .id()
     }
@@ -523,6 +550,7 @@ impl Render {
             .create_entity()
             .with(Cursor {})
             .with(Stencil::default())
+            .with(Css::default())
             .build()
             .id()
     }
@@ -585,6 +613,7 @@ impl Render {
                 stencil_middle,
                 stencil_end,
             })
+            .with(Css::default())
             .build();
 
         let mut parents = self.world.write_component::<Parent>();
@@ -670,13 +699,15 @@ impl Render {
 
     pub fn stencils(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
-        for (entity, stencil) in (
+        for (entity, css, stencil) in (
             &self.world.entities(),
+            self.world.read_component::<Css>().maybe(),
             &self.world.read_component::<Stencil>(),
         )
             .join()
         {
             lines.push(entity.id().to_string());
+            lines.push(css.and_then(|c| c.class.clone()).unwrap_or_default());
             lines.push(stencil.to_svg());
         }
         lines.join("\n")
@@ -698,13 +729,15 @@ impl Render {
 
     pub fn stencil_maps(&self) -> String {
         let mut lines: Vec<String> = Vec::new();
-        for (entity, stencil) in (
+        for (entity, css, stencil) in (
             &self.world.entities(),
+            self.world.read_component::<Css>().maybe(),
             &self.world.read_component::<StencilMap>(),
         )
             .join()
         {
             lines.push(entity.id().to_string());
+            lines.push(css.and_then(|c| c.class.clone()).unwrap_or_default());
             lines.push(stencil.to_json());
         }
         lines.join("\n")

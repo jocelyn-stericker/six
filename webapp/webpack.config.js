@@ -92,7 +92,7 @@ module.exports = {
         path.resolve(__dirname, "..", "staff"),
         path.resolve(__dirname, "..", "stencil"),
       ],
-      // forceMode: "production",
+      forceMode: "production",
     }),
 
     new NormalModuleReplacementPlugin(

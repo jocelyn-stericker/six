@@ -1,6 +1,16 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
-import StencilView, { StencilMeta, StencilOrStencilMap } from "./stencil_view";
+import StencilView, {
+  StencilMeta,
+  StencilOrStencilMap,
+  Props as StencilViewProps,
+} from "./stencil_view";
 import { newRender, render } from "./reconciler";
 import css from "./index.module.scss";
 
@@ -29,6 +39,11 @@ interface Props {
   onMouseMove?: (ev: React.MouseEvent) => void;
   onHover: (info: HoverInfo) => void;
 }
+
+export const StencilViewLazy = memo<StencilViewProps & { transient: boolean }>(
+  StencilView,
+  (_prevProps, nextProps) => nextProps.transient,
+);
 
 export default function Scene(props: Props) {
   // create/destroy Rust container
@@ -61,24 +76,30 @@ export default function Scene(props: Props) {
       return;
     }
 
-    let stencilPairs = container.stencils().split("\n");
-    let stencilMapPairs = container.stencil_maps().split("\n");
-    let stencilMetaPairs = container.get_stencil_bboxes().split("\n");
+    let stencilTuples = container.stencils().split("\n");
+    let stencilMapTuples = container.stencil_maps().split("\n");
+    let stencilMetaTuples = container.get_stencil_bboxes().split("\n");
     let parents = container.parents().split("\n");
 
     let stencils: { [key: number]: StencilOrStencilMap } = {};
-    for (let i = 0; i < stencilPairs.length; i += 2) {
-      stencils[stencilPairs[i] as any] = stencilPairs[i + 1];
+    for (let i = 0; i < stencilTuples.length; i += 3) {
+      stencils[stencilTuples[i] as any] = [
+        stencilTuples[i + 1],
+        stencilTuples[i + 2],
+      ];
     }
 
-    for (let i = 0; i < stencilMapPairs.length; i += 2) {
-      stencils[stencilMapPairs[i] as any] = JSON.parse(stencilMapPairs[i + 1]);
+    for (let i = 0; i < stencilMapTuples.length; i += 3) {
+      stencils[stencilMapTuples[i] as any] = [
+        stencilTuples[i + 1],
+        JSON.parse(stencilMapTuples[i + 2]),
+      ];
     }
 
     let stencilMeta: { [key: number]: StencilMeta } = {};
-    for (let i = 0; i < stencilMetaPairs.length; i += 2) {
-      stencilMeta[stencilMetaPairs[i] as any] = JSON.parse(
-        stencilMetaPairs[i + 1],
+    for (let i = 0; i < stencilMetaTuples.length; i += 2) {
+      stencilMeta[stencilMetaTuples[i] as any] = JSON.parse(
+        stencilMetaTuples[i + 1],
       );
     }
 
@@ -174,11 +195,10 @@ export default function Scene(props: Props) {
         }}
       >
         {root && stencils && stencils[root] && stencilMeta && (
-          <StencilView
+          <StencilViewLazy
             id={root}
             stencils={stencils}
-            stencilMeta={stencilMeta}
-            classNames={container.classNames}
+            transient={props.transient ?? false}
           />
         )}
       </svg>
