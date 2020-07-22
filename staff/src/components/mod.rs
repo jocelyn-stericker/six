@@ -11,12 +11,12 @@ mod song;
 mod space_time_warp;
 mod staff;
 
+pub use self::staff::Staff;
 pub use children::Children;
 pub use cursor::Cursor;
 pub use line_of_staff::LineOfStaff;
 pub use signature::Signature;
 pub use song::Song;
-pub use staff::Staff;
 
 pub use beam::Beam;
 pub use beam_for_chord::BeamForChord;

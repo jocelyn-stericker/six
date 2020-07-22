@@ -752,7 +752,9 @@ impl Default for Stencil {
 
 #[cfg(test)]
 mod tests {
+    use crate::components::*;
     use crate::*;
+    use kurbo::Vec2;
 
     #[test]
     fn time_signatures() {

@@ -211,7 +211,13 @@ mod tests {
 
     #[test]
     fn signatures() {
+        use specs::world::EntitiesRes;
         use stencil::snapshot;
+
+        let ents = EntitiesRes::default();
+        let ent_a = ents.create();
+        let ent_b = ents.create();
+        let ent_c = ents.create();
 
         let context = Context {
             bar: 0,
@@ -230,9 +236,9 @@ mod tests {
                 time: Some((4, 4)),
                 key: Some(0),
                 barline: Some(Barline::Normal),
-                stencil_start: Entity::new(0),
-                stencil_middle: Entity::new(1),
-                stencil_end: Entity::new(2),
+                stencil_start: ent_a,
+                stencil_middle: ent_b,
+                stencil_end: ent_c,
             }
             .render_start(&context)
             .and_right(
@@ -241,9 +247,9 @@ mod tests {
                     time: Some((4, 4)),
                     key: Some(6),
                     barline: Some(Barline::Normal),
-                    stencil_start: Entity::new(0),
-                    stencil_middle: Entity::new(1),
-                    stencil_end: Entity::new(2),
+                    stencil_start: ent_a,
+                    stencil_middle: ent_b,
+                    stencil_end: ent_c,
                 }
                 .render_start(&context),
             )
@@ -253,9 +259,9 @@ mod tests {
                     time: Some((4, 4)),
                     key: Some(-6),
                     barline: Some(Barline::Normal),
-                    stencil_start: Entity::new(0),
-                    stencil_middle: Entity::new(1),
-                    stencil_end: Entity::new(2),
+                    stencil_start: ent_a,
+                    stencil_middle: ent_b,
+                    stencil_end: ent_c,
                 }
                 .render_start(&context),
             )
@@ -265,9 +271,9 @@ mod tests {
                     time: Some((6, 8)),
                     key: Some(6),
                     barline: Some(Barline::Normal),
-                    stencil_start: Entity::new(0),
-                    stencil_middle: Entity::new(1),
-                    stencil_end: Entity::new(2),
+                    stencil_start: ent_a,
+                    stencil_middle: ent_b,
+                    stencil_end: ent_c,
                 }
                 .render_start(&context),
             )
@@ -277,9 +283,9 @@ mod tests {
                     time: Some((6, 8)),
                     key: Some(-6),
                     barline: Some(Barline::Normal),
-                    stencil_start: Entity::new(0),
-                    stencil_middle: Entity::new(1),
-                    stencil_end: Entity::new(2),
+                    stencil_start: ent_a,
+                    stencil_middle: ent_b,
+                    stencil_end: ent_c,
                 }
                 .render_start(&context),
             )

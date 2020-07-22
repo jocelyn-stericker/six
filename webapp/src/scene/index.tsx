@@ -91,7 +91,7 @@ export default function Scene(props: Props) {
 
     for (let i = 0; i < stencilMapTuples.length; i += 3) {
       stencils[stencilMapTuples[i] as any] = [
-        stencilTuples[i + 1],
+        stencilMapTuples[i + 1],
         JSON.parse(stencilMapTuples[i + 2]),
       ];
     }

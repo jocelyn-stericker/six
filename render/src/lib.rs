@@ -126,6 +126,7 @@ impl Render {
 
     pub fn css_set_class(&mut self, css: u32, class_name: &str) {
         let css = self.world.entities().entity(css);
+        assert!(self.world.is_alive(css));
 
         let mut csses = self.world.write_component::<Css>();
         if let Some(css) = csses.get_mut(css) {

@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React from "react";
 
 /** [entity, x, y, scale] */
 export type StencilMapItem = [number, number, number];
@@ -26,11 +26,7 @@ export interface Props {
   transform?: string;
 }
 
-const StencilView = memo(function StencilView({
-  id,
-  stencils,
-  transform,
-}: Props) {
+const StencilView = function StencilView({ id, stencils, transform }: Props) {
   const [className, stencil] = stencils[id];
   if (!stencil) {
     return null;
@@ -63,6 +59,6 @@ const StencilView = memo(function StencilView({
       </g>
     );
   }
-});
+};
 
 export default StencilView;

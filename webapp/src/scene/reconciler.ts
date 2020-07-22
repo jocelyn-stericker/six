@@ -141,7 +141,7 @@ function getTextWidth(fontSize: number, text: string) {
 function createInstance(
   spec: CreateInstanceParam,
   container: RustRenderApi,
-): Instance | null {
+): Instance {
   let type: "song" | "staff" | "bar" | "signature" | "chord" | "cursor";
   let entity;
   let meta: any = null;
