@@ -1,6 +1,7 @@
 #![allow(clippy::blacklisted_name)]
 
 mod components;
+mod jsfrac;
 mod systems;
 
 use crate::{
@@ -28,7 +29,6 @@ use staff::{
     },
     Barline, PitchKind,
 };
-use std::convert::TryInto;
 use stencil::{
     components::{Parent, Stencil, StencilMap, WorldBbox},
     Pdf,
@@ -308,18 +308,24 @@ impl Render {
             if t < Rational::new(0, 1) {
                 None
             } else {
-                Some(((bar_idx - 1).try_into().unwrap(), t))
+                Some((bar_idx - 1, t))
             }
         } else if t >= bar.metre().duration() {
-            let next_bar = bars.get(self.bar_by_index(&staff_bars.0, bar_idx + 1)?)?;
-            let t = t - bar.metre().duration();
-            if t >= next_bar.metre().duration() {
-                None
+            if let Some(next_bar) = self
+                .bar_by_index(&staff_bars.0, bar_idx + 1)
+                .and_then(|b| bars.get(b))
+            {
+                let t = t - bar.metre().duration();
+                if t >= next_bar.metre().duration() {
+                    None
+                } else {
+                    Some((bar_idx + 1, t))
+                }
             } else {
-                Some(((bar_idx + 1).try_into().unwrap(), t))
+                Some((bar_idx, bar.metre().duration()))
             }
         } else {
-            Some((bar_idx.try_into().unwrap(), t))
+            Some((bar_idx, t))
         }?;
 
         let bar = bars.get(self.bar_by_index(&staff_bars.0, t.0 as usize)?)?;
@@ -345,7 +351,7 @@ impl Render {
             }
         }
 
-        Some(vec![t.0, *t.1.numer(), *t.1.denom()])
+        Some(vec![t.0 as isize, *t.1.numer(), *t.1.denom()])
     }
 
     /// Create a bar, without attaching it to a staff.
@@ -615,13 +621,21 @@ impl Render {
                 stencil_end,
             })
             .with(Css::default())
+            .with(Children::default())
             .build();
 
         let mut parents = self.world.write_component::<Parent>();
+        let mut children = self.world.write_component::<Children>();
 
         parents.insert(stencil_start, Parent(signature)).unwrap();
         parents.insert(stencil_middle, Parent(signature)).unwrap();
         parents.insert(stencil_end, Parent(signature)).unwrap();
+
+        children.insert(stencil_start, Children::default()).unwrap();
+        children
+            .insert(stencil_middle, Children::default())
+            .unwrap();
+        children.insert(stencil_end, Children::default()).unwrap();
 
         signature.id()
     }
@@ -680,7 +694,6 @@ impl Render {
 
         self.systems.space_beam.run_now(&self.world);
         self.systems.print_beam.run_now(&self.world);
-        self.systems.print_staff_lines.run_now(&self.world);
         self.systems.print_cursor.run_now(&self.world);
 
         self.systems.print_staff.run_now(&self.world);

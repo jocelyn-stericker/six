@@ -21,10 +21,12 @@ function clefStrToNum(clef: ClefStr): Clef {
 export default function Signature({
   appState,
   beforeBar,
+  children,
 }: {
   appState: State;
   dispatch: (action: Action) => void;
   beforeBar: number;
+  children?: any;
 }) {
   const bar = appState.song.part.bars[beforeBar - 1];
   const signature = appState.song.global.signatures[beforeBar];
@@ -42,6 +44,8 @@ export default function Signature({
       tsDen={signature?.ts?.[1]}
       ks={signature?.ks}
       className={css.signature}
-    />
+    >
+      {children}
+    </signature>
   );
 }

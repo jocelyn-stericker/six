@@ -92,6 +92,7 @@ export interface SignatureProps extends Stylable {
   tsDen?: number;
   ks?: number | undefined;
   barline?: Barline | undefined;
+  children?: any;
 }
 
 export interface ChordProps extends Stylable {

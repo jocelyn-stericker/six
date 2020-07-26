@@ -11,6 +11,7 @@ import React, {
 } from "react";
 
 import Scene, { RustRenderApi } from "../scene";
+import Frac from "../frac";
 import {
   Action,
   addNote,
@@ -410,7 +411,12 @@ const Editor = forwardRef(function Editor(
                           dispatch(ev);
                         }}
                         beforeBar={barIdx + 1}
-                      />
+                      >
+                        {cursorBarIdx === barIdx &&
+                          new Frac(cursorTime[0], cursorTime[1]).eq(
+                            new Frac(currTs[0], currTs[1]),
+                          ) && <cursor className={css.cursor} />}
+                      </Signature>
                     </React.Fragment>
                   );
                 })}

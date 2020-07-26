@@ -81,6 +81,13 @@ impl<'a> System<'a> for PrintStaff {
                     staff_advance += advance;
                 } else if let Some(stencil) = stencils.get(child) {
                     staff_stencil = staff_stencil.and(child, Some(Vec2::new(staff_advance, 0.0)));
+                    if let Some(Children(children)) = children.get(child) {
+                        for &child in children {
+                            staff_stencil =
+                                staff_stencil.and(child, Some(Vec2::new(staff_advance, 0.0)));
+                        }
+                    }
+
                     staff_advance += stencil.advance();
                 }
             }
