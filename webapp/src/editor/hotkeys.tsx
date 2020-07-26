@@ -9,6 +9,7 @@ export interface Props {
   onDown: () => unknown;
   onNote: (note: string, alt: number) => unknown;
   onDuration: (pow2: number) => unknown;
+  onBackspace: () => unknown;
 }
 
 class EditorHotkeys extends React.Component<Props> {
@@ -155,7 +156,7 @@ class EditorHotkeys extends React.Component<Props> {
           group="Editor"
           combo="backspace"
           label="Remove previous note"
-          onKeyDown={() => alert("TODO")}
+          onKeyDown={this.props.onBackspace}
         />
       </Hotkeys>
     );

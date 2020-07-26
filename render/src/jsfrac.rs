@@ -1,4 +1,5 @@
 use num_rational::Rational;
+use rhythm::{Duration, NoteValue};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -18,6 +19,12 @@ impl RationalToVecForJs for Rational {
 impl JsFrac {
     pub fn reduce(numer: isize, denom: isize) -> Vec<isize> {
         Rational::new(numer, denom).to_js()
+    }
+
+    pub fn from_duration(note_value: isize, dots: u8) -> Vec<isize> {
+        let note_value = NoteValue::new(note_value).unwrap();
+        let d = Duration::new(note_value, dots, None).duration();
+        vec![*d.numer(), *d.denom()]
     }
 
     pub fn add(a_numer: isize, a_denom: isize, b_numer: isize, b_denom: isize) -> Vec<isize> {

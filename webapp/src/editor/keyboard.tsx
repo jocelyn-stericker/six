@@ -163,6 +163,7 @@ export interface Props {
   duration: number;
   onUndo: () => unknown;
   onNote: (base: string, alt: number) => unknown;
+  onBackspace: () => unknown;
 }
 
 const Keyboard = forwardRef(function Keyboard(
@@ -442,11 +443,12 @@ const Keyboard = forwardRef(function Keyboard(
         />
         <div className={css.buttonGap} />
         <ActionButton
-          onClick={() => alert("TODO")}
+          onClick={props.onBackspace}
           title="Backspace"
           icon={<span className={css.backspace}>backspace</span>}
           flex={true}
           bigger={true}
+          active={activeKeys["backspace"] > 0}
         />
       </div>
     </div>

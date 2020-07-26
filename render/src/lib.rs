@@ -301,7 +301,8 @@ impl Render {
         let staff_bars = children.get(staff)?;
         let bar = bars.get(self.bar_by_index(&staff_bars.0, bar_idx)?)?;
         let add = Rational::new(add_num, add_den);
-        let t = Rational::new(time_num, time_den) + add;
+        let t0 = Rational::new(time_num, time_den);
+        let t = t0 + add;
         let mut t = if t < Rational::new(0, 1) {
             let prev_bar = bars.get(self.bar_by_index(&staff_bars.0, bar_idx - 1)?)?;
             let t = prev_bar.metre().duration() + t;
@@ -310,17 +311,24 @@ impl Render {
             } else {
                 Some((bar_idx - 1, t))
             }
+        } else if t == bar.metre().duration() {
+            Some((bar_idx, bar.metre().duration()))
+        } else if t0 == bar.metre().duration() && add > Rational::new(0, 1) {
+            if let Some(next_bar) = self
+                .bar_by_index(&staff_bars.0, bar_idx + 1)
+                .and_then(|b| bars.get(b))
+            {
+                Some((bar_idx + 1, Rational::new(0, 1)))
+            } else {
+                // Prompt creation of next bar.
+                None
+            }
         } else if t >= bar.metre().duration() {
             if let Some(next_bar) = self
                 .bar_by_index(&staff_bars.0, bar_idx + 1)
                 .and_then(|b| bars.get(b))
             {
-                let t = t - bar.metre().duration();
-                if t >= next_bar.metre().duration() {
-                    None
-                } else {
-                    Some((bar_idx + 1, t))
-                }
+                Some((bar_idx + 1, Rational::new(0, 1)))
             } else {
                 Some((bar_idx, bar.metre().duration()))
             }
@@ -850,7 +858,7 @@ impl Render {
                         let steps = ((*steps.numer() as f64) / (*steps.denom() as f64)).ceil();
 
                         let pct = (x - *child_left) / (next.0 - *child_left);
-                        let step = (pct * steps).floor() as usize;
+                        let step = (pct * steps).round() as usize;
                         let beat = child_start_beat + quant * (step as isize);
 
                         return Some(vec![
@@ -913,23 +921,6 @@ impl Render {
         } else {
             vec![]
         }
-    }
-
-    pub fn util_duration_to_frac(&self, note_value: isize, dots: u8) -> Vec<isize> {
-        let note_value = NoteValue::new(note_value).unwrap();
-        let d = Duration::new(note_value, dots, None).duration();
-        vec![*d.numer(), *d.denom()]
-    }
-
-    pub fn util_frac_add(
-        &self,
-        a_num: isize,
-        a_den: isize,
-        b_num: isize,
-        b_den: isize,
-    ) -> Vec<isize> {
-        let f = Rational::new(a_num, a_den) + Rational::new(b_num, b_den);
-        vec![*f.numer(), *f.denom()]
     }
 
     pub fn print_for_demo(&mut self) -> Option<String> {

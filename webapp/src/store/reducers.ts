@@ -53,6 +53,22 @@ function apply(state: State, action: Invertible) {
       state.cursorTime = startTime;
       break;
     }
+    case "CHANGE_NOTE_PITCH": {
+      const { barIdx, startTime, pitchAfter } = action;
+      const barObj = state.song.part.bars[barIdx];
+      if (!barObj) {
+        return;
+      }
+      for (const note of barObj.notes) {
+        if (
+          note.startTime[0] === startTime[0] &&
+          note.startTime[1] === startTime[1]
+        ) {
+          note.pitch = pitchAfter;
+        }
+      }
+      break;
+    }
     case "ADD_NOTE": {
       const {
         barIdx,
@@ -203,6 +219,14 @@ function invert(action: Invertible): Invertible {
         afterBarIdx: action.beforeBarIdx,
         afterTime: action.beforeTime,
       };
+    case "CHANGE_NOTE_PITCH":
+      return {
+        type: "CHANGE_NOTE_PITCH",
+        barIdx: action.barIdx,
+        startTime: action.startTime,
+        pitchBefore: action.pitchAfter,
+        pitchAfter: action.pitchBefore,
+      };
     case "ADD_NOTE":
       return {
         type: "REMOVE_NOTE",
@@ -285,6 +309,7 @@ export function reduce(state: State, action: Action): State {
   console.debug("action:", JSON.stringify(action));
   switch (action.type) {
     case "REMOVE_NOTE":
+    case "CHANGE_NOTE_PITCH":
     case "ADD_NOTE":
     case "SET_TS":
     case "SET_KS":

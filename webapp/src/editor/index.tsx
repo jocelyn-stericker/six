@@ -9,14 +9,17 @@ import React, {
   useRef,
   useState,
 } from "react";
+import cx from "classnames";
 
 import Scene, { RustRenderApi } from "../scene";
 import Frac from "../frac";
 import {
   Action,
   addNote,
+  changeNotePitch,
   moveCursor,
   setBarCount,
+  removeNote,
   State,
   undo,
 } from "../store";
@@ -25,6 +28,7 @@ import splitDurationIntoParts, {
 } from "./split_duration_into_parts";
 import EditorHotkeys from "./hotkeys";
 import Signature from "./signature";
+import snapCursor from "./snap_cursor";
 import Keyboard, { KeyboardRef } from "./keyboard";
 import css from "./index.module.scss";
 import appCss from "../app.module.scss";
@@ -38,10 +42,6 @@ const Editor = forwardRef(function Editor(
   { appState, dispatch }: Props,
   ref: React.Ref<{ getPDF: () => string }>,
 ) {
-  const { cursorTime, cursorBarIdx } = appState;
-  const pickup = appState.song.global.pickupSkip;
-  let currTs = appState.song.global.signatures[0].ts;
-
   const songRef = useRef<RustRenderApi>(null);
   const barRefs = useMemo(
     () =>
@@ -51,9 +51,15 @@ const Editor = forwardRef(function Editor(
     [appState.song.part.bars.length],
   );
 
-  const [duration, setDuration] = useState(4);
+  const { cursorTime, cursorBarIdx } = appState;
+  const pickup = appState.song.global.pickupSkip;
 
+  const [duration, setDuration] = useState(4);
   const [focused, setFocused] = useState(false);
+  const [validAppState, setValidAppState] = useState(appState);
+  const [focusNote, setFocusNote] = useState<{ bar: number; t: Frac } | null>(
+    null,
+  );
 
   if (
     pickup &&
@@ -77,8 +83,6 @@ const Editor = forwardRef(function Editor(
       return songRef.current?.to_pdf(JSON.stringify(appState.song)) ?? "";
     },
   }));
-
-  const [validAppState, setValidAppState] = useState(appState);
 
   const preview: NoteAddPatch | null = useMemo(() => {
     // Generate temporary preview taking into account cursor position.
@@ -119,7 +123,7 @@ const Editor = forwardRef(function Editor(
 
   const staff = useRef<number>(null);
 
-  const addTime = useCallback(
+  const getCursorTimePlus = useCallback(
     (add: [number, number]) => {
       return (
         staff.current &&
@@ -136,58 +140,123 @@ const Editor = forwardRef(function Editor(
     [cursorBarIdx, cursorTime, songRef],
   );
 
-  const closestNoteBoundaryTo = useCallback(
-    (barIdx: number, t: [number, number]) => {
-      return (
-        staff.current &&
-        songRef.current?.staff_time_cursor_add(
-          staff.current,
-          barIdx,
-          t[0],
-          t[1],
-          0,
-          1,
-        )
-      );
-    },
-    [songRef],
-  );
-
   const keyboard = useRef<KeyboardRef>(null);
 
   const handleTimeBack = useCallback(() => {
     keyboard.current?.onPhysicalKeyPress("back");
-    setTimeout(() => {
-      const t = addTime([-1, Math.max(duration, 8)]);
-      if (t) {
-        dispatch(moveCursor(t[0], [t[1], t[2]]));
+    const t = getCursorTimePlus([-1, Math.max(duration, 8)]);
+    if (t) {
+      dispatch(moveCursor(t[0], [t[1], t[2]]));
+    }
+    setFocusNote(null);
+  }, [getCursorTimePlus, dispatch, duration]);
+
+  const handleBackspace = useCallback(() => {
+    keyboard.current?.onPhysicalKeyPress("backspace");
+    const t = getCursorTimePlus([-1, Math.max(duration, 8)]);
+    if (t) {
+      const bar = appState.song.part.bars[t[0]]?.notes;
+      for (const note of bar) {
+        if (note.startTime[0] === t[1] && note.startTime[1] === t[2]) {
+          dispatch(
+            removeNote({
+              startTime: note.startTime,
+              pitch: note.pitch,
+              barIdx: t[0],
+              divisions: note.divisions,
+              beforeTime: cursorTime,
+              beforeBarIdx: cursorBarIdx,
+            }),
+          );
+          return;
+        }
       }
-    }, 0);
-  }, [addTime, dispatch, duration]);
+
+      // We did not find a note to delete.
+      dispatch(moveCursor(t[0], [t[1], t[2]]));
+    }
+    setFocusNote(null);
+    // If we are on a note, remove it.
+  }, [
+    appState,
+    getCursorTimePlus,
+    dispatch,
+    duration,
+    cursorBarIdx,
+    cursorTime,
+  ]);
 
   const handleTimeForward = useCallback(() => {
     keyboard.current?.onPhysicalKeyPress("forward");
-    setTimeout(() => {
-      let t = addTime([1, Math.max(duration, 8)]);
-      if (t) {
-        dispatch(moveCursor(t[0], [t[1], t[2]]));
-      } else {
-        dispatch(setBarCount(appState, appState.song.part.bars.length + 1));
-      }
-    }, 0);
-  }, [addTime, dispatch, duration, appState]);
+    let t = getCursorTimePlus([1, Math.max(duration, 8)]);
+    if (t) {
+      dispatch(moveCursor(t[0], [t[1], t[2]]));
+    } else {
+      dispatch(setBarCount(appState, appState.song.part.bars.length + 1));
+    }
+    setFocusNote(null);
+    return t;
+  }, [getCursorTimePlus, dispatch, duration, appState]);
 
   const handleOctaveUp = useCallback(() => {
     keyboard.current?.onPhysicalKeyPress("up");
-    console.log("up");
-  }, []);
+    if (focusNote) {
+      const bar = appState.song.part.bars[focusNote.bar].notes;
+      for (const note of bar) {
+        if (
+          note.startTime[0] === focusNote.t.num &&
+          note.startTime[1] === focusNote.t.den
+        ) {
+          const oldPitch = note.pitch;
+          // TODO: should depend on clef.
+          if (oldPitch.base < 100) {
+            const action = changeNotePitch(
+              appState,
+              focusNote.bar,
+              [focusNote.t.num, focusNote.t.den],
+              {
+                base: oldPitch.base + 12,
+                modifier: oldPitch.modifier,
+              },
+            );
+            if (action) {
+              dispatch(action);
+            }
+          }
+        }
+      }
+    }
+  }, [appState, dispatch, focusNote]);
 
   const handleOctaveDown = useCallback(() => {
     keyboard.current?.onPhysicalKeyPress("down");
-    console.log("down");
-  }, []);
-
-  const editorDiv = useRef<HTMLDivElement>(null);
+    if (focusNote) {
+      const bar = appState.song.part.bars[focusNote.bar].notes;
+      for (const note of bar) {
+        if (
+          note.startTime[0] === focusNote.t.num &&
+          note.startTime[1] === focusNote.t.den
+        ) {
+          const oldPitch = note.pitch;
+          // TODO: should depend on clef.
+          if (oldPitch.base > 12) {
+            const action = changeNotePitch(
+              appState,
+              focusNote.bar,
+              [focusNote.t.num, focusNote.t.den],
+              {
+                base: oldPitch.base - 12,
+                modifier: oldPitch.modifier,
+              },
+            );
+            if (action) {
+              dispatch(action);
+            }
+          }
+        }
+      }
+    }
+  }, [appState, dispatch, focusNote]);
 
   const handleFocusOut = useCallback(
     _ev => {
@@ -227,18 +296,12 @@ const Editor = forwardRef(function Editor(
     } as { [key: string]: number })[base];
 
     // We may have added less than durationFraction (e.g., if we're at the end of a bar, or before a note)
-    let actualFraction = insertion?.divisions
-      .map(d => api.util_duration_to_frac(d.noteValue, d.dots))
-      .reduce(
-        (memo, total): [number, number] => {
-          const frac = api.util_frac_add(memo[0], memo[1], total[0], total[1]);
-          return [frac[0], frac[1]];
-        },
-        [0, 1] as [number, number],
-      );
+    let actualDuration = insertion?.divisions
+      .map(d => Frac.fromDuration(d.noteValue, d.dots))
+      .reduce((sum, part): Frac => sum.plus(part), Frac.zero());
 
-    if (insertion && actualFraction) {
-      const t = addTime(actualFraction);
+    if (insertion && actualDuration) {
+      const t = getCursorTimePlus([actualDuration.num, actualDuration.den]);
       if (t) {
         dispatch(
           addNote({
@@ -253,11 +316,16 @@ const Editor = forwardRef(function Editor(
             afterTime: [t[1], t[2]],
           }),
         );
+        setFocusNote({
+          bar: insertion.barIdx,
+          t: new Frac(insertion.startTime[0], insertion.startTime[1]),
+        });
       }
     }
   };
 
   // React does not support focusout/focusin: https://github.com/facebook/react/issues/6410
+  const editorDiv = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let x = editorDiv.current;
     x?.addEventListener("focusout", handleFocusOut);
@@ -270,6 +338,7 @@ const Editor = forwardRef(function Editor(
 
   const [cursor, setCursor] = useState("default");
 
+  let currTs = appState.song.global.signatures[0].ts;
   return (
     <EditorHotkeys
       onLeft={handleTimeBack}
@@ -278,6 +347,7 @@ const Editor = forwardRef(function Editor(
       onDown={handleOctaveDown}
       onNote={handleNote}
       onDuration={setDuration}
+      onBackspace={handleBackspace}
     >
       <div className={appCss.editor} ref={editorDiv}>
         <Keyboard
@@ -292,6 +362,7 @@ const Editor = forwardRef(function Editor(
             dispatch(undo());
           }}
           onNote={handleNote}
+          onBackspace={handleBackspace}
         />
         <div style={{ position: "relative", cursor }}>
           <Scene
@@ -305,12 +376,19 @@ const Editor = forwardRef(function Editor(
             }}
             onMouseDown={(hoverInfo, _ev) => {
               if (
+                songRef.current &&
+                staff.current &&
                 hoverInfo &&
                 hoverInfo.bar != null &&
                 hoverInfo.time != null &&
                 hoverInfo.pitch != null
               ) {
-                const t = closestNoteBoundaryTo(hoverInfo.bar, hoverInfo.time);
+                const t = snapCursor(
+                  songRef.current,
+                  staff.current,
+                  hoverInfo.bar,
+                  hoverInfo.time,
+                );
                 if (t) {
                   dispatch(moveCursor(t[0], [t[1], t[2]]));
                 }
@@ -361,7 +439,15 @@ const Editor = forwardRef(function Editor(
                             {divisions.map(
                               ({ noteValue, dots, startTime }, jdx) => (
                                 <chord
-                                  className={css.note}
+                                  className={cx(
+                                    css.note,
+                                    focused &&
+                                      focusNote &&
+                                      focusNote.bar === barIdx &&
+                                      focusNote.t.num === startTime[0] &&
+                                      focusNote.t.den === startTime[1] &&
+                                      css.noteHoverPreview,
+                                  )}
                                   key={jdx}
                                   noteValue={noteValue}
                                   dots={dots}
@@ -388,7 +474,6 @@ const Editor = forwardRef(function Editor(
                           preview.divisions.map((div, idx) => (
                             <chord
                               key={idx}
-                              className={css.noteHoverPreview}
                               noteValue={div.noteValue}
                               dots={div.dots}
                               startNum={div.startTime[0]}

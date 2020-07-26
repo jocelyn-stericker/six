@@ -16,6 +16,45 @@ export function addNote(insertion: Omit<AddNote, "type">): AddNote {
   };
 }
 
+export interface ChangeNotePitch {
+  type: "CHANGE_NOTE_PITCH";
+  barIdx: number;
+  startTime: [number, number];
+  pitchBefore: Pitch;
+  pitchAfter: Pitch;
+}
+export function changeNotePitch(
+  appState: State,
+  barIdx: number,
+  startTime: [number, number],
+  pitch: Pitch,
+): ChangeNotePitch | null {
+  let pitchBefore;
+  const bar = appState.song.part.bars[barIdx];
+  if (!bar) {
+    return null;
+  }
+  for (const note of bar.notes) {
+    if (
+      note.startTime[0] === startTime[0] &&
+      note.startTime[1] === startTime[1]
+    ) {
+      pitchBefore = note.pitch;
+    }
+  }
+  if (!pitchBefore) {
+    return null;
+  }
+
+  return {
+    type: "CHANGE_NOTE_PITCH",
+    barIdx,
+    startTime,
+    pitchBefore,
+    pitchAfter: pitch,
+  };
+}
+
 export interface RemoveNote {
   type: "REMOVE_NOTE";
   barIdx: number;
@@ -272,6 +311,7 @@ export function moveCursor(barIdx: number, time: [number, number]): MoveCursor {
 
 export type Invertible =
   | AddNote
+  | ChangeNotePitch
   | RemoveNote
   | SetKs
   | SetTs

@@ -18,6 +18,15 @@ export default class Frac {
     this._den = frac[1];
   }
 
+  static fromDuration(noteValue: number, dots: number): Frac {
+    const frac = JsFrac.from_duration(noteValue, dots);
+    return new Frac(frac[0], frac[1]);
+  }
+
+  static zero(): Frac {
+    return new Frac(0, 1);
+  }
+
   get num(): number {
     return this._num;
   }
