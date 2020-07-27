@@ -18,8 +18,8 @@ import {
   addNote,
   changeNotePitch,
   moveCursor,
-  setBarCount,
   removeNote,
+  setBarCount,
   State,
   undo,
 } from "../store";
