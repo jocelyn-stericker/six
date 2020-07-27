@@ -314,9 +314,10 @@ impl Render {
         } else if t == bar.metre().duration() {
             Some((bar_idx, bar.metre().duration()))
         } else if t0 == bar.metre().duration() && add > Rational::new(0, 1) {
-            if let Some(next_bar) = self
+            if self
                 .bar_by_index(&staff_bars.0, bar_idx + 1)
                 .and_then(|b| bars.get(b))
+                .is_some()
             {
                 Some((bar_idx + 1, Rational::new(0, 1)))
             } else {
@@ -324,9 +325,10 @@ impl Render {
                 None
             }
         } else if t >= bar.metre().duration() {
-            if let Some(next_bar) = self
+            if self
                 .bar_by_index(&staff_bars.0, bar_idx + 1)
                 .and_then(|b| bars.get(b))
+                .is_some()
             {
                 Some((bar_idx + 1, Rational::new(0, 1)))
             } else {

@@ -3,7 +3,7 @@ use rhythm::{Duration, NoteValue};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-struct JsFrac;
+pub struct JsFrac;
 
 trait RationalToVecForJs {
     fn to_js(&self) -> Vec<isize>;
