@@ -1,7 +1,7 @@
-import { RustRenderApi } from "../scene";
+import { NativeSixDom } from "../scene";
 
 export default function snapCursor(
-  api: RustRenderApi,
+  api: NativeSixDom,
   staff: number,
   barIdx: number,
   t: [number, number],

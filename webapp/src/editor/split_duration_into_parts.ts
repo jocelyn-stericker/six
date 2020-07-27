@@ -1,5 +1,5 @@
 import { State, TiedNote } from "../store";
-import { RustRenderApi } from "../scene";
+import { NativeSixDom } from "../scene";
 
 export interface NoteAddPatch {
   barIdx: number;
@@ -19,7 +19,7 @@ export function count(noteValue: number, dots: number) {
 }
 
 export default function splitDurationIntoParts(
-  render: RustRenderApi | null,
+  render: NativeSixDom | null,
   appState: State,
   barEntity: number | null,
   barIdx: number,

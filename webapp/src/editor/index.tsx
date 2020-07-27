@@ -11,7 +11,7 @@ import React, {
 } from "react";
 import cx from "classnames";
 
-import Scene, { RustRenderApi } from "../scene";
+import Scene, { NativeSixDom } from "../scene";
 import Frac from "../frac";
 import {
   Action,
@@ -42,7 +42,7 @@ const Editor = forwardRef(function Editor(
   { appState, dispatch }: Props,
   ref: React.Ref<{ getPDF: () => string }>,
 ) {
-  const songRef = useRef<RustRenderApi>(null);
+  const songRef = useRef<NativeSixDom>(null);
   const barRefs = useMemo(
     () =>
       Array.from({ length: appState.song.part.bars.length }).map(() =>

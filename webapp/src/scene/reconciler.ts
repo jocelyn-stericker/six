@@ -1,27 +1,11 @@
 /// <reference path="./jsx_ext.d.ts" /> #
 
-import {
-  Render as _Render,
-  Barline,
-  Clef,
-} from "../../rust_render_built/index";
+import { Barline, Clef, NativeSixDom } from "../../rust_render_built/index";
 import { unstable_now as now } from "scheduler";
 import ReactReconciler from "react-reconciler";
 import { Ref } from "react";
 
-interface RenderExtra {
-  html: { [key: string]: any };
-}
-
-export type RustRenderApi = _Render & RenderExtra;
-
-export { Barline, Clef } from "../../rust_render_built/index";
-
-export function newRender(): RustRenderApi {
-  return Object.assign(_Render.new(), {
-    html: {} as { [key: string]: any },
-  });
-}
+export { NativeSixDom, Barline, Clef } from "../../rust_render_built/index";
 
 export enum NoteValue {
   Maxima = 3,
@@ -40,23 +24,18 @@ export enum NoteValue {
 
 interface Instance {
   type: "song" | "staff" | "bar" | "signature" | "chord" | "cursor";
-  container: RustRenderApi;
+  container: NativeSixDom;
   entity: number;
   meta: any;
 }
 
 interface Stylable {
   className?: any;
-  html?:
-    | ((props: { width: number; height: number }) => any)
-    | null
-    | undefined
-    | false;
 }
 
 export interface SongProps extends Stylable {
   key?: string | number | null | undefined;
-  ref?: Ref<RustRenderApi>;
+  ref?: Ref<NativeSixDom>;
   freezeSpacing?: number | undefined;
   children: React.ReactNode;
   /** In mm */
@@ -141,7 +120,7 @@ function getTextWidth(fontSize: number, text: string) {
 
 function createInstance(
   spec: CreateInstanceParam,
-  container: RustRenderApi,
+  container: NativeSixDom,
 ): Instance {
   let type: "song" | "staff" | "bar" | "signature" | "chord" | "cursor";
   let entity;
@@ -216,10 +195,6 @@ function createInstance(
     container.css_set_class(entity, spec.props.className);
   }
 
-  if ("html" in spec.props) {
-    container.html[entity] = spec.props.html;
-  }
-
   return { container, type, entity, meta };
 }
 
@@ -241,13 +216,13 @@ function appendChild(parent: Instance, child: Instance) {
 
 const Reconciler = ReactReconciler({
   supportsMutation: true,
-  createInstance(type, props, container: RustRenderApi) {
+  createInstance(type, props, container: NativeSixDom) {
     // @ts-ignore
     return createInstance({ type, props }, container);
   },
   createTextInstance(
     _text,
-    _rootContainerInstance: RustRenderApi,
+    _rootContainerInstance: NativeSixDom,
     _hostContext,
     _internalInstanceHandle,
   ) {
@@ -264,7 +239,7 @@ const Reconciler = ReactReconciler({
     appendChild(parent, child);
   },
 
-  removeChildFromContainer(_container: RustRenderApi, child: Instance) {
+  removeChildFromContainer(_container: NativeSixDom, child: Instance) {
     child.container.root_clear(child.entity);
   },
   removeChild(parent: Instance, child: Instance) {
@@ -277,11 +252,9 @@ const Reconciler = ReactReconciler({
     } else {
       child.container.child_remove(parent.entity, child.entity);
     }
-
-    // TODO: remove child entities from html
   },
   insertInContainerBefore(
-    _container: RustRenderApi,
+    _container: NativeSixDom,
     _child: Instance,
     _before: Instance,
   ) {
@@ -308,7 +281,7 @@ const Reconciler = ReactReconciler({
     _type,
     _oldProps: any,
     _newProps: any,
-    _rootContainerInstance: RustRenderApi,
+    _rootContainerInstance: NativeSixDom,
     _currentHostContext,
   ) {
     return {};
@@ -447,10 +420,6 @@ const Reconciler = ReactReconciler({
         instance.container.css_clear_class(instance.entity);
       }
     }
-
-    if (oldProps.html !== newProps.html) {
-      instance.container.html[instance.entity] = newProps.html;
-    }
   },
 
   finalizeInitialChildren() {
@@ -487,9 +456,9 @@ const Reconciler = ReactReconciler({
   },
 });
 
-const roots = new Map<RustRenderApi, ReactReconciler.FiberRoot>();
+const roots = new Map<NativeSixDom, ReactReconciler.FiberRoot>();
 
-export function render(whatToRender: any, container: RustRenderApi) {
+export function render(whatToRender: any, container: NativeSixDom) {
   let root = roots.get(container);
   if (!root) {
     root = Reconciler.createContainer(container, false, false);
